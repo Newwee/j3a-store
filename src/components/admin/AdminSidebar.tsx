@@ -15,6 +15,7 @@ import {
   PlusCircle,
   Shield,
   Layers,
+  Wallet,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils/cn';
@@ -49,6 +50,11 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
       href: '/admin/orders',
       label: 'รายการคำสั่งซื้อ (Orders)',
       icon: ShoppingBag,
+    },
+    {
+      href: '/admin/topups',
+      label: 'อนุมัติการเติมเงิน (Top-ups)',
+      icon: Wallet,
     },
     {
       href: '/admin/customers',

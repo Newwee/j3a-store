@@ -217,9 +217,14 @@ service cloud.firestore {
         isAdmin()
       ) && isValidUser(request.resource.data, userId);
 
-      // Update: User can update their own profile without changing role, or admin can update
+      // Update: User can update their own profile without changing role, credits, or tier; Admin can update all
       allow update: if (
-        (isOwner(userId) && request.resource.data.role == resource.data.role) ||
+        (
+          isOwner(userId) &&
+          request.resource.data.role == resource.data.role &&
+          request.resource.data.credits == resource.data.credits &&
+          request.resource.data.tier == resource.data.tier
+        ) ||
         isAdmin()
       ) && isValidUser(request.resource.data, userId)
         && areImmutableFieldsUnchanged(['uid', 'createdAt']);
@@ -292,6 +297,21 @@ service cloud.firestore {
 
       // Update / Delete: Admin or review author
       allow update, delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+    }
+
+    // 5. Topups Collection (QR Slip Wallet Top-up with Admin Approval)
+    match /topups/{topupId} {
+      // Read: Request owner or Admin
+      allow read: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
+
+      // Create: Authenticated user can submit a topup request with status 'pending'
+      allow create: if isSignedIn() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.amount > 0;
+
+      // Update / Delete: Admin only (for approving and rejecting requests)
+      allow update, delete: if isAdmin();
     }
   }
 }

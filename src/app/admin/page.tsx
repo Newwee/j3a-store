@@ -58,14 +58,32 @@ export default function AdminDashboardPage() {
         actionHref="/admin/products/new"
       />
 
-      {/* 4 Overview Statistics Cards */}
+      {/* Pending Top-ups Notification Banner */}
+      {Boolean(stats?.pendingTopupsCount && stats.pendingTopupsCount > 0) && (
+        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs sm:text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-[0_0_20px_rgba(245,158,11,0.15)]">
+          <div className="flex items-center gap-2.5">
+            <Clock className="w-5 h-5 shrink-0 text-amber-400" />
+            <span>
+              มีรายการแจ้งเติมเงินรอการตรวจสอบและอนุมัติ <strong>{stats?.pendingTopupsCount} รายการ</strong>
+            </span>
+          </div>
+          <Link
+            href="/admin/topups"
+            className="px-3.5 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold text-xs border border-amber-500/40 transition-colors flex items-center justify-center gap-1.5 self-start sm:self-auto"
+          >
+            <span>ไปที่หน้าอนุมัติเงิน</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+      )}
+
+      {/* 4 Overview Statistics Cards - 100% Real Live Data */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="รายได้รวม (Total Revenue)"
           value={formatCurrency(stats?.totalRevenue || 0)}
           subtitle="จากคำสั่งซื้อที่ชำระเงินสำเร็จ"
           icon={Coins}
-          trend="+18.4%"
           color="cyan"
         />
         <StatCard
@@ -73,7 +91,6 @@ export default function AdminDashboardPage() {
           value={formatNumber(stats?.totalOrders || 0)}
           subtitle="รายการคำสั่งซื้อสะสม"
           icon={ShoppingBag}
-          trend="+12.5%"
           color="emerald"
         />
         <StatCard

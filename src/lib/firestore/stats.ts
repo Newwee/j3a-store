@@ -13,6 +13,7 @@ export interface StoreStats {
   averageRating: number;
   totalReviews: number;
   satisfactionRate: string;
+  pendingTopupsCount: number;
   recentOrders: Order[];
   recentProducts: Product[];
 }
@@ -29,6 +30,7 @@ export async function getStoreDashboardStats(): Promise<StoreStats> {
     averageRating: 5.0,
     totalReviews: 0,
     satisfactionRate: '100%',
+    pendingTopupsCount: 0,
     recentOrders: [],
     recentProducts: [],
   };
@@ -66,14 +68,25 @@ export async function getStoreDashboardStats(): Promise<StoreStats> {
       totalCustomers = usrs.size;
     }
 
-    // Fetch recent orders & compute revenue
-    const recentOrders = await getOrders({ limitCount: 10 });
+    // Fetch recent orders & compute revenue from real orders
+    const recentOrders = await getOrders({ limitCount: 50 });
     const totalRevenue = recentOrders.reduce((sum, ord) => {
       if (ord.status === 'paid' || ord.status === 'completed' || ord.status === 'processing') {
         return sum + (ord.total || 0);
       }
       return sum;
     }, 0);
+
+    // Fetch pending topups count
+    let pendingTopupsCount = 0;
+    try {
+      const topupsCol = collection(db, 'topups');
+      const q = query(topupsCol);
+      const topupSnap = await getDocs(q);
+      pendingTopupsCount = topupSnap.docs.filter((d) => d.data().status === 'pending').length;
+    } catch (err) {
+      console.warn('Could not load pending topups:', err);
+    }
 
     // Fetch recent products
     const recentProducts = await getProducts({ limitCount: 8, sortBy: 'newest' });
@@ -110,6 +123,7 @@ export async function getStoreDashboardStats(): Promise<StoreStats> {
       averageRating,
       totalReviews,
       satisfactionRate,
+      pendingTopupsCount,
       recentOrders,
       recentProducts,
     };
