@@ -9,6 +9,14 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
+        hostname: "j3astore.firebasestorage.app",
+      },
+      {
+        protocol: "https",
+        hostname: "storage.googleapis.com",
+      },
+      {
+        protocol: "https",
         hostname: "images.unsplash.com",
       },
       {
