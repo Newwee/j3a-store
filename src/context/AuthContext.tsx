@@ -9,6 +9,8 @@ import {
   signOut,
   sendPasswordResetEmail,
   updateProfile,
+  GoogleAuthProvider,
+  signInWithPopup,
 } from 'firebase/auth';
 import { auth, isFirebaseConfigured } from '@/lib/firebase/client';
 import { getUserProfile, createUserProfile } from '@/lib/firestore/users';
@@ -23,6 +25,7 @@ interface AuthContextType {
   isFirebaseReady: boolean;
   login: (email: string, pass: string) => Promise<void>;
   register: (email: string, pass: string, name: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -120,6 +123,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const loginWithGoogle = async () => {
+    if (!auth) throw new Error('Firebase Auth ไม่ได้เปิดใช้งาน กรุณาตั้งค่า .env.local');
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    const cred = await signInWithPopup(auth, provider);
+    if (cred.user) {
+      await syncProfile(cred.user);
+    }
+  };
+
   const logout = async () => {
     if (!auth) return;
     await signOut(auth);
@@ -155,6 +168,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isFirebaseReady: isFirebaseConfigured,
         login,
         register,
+        loginWithGoogle,
         logout,
         resetPassword,
         refreshProfile,

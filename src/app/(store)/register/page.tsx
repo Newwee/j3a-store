@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { Lock, Mail, User, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Lock, Mail, User, ArrowRight, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { Button } from '@/components/ui/Button';
@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/Input';
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { register, isFirebaseReady } = useAuth();
+  const { register, loginWithGoogle, isFirebaseReady } = useAuth();
   const { success, error } = useToast();
 
   const [name, setName] = useState('');
@@ -20,7 +20,28 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  const handleGoogleSignIn = async () => {
+    setGoogleLoading(true);
+    setErrorMessage('');
+    try {
+      await loginWithGoogle();
+      success('เข้าสู่ระบบด้วย Google สำเร็จ ยินดีต้อนรับสู่ J3A STORE!');
+      router.push('/');
+      router.refresh();
+    } catch (err: any) {
+      console.error('Google Sign-in error:', err);
+      if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
+        const msg = err.message || 'ไม่สามารถสมัครหรือเข้าสู่ระบบด้วย Google ได้ กรุณาลองใหม่อีกครั้ง';
+        setErrorMessage(msg);
+        error(msg);
+      }
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -151,6 +172,46 @@ export default function RegisterPage() {
               สมัครสมาชิกทันที
             </Button>
           </form>
+
+          {/* Divider */}
+          <div className="relative my-2 flex items-center justify-center">
+            <div className="w-full border-t border-slate-800" />
+            <span className="absolute bg-[#0c0a13] px-3 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+              หรือสมัครด้วย
+            </span>
+          </div>
+
+          {/* Google Sign-In Button */}
+          <button
+            type="button"
+            onClick={handleGoogleSignIn}
+            disabled={googleLoading || loading}
+            className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 hover:border-slate-600 text-slate-200 hover:text-white text-xs sm:text-sm font-semibold transition-all duration-200 shadow-sm active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+          >
+            {googleLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
+            ) : (
+              <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                <path
+                  fill="#4285F4"
+                  d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.03 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
+                />
+                <path
+                  fill="#EA4335"
+                  d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+                />
+              </svg>
+            )}
+            <span>สมัครสมาชิกด้วย Google</span>
+          </button>
 
           {/* Footer Navigation */}
           <div className="pt-4 border-t border-slate-800 text-center text-xs text-slate-400">
