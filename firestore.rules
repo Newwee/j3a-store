@@ -1,0 +1,282 @@
+rules_version = '2';
+
+// ============================================================================
+// Assumed Data Model
+// ============================================================================
+//
+// Collection: users
+// Document ID: {userId} (matches request.auth.uid)
+// Fields:
+//   - uid: string (required, must match {userId}, immutable)
+//   - email: string | null (optional, valid email format, max 100 chars)
+//   - displayName: string | null (optional, max 100 chars)
+//   - photoURL: string | null (optional, valid URL / path, max 1000 chars)
+//   - role: string (required, 'customer' | 'admin', customer cannot escalate)
+//   - credits: number (required, non-negative number, max 10,000,000)
+//   - tier: string (required, 'Bronze' | 'Silver' | 'Gold' | 'VIP')
+//   - phone: string | null (optional, max 30 chars)
+//   - createdAt: timestamp | string (optional, immutable)
+//   - updatedAt: timestamp | string (optional)
+//
+// Collection: products
+// Document ID: {productId}
+// Fields:
+//   - id: string | null (optional, max 100 chars)
+//   - name: string (required, 1-200 chars)
+//   - slug: string (required, 1-200 chars)
+//   - description: string | null (optional, max 10,000 chars)
+//   - price: number (required, non-negative number)
+//   - comparePrice: number | null (optional, non-negative number)
+//   - image: string (required, valid URL / path, 1-1000 chars)
+//   - images: list of strings (optional, max 20 items)
+//   - category: string (required, 1-100 chars)
+//   - stock: number (required, non-negative integer/number)
+//   - status: string (required, 'active' | 'draft' | 'out_of_stock')
+//   - featured: bool (required)
+//   - tags: list of strings (optional, max 30 items)
+//   - specs: map (optional, max 50 keys)
+//   - createdAt: timestamp | string (optional, immutable)
+//   - updatedAt: timestamp | string (optional)
+//
+// Collection: orders
+// Document ID: {orderId}
+// Fields:
+//   - orderNumber: string (required, 3-50 chars, immutable)
+//   - userId: string (required, user auth.uid or 'guest', max 100 chars, immutable)
+//   - customer: map (required, contains name, email, phone, address, optional notes)
+//   - items: list of maps (required, 1-100 items with product details)
+//   - subtotal: number (required, non-negative number)
+//   - shipping: number (required, non-negative number)
+//   - discount: number | null (optional, non-negative number)
+//   - total: number (required, non-negative number)
+//   - paymentMethod: string (required, 'promptpay' | 'bank_transfer' | 'credit_card' | 'wallet')
+//   - status: string (required, 'pending' | 'paid' | 'processing' | 'completed' | 'cancelled')
+//   - paymentProofUrl: string | null (optional, valid URL / path, max 1000 chars)
+//   - transactionRef: string | null (optional, max 100 chars)
+//   - createdAt: timestamp | string (optional, immutable)
+//   - updatedAt: timestamp | string (optional)
+//
+// ============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ========================================================================
+    // Helper Functions
+    // ========================================================================
+
+    // Check if the user is authenticated
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Check if the user is the owner of the document
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Check if the requester has admin privileges
+    // Supports custom claims ('role' or 'admin') and fallback Firestore user role
+    function isAdmin() {
+      return isSignedIn() && (
+        ('role' in request.auth.token && request.auth.token.role == 'admin') ||
+        ('admin' in request.auth.token && request.auth.token.admin == true) ||
+        (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          'role' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+        )
+      );
+    }
+
+    // Validate that document contains only the allowed fields
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // Validate that required fields exist
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    // Validate that immutable fields have not been modified on update
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // Validate email format
+    function isValidEmail(email) {
+      return email is string &&
+        email.size() <= 100 &&
+        email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // Validate URL / relative web path
+    function isValidUrl(url) {
+      return url is string &&
+        url.size() <= 1000 &&
+        (url.matches("^https?://.*") || url.matches("^/.*"));
+    }
+
+    // Validate date / timestamp representation (Timestamp or ISO string)
+    function isValidDate(val) {
+      return val is timestamp || (val is string && val.size() >= 10 && val.size() <= 40);
+    }
+
+    // ========================================================================
+    // Domain Validators
+    // ========================================================================
+
+    // User Profile Validator
+    function isValidUser(data, userId) {
+      return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'photoURL', 'role', 'credits', 'tier', 'phone', 'createdAt', 'updatedAt']) &&
+        hasRequiredFields(['uid', 'role', 'credits', 'tier']) &&
+        data.uid is string && data.uid == userId &&
+        data.role in ['customer', 'admin'] &&
+        data.credits is number && data.credits >= 0 && data.credits <= 10000000 &&
+        data.tier in ['Bronze', 'Silver', 'Gold', 'VIP'] &&
+        (!('email' in data) || data.email == null || (data.email is string && isValidEmail(data.email))) &&
+        (!('displayName' in data) || data.displayName == null || (data.displayName is string && data.displayName.size() <= 100)) &&
+        (!('photoURL' in data) || data.photoURL == null || (data.photoURL is string && isValidUrl(data.photoURL))) &&
+        (!('phone' in data) || data.phone == null || (data.phone is string && data.phone.size() <= 30)) &&
+        (!('createdAt' in data) || isValidDate(data.createdAt)) &&
+        (!('updatedAt' in data) || isValidDate(data.updatedAt));
+    }
+
+    // Product Validator
+    function isValidProduct(data) {
+      return hasOnlyAllowedFields(['id', 'name', 'slug', 'description', 'price', 'comparePrice', 'image', 'images', 'category', 'stock', 'status', 'featured', 'tags', 'specs', 'createdAt', 'updatedAt']) &&
+        hasRequiredFields(['name', 'slug', 'price', 'image', 'category', 'stock', 'status', 'featured']) &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 200 &&
+        data.slug is string && data.slug.size() >= 1 && data.slug.size() <= 200 &&
+        (!('description' in data) || data.description == null || (data.description is string && data.description.size() <= 10000)) &&
+        data.price is number && data.price >= 0 && data.price <= 100000000 &&
+        (!('comparePrice' in data) || data.comparePrice == null || (data.comparePrice is number && data.comparePrice >= 0 && data.comparePrice <= 100000000)) &&
+        data.image is string && isValidUrl(data.image) &&
+        (!('images' in data) || (data.images is list && data.images.size() <= 20)) &&
+        data.category is string && data.category.size() >= 1 && data.category.size() <= 100 &&
+        data.stock is number && data.stock >= 0 && data.stock <= 1000000 &&
+        data.status in ['active', 'draft', 'out_of_stock'] &&
+        data.featured is bool &&
+        (!('tags' in data) || (data.tags is list && data.tags.size() <= 30)) &&
+        (!('specs' in data) || (data.specs is map && data.specs.size() <= 50)) &&
+        (!('id' in data) || data.id == null || (data.id is string && data.id.size() <= 100)) &&
+        (!('createdAt' in data) || isValidDate(data.createdAt)) &&
+        (!('updatedAt' in data) || isValidDate(data.updatedAt));
+    }
+
+    // Order Customer Info Validator
+    function isValidCustomer(customer) {
+      return customer is map &&
+        customer.keys().hasOnly(['name', 'email', 'phone', 'address', 'notes']) &&
+        customer.keys().hasAll(['name', 'email', 'phone', 'address']) &&
+        customer.name is string && customer.name.size() >= 1 && customer.name.size() <= 100 &&
+        customer.email is string && isValidEmail(customer.email) &&
+        customer.phone is string && customer.phone.size() >= 1 && customer.phone.size() <= 30 &&
+        customer.address is string && customer.address.size() >= 1 && customer.address.size() <= 500 &&
+        (!('notes' in customer) || customer.notes == null || (customer.notes is string && customer.notes.size() <= 500));
+    }
+
+    // Order Validator
+    function isValidOrder(data) {
+      return hasOnlyAllowedFields(['orderNumber', 'userId', 'customer', 'items', 'subtotal', 'shipping', 'discount', 'total', 'paymentMethod', 'status', 'paymentProofUrl', 'transactionRef', 'createdAt', 'updatedAt']) &&
+        hasRequiredFields(['orderNumber', 'userId', 'customer', 'items', 'subtotal', 'shipping', 'total', 'paymentMethod', 'status']) &&
+        data.orderNumber is string && data.orderNumber.size() >= 3 && data.orderNumber.size() <= 50 &&
+        data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 100 &&
+        isValidCustomer(data.customer) &&
+        data.items is list && data.items.size() >= 1 && data.items.size() <= 100 &&
+        data.subtotal is number && data.subtotal >= 0 && data.subtotal <= 100000000 &&
+        data.shipping is number && data.shipping >= 0 && data.shipping <= 1000000 &&
+        (!('discount' in data) || data.discount == null || (data.discount is number && data.discount >= 0 && data.discount <= 100000000)) &&
+        data.total is number && data.total >= 0 && data.total <= 100000000 &&
+        data.paymentMethod in ['promptpay', 'bank_transfer', 'credit_card', 'wallet'] &&
+        data.status in ['pending', 'paid', 'processing', 'completed', 'cancelled'] &&
+        (!('paymentProofUrl' in data) || data.paymentProofUrl == null || (data.paymentProofUrl is string && isValidUrl(data.paymentProofUrl))) &&
+        (!('transactionRef' in data) || data.transactionRef == null || (data.transactionRef is string && data.transactionRef.size() <= 100)) &&
+        (!('createdAt' in data) || isValidDate(data.createdAt)) &&
+        (!('updatedAt' in data) || isValidDate(data.updatedAt));
+    }
+
+    // ========================================================================
+    // Collection Rules
+    // ========================================================================
+
+    // Default Deny: Deny all reads and writes by default
+    match /{document=**} {
+      allow read, write: false;
+    }
+
+    // 1. Users Collection
+    match /users/{userId} {
+      // Read: Allowed if user is reading their own document or is an admin
+      allow read: if isOwner(userId) || isAdmin();
+
+      // Create: Authenticated user can create their own profile with role 'customer', or admin can create
+      allow create: if (
+        (isOwner(userId) && request.resource.data.role == 'customer') ||
+        isAdmin()
+      ) && isValidUser(request.resource.data, userId);
+
+      // Update: User can update their own profile without changing role, or admin can update
+      allow update: if (
+        (isOwner(userId) && request.resource.data.role == resource.data.role) ||
+        isAdmin()
+      ) && isValidUser(request.resource.data, userId)
+        && areImmutableFieldsUnchanged(['uid', 'createdAt']);
+
+      // Delete: Admin only
+      allow delete: if isAdmin();
+    }
+
+    // 2. Products Collection
+    match /products/{productId} {
+      // Read: Public can read active products; Admin can read all (including draft and out_of_stock)
+      allow read: if resource.data.status == 'active' || isAdmin();
+
+      // Create: Admin only
+      allow create: if isAdmin() && isValidProduct(request.resource.data);
+
+      // Update: Admin only
+      allow update: if isAdmin()
+        && isValidProduct(request.resource.data)
+        && areImmutableFieldsUnchanged(['createdAt']);
+
+      // Delete: Admin only
+      allow delete: if isAdmin();
+    }
+
+    // 3. Orders Collection
+    match /orders/{orderId} {
+      // Read: Allowed for the order owner or admin
+      allow read: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
+
+      // Create: Any user (authenticated or guest) can create an order where status == 'pending'
+      allow create: if request.resource.data.status == 'pending' &&
+        (
+          (!isSignedIn() && request.resource.data.userId == 'guest') ||
+          (isSignedIn() && (request.resource.data.userId == request.auth.uid || request.resource.data.userId == 'guest'))
+        ) &&
+        isValidOrder(request.resource.data);
+
+      // Update:
+      // - Admin can update any order (e.g. status transitions, order details)
+      // - Owner can only update paymentProofUrl while status is 'pending' or 'paid'
+      allow update: if (
+        isAdmin() &&
+        isValidOrder(request.resource.data) &&
+        areImmutableFieldsUnchanged(['orderNumber', 'createdAt'])
+      ) || (
+        isSignedIn() &&
+        resource.data.userId == request.auth.uid &&
+        request.resource.data.userId == resource.data.userId &&
+        resource.data.status in ['pending', 'paid'] &&
+        request.resource.data.status in ['pending', 'paid'] &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['paymentProofUrl', 'status', 'updatedAt']) &&
+        isValidOrder(request.resource.data)
+      );
+
+      // Delete: Admin only
+      allow delete: if isAdmin();
+    }
+  }
+}

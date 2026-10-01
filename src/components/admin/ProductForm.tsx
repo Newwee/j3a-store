@@ -1,0 +1,494 @@
+'use client';
+
+import React, { useState, useRef } from 'react';
+import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import {
+  Upload,
+  X,
+  Sparkles,
+  Link as LinkIcon,
+  Check,
+  AlertCircle,
+  Save,
+  ArrowLeft,
+  Loader2,
+  RefreshCw,
+} from 'lucide-react';
+import { Product, ProductFormData, ProductStatus } from '@/types/product';
+import { uploadProductImage, deleteProductImage } from '@/lib/storage/upload';
+import { createProduct, updateProduct } from '@/lib/firestore/products';
+import { slugify } from '@/lib/utils/formatters';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { useToast } from '@/context/ToastContext';
+
+interface ProductFormProps {
+  initialData?: Product;
+  isEdit?: boolean;
+}
+
+const CATEGORIES = [
+  'เกมยอดนิยม',
+  'บัตรเติมเงิน',
+  'บริการดิจิทัล',
+  'ไอดีเกม & สกิน',
+  'ซอฟต์แวร์ & คีย์',
+  'อุปกรณ์เสริม',
+  'ทั่วไป',
+];
+
+export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
+  const router = useRouter();
+  const { success, error, toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Form states
+  const [name, setName] = useState(initialData?.name || '');
+  const [slug, setSlug] = useState(initialData?.slug || '');
+  const [description, setDescription] = useState(initialData?.description || '');
+  const [price, setPrice] = useState<number | string>(initialData?.price ?? '');
+  const [comparePrice, setComparePrice] = useState<number | string>(
+    initialData?.comparePrice ?? ''
+  );
+  const [category, setCategory] = useState(initialData?.category || 'เกมยอดนิยม');
+  const [stock, setStock] = useState<number | string>(initialData?.stock ?? 10);
+  const [status, setStatus] = useState<ProductStatus>(initialData?.status || 'active');
+  const [featured, setFeatured] = useState<boolean>(initialData?.featured || false);
+  const [tagsInput, setTagsInput] = useState(initialData?.tags?.join(', ') || '');
+
+  // Image states
+  const [imagePreview, setImagePreview] = useState<string>(initialData?.image || '');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+
+  // Auto-generate slug when name changes (only in create mode or when user clicks regenerate)
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newName = e.target.value;
+    setName(newName);
+    if (!isEdit || !slug) {
+      setSlug(slugify(newName));
+    }
+  };
+
+  const regenerateSlug = () => {
+    setSlug(slugify(name));
+  };
+
+  // Image selection
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setSelectedFile(file);
+      setImagePreview(URL.createObjectURL(file));
+      setUploadProgress(0);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setSelectedFile(null);
+    setImagePreview('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Validation
+  const validate = () => {
+    const errs: Record<string, string> = {};
+    if (!name.trim()) errs.name = 'กรุณาระบุชื่อสินค้า';
+    if (!slug.trim()) errs.slug = 'กรุณาระบุ Slug URL';
+    if (price === '' || Number(price) < 0) errs.price = 'กรุณาระบุราคาที่ถูกต้อง';
+    if (stock === '' || Number(stock) < 0) errs.stock = 'กรุณาระบุจำนวนสินค้าในคลัง';
+    setValidationErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  // Submit Handler
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validate()) {
+      error('กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน');
+      return;
+    }
+
+    setIsSaving(true);
+    let finalImageUrl = imagePreview || '/logo.png';
+
+    try {
+      // 1. Upload new image if file is selected
+      if (selectedFile) {
+        setIsUploading(true);
+        try {
+          const { downloadUrl } = await uploadProductImage(
+            selectedFile,
+            'products',
+            (progress) => setUploadProgress(progress)
+          );
+          finalImageUrl = downloadUrl;
+
+          // If editing and previous image was on Firebase Storage, clean it up
+          if (isEdit && initialData?.image && initialData.image.includes('firebasestorage')) {
+            await deleteProductImage(initialData.image);
+          }
+        } catch (uploadErr: any) {
+          console.warn('Storage upload error, using local/preview URL:', uploadErr);
+          // If storage isn't configured, fallback gracefully so demo or dev is not broken
+          toast('บันทึกรูปภาพแบบ URL สำรอง (ตรวจสอบ Firebase Storage Config)', 'info');
+        } finally {
+          setIsUploading(false);
+        }
+      }
+
+      // 2. Prepare payload
+      const tags = tagsInput
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean);
+
+      const payload: ProductFormData = {
+        name: name.trim(),
+        slug: slug.trim(),
+        description: description.trim(),
+        price: Number(price),
+        comparePrice: comparePrice !== '' ? Number(comparePrice) : undefined,
+        category,
+        stock: Number(stock),
+        status,
+        featured,
+        image: finalImageUrl,
+        images: initialData?.images || [],
+        tags,
+      };
+
+      // 3. Save to Firestore
+      if (isEdit && initialData?.id) {
+        await updateProduct(initialData.id, payload);
+        success(`อัปเดตสินค้า "${name}" สำเร็จแล้ว`);
+      } else {
+        await createProduct(payload);
+        success(`สร้างสินค้า "${name}" เรียบร้อยแล้ว`);
+      }
+
+      router.push('/admin/products');
+      router.refresh();
+    } catch (err: any) {
+      console.error('Failed to save product:', err);
+      error(`เกิดข้อผิดพลาดในการบันทึก: ${err.message || 'กรุณาลองใหม่อีกครั้ง'}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* Left Column: Product Information Form */}
+        <div className="lg:col-span-8 space-y-6">
+          {/* Basic Info Card */}
+          <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-md space-y-4">
+            <h3 className="text-base font-bold text-white mb-2">
+              ข้อมูลทั่วไป (General Information)
+            </h3>
+
+            {/* Product Name */}
+            <Input
+              label="ชื่อสินค้า (Product Name) *"
+              value={name}
+              onChange={handleNameChange}
+              placeholder="เช่น Steam Wallet Card 1,000 THB หรือ Valorant Points"
+              error={validationErrors.name}
+              required
+            />
+
+            {/* Slug URL */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-medium text-slate-300">
+                Slug URL (ใช้สำหรับลิงก์สินค้า) *
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={slug}
+                  onChange={(e) => setSlug(e.target.value)}
+                  placeholder="steam-wallet-1000-thb"
+                  className="w-full bg-slate-950/80 text-sm text-slate-100 placeholder:text-slate-500 rounded-xl px-3.5 py-2.5 border border-slate-700/80 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={regenerateSlug}
+                  title="สร้าง Slug จากชื่อสินค้าอัตโนมัติ"
+                  className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors flex items-center justify-center shrink-0 cursor-pointer"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </button>
+              </div>
+              {validationErrors.slug && (
+                <p className="text-xs text-rose-400">{validationErrors.slug}</p>
+              )}
+              <p className="text-[11px] text-slate-500">
+                URL: /products/{slug || 'product-slug'}
+              </p>
+            </div>
+
+            {/* Description */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-medium text-slate-300">
+                คำอธิบายสินค้า (Description)
+              </label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={4}
+                placeholder="ระบุรายละเอียดสินค้า วิธีการใช้งาน เงื่อนไขการรับประกัน หรือรายละเอียดไอดี..."
+                className="w-full bg-slate-950/80 text-sm text-slate-100 placeholder:text-slate-500 rounded-xl p-3.5 border border-slate-700/80 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 outline-none resize-y"
+              />
+            </div>
+
+            {/* Category & Tags */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-medium text-slate-300">
+                  หมวดหมู่ (Category) *
+                </label>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full bg-slate-950/80 text-sm text-slate-100 rounded-xl p-2.5 border border-slate-700/80 focus:border-cyan-500 outline-none cursor-pointer"
+                >
+                  {CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <Input
+                label="แท็กค้นหา (Tags คั่นด้วยจุลภาค)"
+                value={tagsInput}
+                onChange={(e) => setTagsInput(e.target.value)}
+                placeholder="เช่น steam, wallet, gaming, code"
+              />
+            </div>
+          </div>
+
+          {/* Pricing & Stock Card */}
+          <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-md space-y-4">
+            <h3 className="text-base font-bold text-white mb-2">
+              ราคาและสต็อก (Pricing & Inventory)
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {/* Regular Price */}
+              <Input
+                label="ราคาขายจริง (THB) *"
+                type="number"
+                min="0"
+                step="any"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                placeholder="990"
+                error={validationErrors.price}
+                required
+              />
+
+              {/* Compare Price */}
+              <Input
+                label="ราคาเปรียบเทียบ (ขีดฆ่า)"
+                type="number"
+                min="0"
+                step="any"
+                value={comparePrice}
+                onChange={(e) => setComparePrice(e.target.value)}
+                placeholder="1,200"
+                helperText="จะแสดงเป็นราคาเดิมที่ลดราคา"
+              />
+
+              {/* Stock */}
+              <Input
+                label="จำนวนสินค้าในสต็อก *"
+                type="number"
+                min="0"
+                value={stock}
+                onChange={(e) => setStock(e.target.value)}
+                placeholder="100"
+                error={validationErrors.stock}
+                required
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column: Image Upload & Status Toggles */}
+        <div className="lg:col-span-4 space-y-6">
+          {/* Image Upload Box */}
+          <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-md space-y-4">
+            <h3 className="text-base font-bold text-white mb-2">
+              รูปภาพสินค้า (Product Image)
+            </h3>
+
+            {/* Hidden file input */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              accept="image/png, image/jpeg, image/webp"
+              className="hidden"
+            />
+
+            {/* Preview Box */}
+            <div className="relative w-full aspect-square rounded-2xl border-2 border-dashed border-slate-700 hover:border-cyan-500/50 bg-slate-950/60 overflow-hidden flex flex-col items-center justify-center p-4 transition-colors">
+              {imagePreview ? (
+                <>
+                  <Image
+                    src={imagePreview}
+                    alt="Preview"
+                    fill
+                    className="object-contain p-2"
+                  />
+                  <div className="absolute top-2 right-2 flex gap-1.5 z-10">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="p-1.5 rounded-lg bg-slate-900/90 text-slate-200 hover:text-white border border-slate-700 hover:border-cyan-400 shadow-md cursor-pointer"
+                      title="เปลี่ยนรูปภาพ"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleRemoveImage}
+                      className="p-1.5 rounded-lg bg-rose-900/90 text-rose-200 hover:text-white border border-rose-700 shadow-md cursor-pointer"
+                      title="ลบรูปภาพ"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex flex-col items-center justify-center text-center cursor-pointer p-4 group"
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-center text-slate-400 group-hover:text-cyan-400 group-hover:border-cyan-500/40 transition-colors mb-3">
+                    <Upload className="w-6 h-6" />
+                  </div>
+                  <p className="text-xs font-semibold text-slate-200 group-hover:text-cyan-400 transition-colors">
+                    คลิกเพื่ออัปโหลดรูปภาพ
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    รองรับ PNG, JPG, WEBP ขนาดไม่เกิน 5MB
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Upload Progress Bar */}
+            {isUploading && (
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs text-slate-400">
+                  <span>กำลังอัปโหลดขึ้น Firebase Storage...</span>
+                  <span className="font-bold text-cyan-400">{uploadProgress}%</span>
+                </div>
+                <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-cyan-400 transition-all duration-300"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Direct Image URL input option */}
+            <div className="pt-2 border-t border-slate-800 space-y-1.5">
+              <label className="block text-[11px] font-medium text-slate-400">
+                หรือใส่ Image URL โดยตรง:
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={imagePreview.startsWith('blob:') ? '' : imagePreview}
+                  onChange={(e) => {
+                    setImagePreview(e.target.value);
+                    setSelectedFile(null);
+                  }}
+                  placeholder="https://..."
+                  className="w-full bg-slate-950/80 text-xs text-slate-200 rounded-lg px-2.5 py-2 border border-slate-800 focus:border-cyan-500 outline-none"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Status & Featured Card */}
+          <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-md space-y-5">
+            <h3 className="text-base font-bold text-white mb-2">
+              สถานะสินค้า (Status & Visibility)
+            </h3>
+
+            {/* Status Select */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-medium text-slate-300">
+                สถานะการขาย (Status)
+              </label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value as ProductStatus)}
+                className="w-full bg-slate-950/80 text-sm text-slate-100 rounded-xl p-2.5 border border-slate-700/80 focus:border-cyan-500 outline-none cursor-pointer"
+              >
+                <option value="active">🟢 พร้อมจำหน่าย (Active)</option>
+                <option value="draft">🟡 ฉบับร่าง ซ่อนจากหน้าร้าน (Draft)</option>
+                <option value="out_of_stock">🔴 สินค้าหมด (Out of Stock)</option>
+              </select>
+            </div>
+
+            {/* Featured Switch */}
+            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 border border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <Sparkles className="w-4 h-4 text-amber-400" />
+                <div>
+                  <p className="text-xs font-bold text-slate-200">สินค้าแนะนำ (Featured)</p>
+                  <p className="text-[10px] text-slate-400">แสดงในหน้าแรกและส่วนสินค้ายอดนิยม</p>
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={featured}
+                onChange={(e) => setFeatured(e.target.checked)}
+                className="w-5 h-5 accent-cyan-500 cursor-pointer"
+              />
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="space-y-3">
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              isLoading={isSaving}
+              leftIcon={<Save className="w-5 h-5" />}
+              className="w-full shadow-[0_0_25px_rgba(6,182,212,0.4)]"
+            >
+              {isEdit ? 'บันทึกการแก้ไขสินค้า' : 'สร้างสินค้าทันที'}
+            </Button>
+
+            <Button
+              type="button"
+              variant="secondary"
+              size="md"
+              onClick={() => router.push('/admin/products')}
+              leftIcon={<ArrowLeft className="w-4 h-4" />}
+              className="w-full"
+            >
+              ยกเลิกและย้อนกลับ
+            </Button>
+          </div>
+        </div>
+      </div>
+    </form>
+  );
+}
