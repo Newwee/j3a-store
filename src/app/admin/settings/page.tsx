@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Settings, Save, Shield, Store, QrCode, MessageCircle, AlertCircle, CheckCircle2, Sparkles } from 'lucide-react';
+import { Settings, Save, Shield, Store, QrCode, MessageCircle, AlertCircle, CheckCircle2, Sparkles, Truck } from 'lucide-react';
 import { AdminHeader } from '@/components/admin/AdminHeader';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -16,6 +16,8 @@ export default function AdminSettingsPage() {
   const [lineContact, setLineContact] = useState(DEFAULT_STORE_SETTINGS.lineContact);
   const [discordContact, setDiscordContact] = useState(DEFAULT_STORE_SETTINGS.discordContact);
   const [announcement, setAnnouncement] = useState(DEFAULT_STORE_SETTINGS.announcement);
+  const [shippingFee, setShippingFee] = useState(String(DEFAULT_STORE_SETTINGS.shippingFee));
+  const [freeShippingThreshold, setFreeShippingThreshold] = useState(String(DEFAULT_STORE_SETTINGS.freeShippingThreshold));
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -28,6 +30,8 @@ export default function AdminSettingsPage() {
         setLineContact(data.lineContact);
         setDiscordContact(data.discordContact);
         setAnnouncement(data.announcement);
+        setShippingFee(String(data.shippingFee));
+        setFreeShippingThreshold(String(data.freeShippingThreshold));
       } catch (err: any) {
         console.error('Failed to load settings:', err);
       } finally {
@@ -48,6 +52,8 @@ export default function AdminSettingsPage() {
         lineContact: lineContact.trim(),
         discordContact: discordContact.trim(),
         announcement: announcement.trim(),
+        shippingFee: Math.max(0, Number(shippingFee) || 0),
+        freeShippingThreshold: Math.max(0, Number(freeShippingThreshold) || 0),
       });
       success('บันทึกการตั้งค่าร้านค้าเรียบร้อยแล้ว! เบอร์พร้อมเพย์และ QR Code อัปเดตไปยังหน้าลูกค้าทันที');
     } catch (err: any) {
@@ -144,6 +150,49 @@ export default function AdminSettingsPage() {
                   onChange={(e) => setDiscordContact(e.target.value)}
                   placeholder="https://discord.gg/j3astore"
                 />
+              </div>
+            </div>
+
+            {/* Shipping Fee Settings */}
+            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-md space-y-4">
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <Truck className="w-5 h-5 text-cyan-400" />
+                <span>ค่าจัดส่ง / ค่าบริการ (Shipping Fee)</span>
+              </h2>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Input
+                    label="ค่าจัดส่งมาตรฐาน (บาท)"
+                    type="number"
+                    min="0"
+                    value={shippingFee}
+                    onChange={(e) => setShippingFee(e.target.value)}
+                    placeholder="0"
+                  />
+                  <p className="text-[11px] text-slate-400">
+                    * ตั้ง <strong className="text-white">0</strong> = ฟรีค่าจัดส่งเสมอ (แนะนำสำหรับสินค้าดิจิทัล)
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <Input
+                    label="ยอดซื้อขั้นต่ำสำหรับฟรีค่าจัดส่ง (บาท)"
+                    type="number"
+                    min="0"
+                    value={freeShippingThreshold}
+                    onChange={(e) => setFreeShippingThreshold(e.target.value)}
+                    placeholder="0"
+                  />
+                  <p className="text-[11px] text-slate-400">
+                    * ตั้ง <strong className="text-white">0</strong> = ฟรีเสมอโดยไม่ต้องถึงยอดขั้นต่ำ
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-[11px] text-slate-400 space-y-1">
+                <p>📦 ตัวอย่างการตั้งค่า:</p>
+                <p>• <strong className="text-white">ฟรีเสมอ</strong>: ค่าจัดส่ง = 0, ขั้นต่ำ = 0</p>
+                <p>• <strong className="text-white">ค่าจัดส่ง 50฿ ฟรีถ้าซื้อเกิน 500฿</strong>: ค่าจัดส่ง = 50, ขั้นต่ำ = 500</p>
               </div>
             </div>
           </div>

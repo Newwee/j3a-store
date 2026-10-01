@@ -11,6 +11,8 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   lineContact: '@j3astore',
   discordContact: 'https://discord.gg/j3astore',
   announcement: 'ยินดีต้อนรับสู่ J3A STORE ระบบเติมเกมและบริการดิจิทัลอัตโนมัติ 24 ชม.',
+  shippingFee: 0,
+  freeShippingThreshold: 0,
 };
 
 /**
@@ -41,6 +43,8 @@ export async function getStoreSettings(): Promise<StoreSettings> {
       lineContact: data.lineContact || DEFAULT_STORE_SETTINGS.lineContact,
       discordContact: data.discordContact || DEFAULT_STORE_SETTINGS.discordContact,
       announcement: data.announcement || DEFAULT_STORE_SETTINGS.announcement,
+      shippingFee: typeof data.shippingFee === 'number' ? data.shippingFee : DEFAULT_STORE_SETTINGS.shippingFee,
+      freeShippingThreshold: typeof data.freeShippingThreshold === 'number' ? data.freeShippingThreshold : DEFAULT_STORE_SETTINGS.freeShippingThreshold,
       updatedAt,
     };
   } catch (error) {

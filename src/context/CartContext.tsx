@@ -4,10 +4,9 @@ import React, { createContext, useContext, useEffect, useState, useMemo } from '
 import { Product } from '@/types/product';
 import { CartItem, CartContextType } from '@/types/cart';
 import { useToast } from './ToastContext';
+import { getStoreSettings, DEFAULT_STORE_SETTINGS } from '@/lib/firestore/settings';
 
 const CART_STORAGE_KEY = 'j3a_store_cart_v1';
-const FREE_SHIPPING_THRESHOLD = 1000;
-const STANDARD_SHIPPING_FEE = 50;
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
@@ -15,6 +14,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [shippingFee, setShippingFee] = useState(DEFAULT_STORE_SETTINGS.shippingFee);
+  const [freeShippingThreshold, setFreeShippingThreshold] = useState(DEFAULT_STORE_SETTINGS.freeShippingThreshold);
   const { toast } = useToast();
 
   // Load from localStorage on mount
@@ -29,6 +30,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoaded(true);
     }
+  }, []);
+
+  // Load shipping settings from Firestore (dynamic — admin configurable)
+  useEffect(() => {
+    getStoreSettings()
+      .then((s) => {
+        setShippingFee(s.shippingFee);
+        setFreeShippingThreshold(s.freeShippingThreshold);
+      })
+      .catch(() => {
+        // fallback to defaults on error (already set in state)
+      });
   }, []);
 
   // Save to localStorage when items change
@@ -102,7 +115,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const { subtotal, shipping, total, totalItems } = useMemo(() => {
     const sub = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
     const count = items.reduce((sum, item) => sum + item.quantity, 0);
-    const ship = sub > 0 ? (sub >= FREE_SHIPPING_THRESHOLD ? 0 : STANDARD_SHIPPING_FEE) : 0;
+    // ถ้า shippingFee = 0 หรือ sub = 0 → ฟรีเสมอ
+    // ถ้า freeShippingThreshold > 0 และ sub >= threshold → ฟรี
+    let ship = 0;
+    if (sub > 0 && shippingFee > 0) {
+      ship = freeShippingThreshold > 0 && sub >= freeShippingThreshold ? 0 : shippingFee;
+    }
     const tot = sub + ship;
 
     return {
@@ -111,7 +129,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       total: tot,
       totalItems: count,
     };
-  }, [items]);
+  }, [items, shippingFee, freeShippingThreshold]);
 
   return (
     <CartContext.Provider
