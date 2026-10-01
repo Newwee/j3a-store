@@ -212,7 +212,7 @@ service cloud.firestore {
 
     // Default Deny: Deny all reads and writes by default
     match /{document=**} {
-      allow read, write: false;
+      allow read, write: if false;
     }
 
     // 1. Users Collection
