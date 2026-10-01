@@ -228,7 +228,10 @@ function ProfileContent() {
   };
 
   const credits = profile?.credits || 0;
-  const userInitials = (profile?.displayName || user.displayName || 'U').charAt(0).toUpperCase();
+  const userDisplayName = (profile?.displayName && profile.displayName !== 'Customer')
+    ? profile.displayName
+    : (user.displayName || (user.email ? user.email.split('@')[0] : 'Customer'));
+  const userInitials = userDisplayName.charAt(0).toUpperCase();
 
   // Dynamic PromptPay QR Code Link from Firestore Admin Settings
   const qrCodeUrl = `https://promptpay.io/${cleanPromptpay || '0812345678'}/${effectiveAmount}.png`;
@@ -243,7 +246,7 @@ function ProfileContent() {
               {profile?.photoURL || user.photoURL ? (
                 <Image
                   src={profile?.photoURL || user.photoURL || ''}
-                  alt={profile?.displayName || 'Avatar'}
+                  alt={userDisplayName}
                   fill
                   className="object-cover"
                 />
@@ -254,7 +257,7 @@ function ProfileContent() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl sm:text-2xl font-black text-white">
-                  {profile?.displayName || user.displayName || 'Customer'}
+                  {userDisplayName}
                 </h1>
                 <RoleBadge role={profile?.role || 'customer'} />
               </div>

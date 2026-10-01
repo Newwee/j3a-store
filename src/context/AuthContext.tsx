@@ -13,7 +13,7 @@ import {
   signInWithPopup,
 } from 'firebase/auth';
 import { auth, isFirebaseConfigured } from '@/lib/firebase/client';
-import { getUserProfile, createUserProfile } from '@/lib/firestore/users';
+import { getUserProfile, createUserProfile, updateUserProfile } from '@/lib/firestore/users';
 import { UserProfile, UserRole } from '@/types/user';
 
 interface AuthContextType {
@@ -42,13 +42,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const syncProfile = useCallback(async (firebaseUser: FirebaseUser) => {
     try {
       let p = await getUserProfile(firebaseUser.uid);
+      const effectiveName = (firebaseUser.displayName && firebaseUser.displayName !== 'Customer')
+        ? firebaseUser.displayName
+        : (firebaseUser.email ? firebaseUser.email.split('@')[0] : 'Customer');
+
       if (!p) {
         // First-time record initialization
         p = await createUserProfile(firebaseUser.uid, {
           email: firebaseUser.email,
-          displayName: firebaseUser.displayName || 'Customer',
+          displayName: effectiveName,
           photoURL: firebaseUser.photoURL,
         });
+      } else {
+        // If the profile document still has 'Customer', but we now have a real name, sync it!
+        if ((!p.displayName || p.displayName === 'Customer') && effectiveName !== 'Customer') {
+          try {
+            await updateUserProfile(firebaseUser.uid, { displayName: effectiveName });
+            p.displayName = effectiveName;
+          } catch (e) {
+            console.warn('Could not sync user profile name:', e);
+          }
+        }
       }
       setProfile(p);
     } catch (err) {
@@ -66,7 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProfile({
         uid: firebaseUser.uid,
         email: firebaseUser.email,
-        displayName: firebaseUser.displayName || 'Customer',
+        displayName: firebaseUser.displayName || (firebaseUser.email ? firebaseUser.email.split('@')[0] : 'Customer'),
         photoURL: firebaseUser.photoURL,
         role: isMaster ? 'admin' : 'customer',
         credits: 0,
@@ -119,6 +133,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email,
         displayName: name,
       });
+      try {
+        await updateUserProfile(cred.user.uid, { displayName: name });
+        newProfile.displayName = name;
+      } catch (e) {
+        console.warn('Could not force update displayName in firestore:', e);
+      }
       setProfile(newProfile);
     }
   };

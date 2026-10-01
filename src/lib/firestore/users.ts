@@ -32,10 +32,17 @@ function mapDocToUserProfile(docSnap: { id: string; data: () => Record<string, u
     updatedAt = data.updatedAt;
   }
 
+  const email = (data.email as string) || null;
+  const rawDisplayName = (data.displayName as string) || null;
+  // If rawDisplayName is empty or default 'Customer', fallback to email prefix
+  const displayName = rawDisplayName && rawDisplayName.trim() && rawDisplayName !== 'Customer'
+    ? rawDisplayName.trim()
+    : (email ? email.split('@')[0] : 'Customer');
+
   return {
     uid: docSnap.id,
-    email: (data.email as string) || null,
-    displayName: (data.displayName as string) || null,
+    email,
+    displayName,
     photoURL: (data.photoURL as string) || null,
     role: (data.role as UserRole) || 'customer',
     credits: Number(data.credits) || 0,
@@ -98,14 +105,33 @@ export async function createUserProfile(
     data.email && adminEmails.includes(data.email.toLowerCase())
   );
 
+  const resolvedName = (data.displayName && data.displayName.trim() && data.displayName !== 'Customer')
+    ? data.displayName.trim()
+    : (data.email ? data.email.split('@')[0] : 'Customer');
+
   if (existing.exists()) {
     const profile = mapDocToUserProfile(existing);
+    const updates: Record<string, any> = {};
+
+    // If existing displayName is generic 'Customer' or empty, but we now have a real name, update it!
+    if ((!profile.displayName || profile.displayName === 'Customer') && resolvedName !== 'Customer') {
+      updates.displayName = resolvedName;
+      profile.displayName = resolvedName;
+    }
+    if (!profile.photoURL && data.photoURL) {
+      updates.photoURL = data.photoURL;
+      profile.photoURL = data.photoURL;
+    }
     if (isMasterAdmin && profile.role !== 'admin') {
+      updates.role = 'admin';
+      profile.role = 'admin';
+    }
+
+    if (Object.keys(updates).length > 0) {
       try {
-        await updateDoc(docRef, { role: 'admin', updatedAt: serverTimestamp() });
-        profile.role = 'admin';
+        await updateDoc(docRef, { ...updates, updatedAt: serverTimestamp() });
       } catch (e) {
-        profile.role = 'admin';
+        console.warn('Could not sync user profile fields:', e);
       }
     }
     return profile;
@@ -116,7 +142,7 @@ export async function createUserProfile(
   const profileData = {
     uid,
     email: data.email || null,
-    displayName: data.displayName || 'Customer',
+    displayName: resolvedName,
     photoURL: data.photoURL || null,
     role: initialRole,
     credits: 0,
@@ -135,11 +161,11 @@ export async function createUserProfile(
 }
 
 /**
- * Update user profile details (only safe fields, never role)
+ * Update user profile details (safe fields: displayName, photoURL, phone, tier)
  */
 export async function updateUserProfile(
   uid: string,
-  data: { displayName?: string; photoURL?: string; phone?: string }
+  data: { displayName?: string; photoURL?: string; phone?: string; tier?: UserTier }
 ): Promise<void> {
   if (!db) throw new Error('Firestore is not initialized.');
 
