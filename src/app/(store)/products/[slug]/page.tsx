@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, use } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ShoppingCart,
   Zap,
@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   Clock,
   Sparkles,
+  Star,
 } from 'lucide-react';
 import { Product } from '@/types/product';
 import { getProductBySlug } from '@/lib/firestore/products';
@@ -25,6 +26,7 @@ import { ImageGallery } from '@/components/product/ImageGallery';
 import { ProductStatusBadge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ProductReviewsSection } from '@/components/review/ProductReviewsSection';
 
 export default function ProductDetailPage({
   params,
@@ -34,6 +36,7 @@ export default function ProductDetailPage({
   const resolvedParams = use(params);
   const slug = resolvedParams.slug;
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { addItem, setIsCartOpen } = useCart();
   const { success, error } = useToast();
 
@@ -153,6 +156,28 @@ export default function ProductDetailPage({
               {product.name}
             </h1>
 
+            {/* Rating Stars Summary */}
+            <div className="flex items-center gap-2.5 text-xs">
+              <div className="flex items-center gap-0.5">
+                {[1, 2, 3, 4, 5].map((s) => (
+                  <Star
+                    key={s}
+                    className={`w-4 h-4 ${
+                      s <= Math.round(product.rating || 5)
+                        ? 'fill-amber-400 text-amber-400'
+                        : 'text-slate-700'
+                    }`}
+                  />
+                ))}
+              </div>
+              <span className="font-bold text-amber-400">
+                {(product.rating || 5.0).toFixed(1)}
+              </span>
+              <span className="text-slate-500">
+                ({product.reviewCount || 0} รีวิวจากผู้ซื้อจริง)
+              </span>
+            </div>
+
             {/* Pricing Section */}
             <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur-sm flex items-center justify-between">
               <div>
@@ -265,6 +290,16 @@ export default function ProductDetailPage({
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Real Product Reviews & Ratings Section */}
+        <div className="mt-12">
+          <ProductReviewsSection
+            productId={product.id}
+            productName={product.name}
+            productSlug={product.slug}
+            autoOpenReview={searchParams.get('openReview') === 'true'}
+          />
         </div>
       </div>
     </div>

@@ -157,9 +157,22 @@ export default function OrderDetailPage({
                       </p>
                     </div>
                   </div>
-                  <span className="text-sm font-bold text-cyan-400">
-                    {formatCurrency(item.price * item.quantity)}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-bold text-cyan-400">
+                      {formatCurrency(item.price * item.quantity)}
+                    </span>
+                    {order.status === 'completed' && (
+                      <Link href={`/products/${item.slug}?openReview=true`}>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="text-xs text-amber-300 border-amber-500/30 hover:bg-amber-500/10 hover:border-amber-400 font-bold"
+                        >
+                          ⭐ ให้คะแนน
+                        </Button>
+                      </Link>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

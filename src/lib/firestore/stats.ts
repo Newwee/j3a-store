@@ -10,6 +10,9 @@ export interface StoreStats {
   totalOrders: number;
   totalCustomers: number;
   totalRevenue: number;
+  averageRating: number;
+  totalReviews: number;
+  satisfactionRate: string;
   recentOrders: Order[];
   recentProducts: Product[];
 }
@@ -23,6 +26,9 @@ export async function getStoreDashboardStats(): Promise<StoreStats> {
     totalOrders: 0,
     totalCustomers: 0,
     totalRevenue: 0,
+    averageRating: 5.0,
+    totalReviews: 0,
+    satisfactionRate: '100%',
     recentOrders: [],
     recentProducts: [],
   };
@@ -72,16 +78,48 @@ export async function getStoreDashboardStats(): Promise<StoreStats> {
     // Fetch recent products
     const recentProducts = await getProducts({ limitCount: 8, sortBy: 'newest' });
 
+    // Fetch review statistics
+    let averageRating = 5.0;
+    let totalReviews = 0;
+    let satisfactionRate = '100%';
+
+    try {
+      const reviewsCol = collection(db, 'reviews');
+      const revSnap = await getDocs(reviewsCol);
+      if (!revSnap.empty) {
+        totalReviews = revSnap.size;
+        let sum = 0;
+        let high = 0;
+        revSnap.forEach((d) => {
+          const r = Number(d.data().rating) || 5;
+          sum += r;
+          if (r >= 4) high++;
+        });
+        averageRating = Number((sum / totalReviews).toFixed(1));
+        satisfactionRate = Math.round((high / totalReviews) * 100) + '%';
+      }
+    } catch (err) {
+      console.warn('Could not load reviews for stats:', err);
+    }
+
     return {
       totalProducts,
       totalOrders,
       totalCustomers,
       totalRevenue,
+      averageRating,
+      totalReviews,
+      satisfactionRate,
       recentOrders,
       recentProducts,
     };
   } catch (error) {
     console.error('Error fetching dashboard stats:', error);
-    return fallbackStats;
+    return {
+      ...fallbackStats,
+      averageRating: 5.0,
+      totalReviews: 0,
+      satisfactionRate: '100%',
+    };
   }
 }

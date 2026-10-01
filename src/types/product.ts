@@ -15,6 +15,8 @@ export interface Product {
   featured: boolean;
   tags?: string[];
   specs?: Record<string, string>;
+  rating?: number;
+  reviewCount?: number;
   createdAt: string;
   updatedAt: string;
 }

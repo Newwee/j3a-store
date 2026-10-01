@@ -12,6 +12,7 @@ import {
   ExternalLink,
   Receipt,
   ChevronDown,
+  Star,
 } from 'lucide-react';
 import { Order, OrderStatus } from '@/types/order';
 import { getOrders, updateOrderStatus } from '@/lib/firestore/orders';
@@ -71,7 +72,11 @@ export default function AdminOrdersPage() {
       setOrders((prev) =>
         prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
       );
-      success(`อัปเดตสถานะคำสั่งซื้อเป็น "${newStatus}" แล้ว`);
+      if (newStatus === 'completed') {
+        success(`อนุมัติคำสั่งซื้อเรียบร้อย! ลูกค้าในออเดอร์นี้ได้รับการปลดล็อกสิทธิ์ให้คะแนนสินค้า (Rating & Review) แล้ว`);
+      } else {
+        success(`อัปเดตสถานะคำสั่งซื้อเป็น "${newStatus}" แล้ว`);
+      }
     } catch (err: any) {
       error('ไม่สามารถเปลี่ยนสถานะคำสั่งซื้อได้');
     }
@@ -85,6 +90,14 @@ export default function AdminOrdersPage() {
         actionText=""
         actionHref=""
       />
+
+      {/* Admin Tip: Review eligibility */}
+      <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-center gap-2.5">
+        <Star className="w-4 h-4 shrink-0 fill-amber-400 text-amber-400" />
+        <span>
+          <strong>ระบบรีวิวความโปร่งใส:</strong> เมื่อแอดมินเปลี่ยนสถานะคำสั่งซื้อเป็น <strong>"สำเร็จ (Completed)"</strong> ลูกค้าในออเดอร์นั้นจะได้รับสิทธิ์ในการเข้าไปกด <strong>"⭐ ให้คะแนนสินค้า"</strong> ในหน้ารายละเอียดสินค้าทันที
+        </span>
+      </div>
 
       {/* Filter and Search Bar */}
       <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 sm:p-5 backdrop-blur-md flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">

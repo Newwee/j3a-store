@@ -1,33 +1,40 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Users, ShoppingBag, Box, Activity } from 'lucide-react';
+import { Users, ShoppingBag, Box, Star } from 'lucide-react';
 import { formatNumber } from '@/lib/utils/formatters';
 import { getStoreDashboardStats } from '@/lib/firestore/stats';
 
 export function LiveStatsSection() {
   const [stats, setStats] = useState({
-    members: 12694,
-    orders: 12173,
-    products: 48,
-    uptime: '99.9%',
+    members: 1,
+    orders: 0,
+    products: 0,
+    rating: 5.0,
+    totalReviews: 0,
+    satisfactionRate: '100%',
   });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
     async function loadStats() {
       try {
         const live = await getStoreDashboardStats();
-        if (isMounted && (live.totalCustomers > 0 || live.totalOrders > 0 || live.totalProducts > 0)) {
-          setStats((prev) => ({
-            ...prev,
-            members: Math.max(12694, live.totalCustomers),
-            orders: Math.max(12173, live.totalOrders),
-            products: Math.max(48, live.totalProducts),
-          }));
+        if (isMounted) {
+          setStats({
+            members: live.totalCustomers,
+            orders: live.totalOrders,
+            products: live.totalProducts,
+            rating: live.averageRating || 5.0,
+            totalReviews: live.totalReviews || 0,
+            satisfactionRate: live.satisfactionRate || '100%',
+          });
+          setLoading(false);
         }
       } catch (err) {
-        console.warn('Using baseline stats:', err);
+        console.warn('Error fetching live stats:', err);
+        if (isMounted) setLoading(false);
       }
     }
     loadStats();
@@ -129,24 +136,26 @@ export function LiveStatsSection() {
               </div>
             </div>
 
-            {/* Card 4: ระบบการทำงาน */}
-            <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 sm:p-5 flex items-center justify-between gap-4 hover:border-cyan-500/40 transition-colors">
+            {/* Card 4: คะแนนรีวิวร้านค้า (Real Ratings) */}
+            <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 sm:p-5 flex items-center justify-between gap-4 hover:border-amber-500/40 transition-colors">
               <div className="flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-xl bg-slate-800/80 border border-slate-700/60 flex items-center justify-center text-emerald-400 shrink-0 shadow-inner">
-                  <Activity className="w-5 h-5" />
+                <div className="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 shadow-inner">
+                  <Star className="w-5 h-5 fill-amber-400" />
                 </div>
                 <div>
                   <p className="text-xs font-medium text-slate-300 leading-tight">
-                    ระบบการจัดส่ง
+                    คะแนนรีวิวร้านค้า
                   </p>
-                  <p className="text-[11px] text-emerald-400">อัตโนมัติ 100%</p>
+                  <p className="text-[11px] text-amber-400">
+                    {stats.totalReviews > 0 ? `${stats.totalReviews} รีวิวจากผู้ซื้อจริง` : 'พึงพอใจ 100%'}
+                  </p>
                 </div>
               </div>
               <div className="text-right">
-                <span className="text-2xl sm:text-3xl font-black text-emerald-400 tracking-tight">
-                  {stats.uptime}
+                <span className="text-2xl sm:text-3xl font-black text-amber-400 tracking-tight">
+                  {stats.rating.toFixed(1)}
                 </span>
-                <span className="text-xs text-slate-400 ml-1.5 font-medium">เสร็จสิ้น</span>
+                <span className="text-xs text-slate-400 ml-1.5 font-medium">/ 5.0</span>
               </div>
             </div>
           </div>

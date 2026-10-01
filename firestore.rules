@@ -145,7 +145,7 @@ service cloud.firestore {
 
     // Product Validator
     function isValidProduct(data) {
-      return hasOnlyAllowedFields(['id', 'name', 'slug', 'description', 'price', 'comparePrice', 'image', 'images', 'category', 'stock', 'status', 'featured', 'tags', 'specs', 'createdAt', 'updatedAt']) &&
+      return hasOnlyAllowedFields(['id', 'name', 'slug', 'description', 'price', 'comparePrice', 'image', 'images', 'category', 'stock', 'status', 'featured', 'tags', 'specs', 'rating', 'reviewCount', 'createdAt', 'updatedAt']) &&
         hasRequiredFields(['name', 'slug', 'price', 'image', 'category', 'stock', 'status', 'featured']) &&
         data.name is string && data.name.size() >= 1 && data.name.size() <= 200 &&
         data.slug is string && data.slug.size() >= 1 && data.slug.size() <= 200 &&
@@ -277,6 +277,21 @@ service cloud.firestore {
 
       // Delete: Admin only
       allow delete: if isAdmin();
+    }
+
+    // 4. Reviews Collection (Real Customer Ratings)
+    match /reviews/{reviewId} {
+      // Read: Public read
+      allow read: if true;
+
+      // Create: Signed in users can submit a review if their UID matches
+      allow create: if isSignedIn() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.rating >= 1 &&
+        request.resource.data.rating <= 5;
+
+      // Update / Delete: Admin or review author
+      allow update, delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
     }
   }
 }
