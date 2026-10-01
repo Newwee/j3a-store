@@ -18,7 +18,7 @@ export function HeroSection() {
           {/* Left Column: Headline and Call-to-actions */}
           <div className="lg:col-span-7 space-y-6 text-center lg:text-left">
             {/* Live Notification Pill */}
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-cyan-500/30 text-cyan-300 text-xs font-semibold shadow-[0_0_15px_rgba(6,182,212,0.2)]">
+            <div className="rb-pill border-cyan-500/30 text-cyan-300 shadow-[0_0_20px_rgba(6,182,212,0.2)]">
               <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
               <Flame className="w-3.5 h-3.5 text-amber-400" />
               <span>เวอร์ชันใหม่เปิดให้บริการแล้ว! ระบบอัตโนมัติ 24 ชม.</span>
@@ -27,7 +27,7 @@ export function HeroSection() {
             {/* Main Headline */}
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.1]">
               NEXT-GEN{' '}
-              <span className="bg-gradient-to-r from-cyan-400 via-sky-300 to-blue-500 bg-clip-text text-transparent">
+              <span className="text-shimmer">
                 E-COMMERCE
               </span>{' '}
               & DIGITAL STORE

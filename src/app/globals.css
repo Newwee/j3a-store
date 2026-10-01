@@ -1,50 +1,165 @@
 @import "tailwindcss";
 
 :root {
-  --background: #080c14;
-  --foreground: #f8fafc;
+  --background: #09080e;
+  --foreground: #f4f4f7;
+  --card-bg: rgba(18, 14, 25, 0.7);
+  --card-border: rgba(255, 255, 255, 0.08);
+  --cyan-glow: rgba(0, 229, 255, 0.25);
+  --purple-glow: rgba(168, 85, 247, 0.25);
   --font-inter: 'Inter', sans-serif;
   --font-prompt: 'Prompt', sans-serif;
 }
 
+/* ============================================================================
+   React Bits Inspired Base & Background Aesthetic
+   ============================================================================ */
 body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-prompt), var(--font-inter), system-ui, -apple-system, sans-serif;
   overflow-x: hidden;
+  background-image: 
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(120, 119, 198, 0.15), transparent),
+    radial-gradient(ellipse 60% 40% at 100% 60%, rgba(6, 182, 212, 0.08), transparent),
+    linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+  background-attachment: fixed;
 }
 
-/* Custom Glassmorphism */
-.glass-panel {
-  background: rgba(15, 23, 42, 0.7);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(56, 189, 248, 0.15);
+/* ============================================================================
+   React Bits Card & Glassmorphism Utilities
+   ============================================================================ */
+.glass-panel,
+.rb-card {
+  position: relative;
+  background: rgba(15, 12, 22, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 
+    0 4px 24px -2px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+  border-radius: 1.25rem;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.glass-panel-hover {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.glass-panel-hover:hover {
+.glass-panel-hover:hover,
+.rb-card:hover {
   border-color: rgba(6, 182, 212, 0.4);
-  box-shadow: 0 0 25px rgba(6, 182, 212, 0.15);
+  box-shadow: 
+    0 16px 40px -4px rgba(0, 0, 0, 0.7),
+    0 0 30px -4px rgba(6, 182, 212, 0.25),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
 }
 
-/* Custom subtle scrollbar */
+/* ============================================================================
+   React Bits Shimmer & Text Gradients
+   ============================================================================ */
+@keyframes rb-shimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.text-shimmer {
+  background: linear-gradient(
+    90deg,
+    #ffffff 0%,
+    #00e5ff 25%,
+    #c084fc 50%,
+    #00e5ff 75%,
+    #ffffff 100%
+  );
+  background-size: 200% auto;
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: rb-shimmer 6s ease-in-out infinite;
+}
+
+.gradient-heading {
+  background: linear-gradient(180deg, #ffffff 0%, rgba(255, 255, 255, 0.75) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ============================================================================
+   React Bits Pill Badge & Buttons
+   ============================================================================ */
+.rb-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(12px);
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.rb-pill:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+/* ============================================================================
+   Pulse & Glow Animations
+   ============================================================================ */
+@keyframes rb-pulse-glow {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+.animate-pulse-glow {
+  animation: rb-pulse-glow 5s ease-in-out infinite;
+}
+
+/* ============================================================================
+   React Bits Custom Minimal Scrollbar
+   ============================================================================ */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #080c14;
+  background: #09080e;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1e293b;
+  background: rgba(255, 255, 255, 0.12);
   border-radius: 9999px;
+  transition: background 0.2s;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #0ea5e9;
+  background: rgba(6, 182, 212, 0.6);
+}
+
+/* ============================================================================
+   Interactive Focus Outlines & Selections
+   ============================================================================ */
+::selection {
+  background-color: #06b6d4;
+  color: #09080e;
 }

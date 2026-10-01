@@ -32,16 +32,16 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     const variants = {
       primary:
-        'bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-semibold shadow-[0_0_20px_rgba(6,182,212,0.35)] hover:shadow-[0_0_25px_rgba(6,182,212,0.5)] border border-cyan-400/30',
+        'bg-gradient-to-r from-cyan-400 via-sky-400 to-blue-600 hover:from-cyan-300 hover:to-blue-500 text-slate-950 font-bold shadow-[0_0_25px_rgba(6,182,212,0.35),inset_0_1px_0_0_rgba(255,255,255,0.3)] border border-cyan-300/40 hover:scale-[1.01]',
       secondary:
-        'bg-slate-800/80 hover:bg-slate-700/80 text-slate-100 border border-slate-700/80 hover:border-slate-600 shadow-sm backdrop-blur-sm',
+        'bg-slate-900/80 hover:bg-slate-800/90 text-slate-100 border border-white/10 hover:border-white/20 shadow-[0_4px_16px_rgba(0,0,0,0.4),inset_0_1px_0_0_rgba(255,255,255,0.08)] backdrop-blur-md',
       outline:
-        'bg-transparent hover:bg-slate-800/60 text-slate-300 hover:text-white border border-slate-700 hover:border-cyan-500/50',
-      ghost: 'bg-transparent hover:bg-slate-800/60 text-slate-300 hover:text-white',
+        'bg-transparent hover:bg-white/[0.04] text-slate-300 hover:text-white border border-white/10 hover:border-cyan-400/40',
+      ghost: 'bg-transparent hover:bg-white/[0.04] text-slate-300 hover:text-white',
       danger:
-        'bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-semibold shadow-[0_0_15px_rgba(225,29,72,0.3)] border border-rose-500/30',
+        'bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-semibold shadow-[0_0_20px_rgba(225,29,72,0.35),inset_0_1px_0_0_rgba(255,255,255,0.2)] border border-rose-500/30',
       neon:
-        'bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 hover:border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.2)]',
+        'bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-400/40 hover:border-cyan-300 shadow-[0_0_20px_rgba(6,182,212,0.25),inset_0_1px_0_0_rgba(6,182,212,0.2)]',
     };
 
     const sizes = {

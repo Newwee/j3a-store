@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ShoppingCart, Eye, Sparkles } from 'lucide-react';
+import { ShoppingCart, Eye, Sparkles, Star } from 'lucide-react';
 import { Product } from '@/types/product';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { useCart } from '@/context/CartContext';
@@ -19,7 +19,7 @@ export function ProductCard({ product }: { product: Product }) {
       : null;
 
   return (
-    <div className="group relative flex flex-col bg-slate-900/70 hover:bg-slate-900 border border-slate-800 hover:border-cyan-500/50 rounded-2xl overflow-hidden shadow-lg hover:shadow-[0_0_25px_rgba(6,182,212,0.2)] transition-all duration-300">
+    <div className="group relative flex flex-col rb-card overflow-hidden transition-all duration-300">
       {/* Top Image Banner */}
       <div className="relative w-full aspect-square bg-slate-950/60 overflow-hidden flex items-center justify-center p-3">
         <Image
@@ -77,7 +77,13 @@ export function ProductCard({ product }: { product: Product }) {
         <div>
           <div className="flex items-center justify-between gap-2 mb-1.5">
             <span className="text-xs text-slate-400 line-clamp-1">{product.category}</span>
-            <ProductStatusBadge status={product.status} />
+            <div className="flex items-center gap-1.5">
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-400">
+                <Star className="w-3 h-3 fill-amber-400" />
+                {(product.rating || 5.0).toFixed(1)}
+              </span>
+              <ProductStatusBadge status={product.status} />
+            </div>
           </div>
 
           <Link href={`/products/${product.slug || product.id}`} className="block group-hover:text-cyan-400 transition-colors">
