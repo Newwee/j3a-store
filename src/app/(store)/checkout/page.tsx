@@ -440,6 +440,7 @@ export default function CheckoutPage() {
                           src={item.product.image || '/logo.png'}
                           alt={item.product.name}
                           fill
+                          unoptimized={Boolean(item.product.image?.startsWith('data:'))}
                           className="object-contain p-1"
                         />
                       </div>

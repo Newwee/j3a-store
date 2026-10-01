@@ -210,6 +210,7 @@ export default function AdminDashboardPage() {
                           src={prod.image || '/logo.png'}
                           alt={prod.name}
                           fill
+                          unoptimized={Boolean(prod.image?.startsWith('data:'))}
                           className="object-contain p-0.5"
                         />
                       </div>

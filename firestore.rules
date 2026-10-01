@@ -27,7 +27,7 @@ rules_version = '2';
 //   - description: string | null (optional, max 10,000 chars)
 //   - price: number (required, non-negative number)
 //   - comparePrice: number | null (optional, non-negative number)
-//   - image: string (required, valid URL / path, 1-1000 chars)
+//   - image: string (required, valid URL / path or base64 data URL, max 800KB)
 //   - images: list of strings (optional, max 20 items)
 //   - category: string (required, 1-100 chars)
 //   - stock: number (required, non-negative integer/number)
@@ -35,6 +35,8 @@ rules_version = '2';
 //   - featured: bool (required)
 //   - tags: list of strings (optional, max 30 items)
 //   - specs: map (optional, max 50 keys)
+//   - rating: number | null (optional, 0 to 5)
+//   - reviewCount: number | null (optional, non-negative number)
 //   - createdAt: timestamp | string (optional, immutable)
 //   - updatedAt: timestamp | string (optional)
 //
@@ -51,7 +53,7 @@ rules_version = '2';
 //   - total: number (required, non-negative number)
 //   - paymentMethod: string (required, 'promptpay' | 'bank_transfer' | 'credit_card' | 'wallet')
 //   - status: string (required, 'pending' | 'paid' | 'processing' | 'completed' | 'cancelled')
-//   - paymentProofUrl: string | null (optional, valid URL / path, max 1000 chars)
+//   - paymentProofUrl: string | null (optional, valid URL / path or base64 data URL, max 800KB)
 //   - transactionRef: string | null (optional, max 100 chars)
 //   - createdAt: timestamp | string (optional, immutable)
 //   - updatedAt: timestamp | string (optional)
@@ -118,6 +120,11 @@ service cloud.firestore {
         (url.matches("^https?://.*") || url.matches("^/.*"));
     }
 
+    // Validate product image (URL or compressed base64 data URL under 800KB)
+    function isValidProductImage(img) {
+      return img is string && (isValidUrl(img) || (img.matches("^data:image/.*") && img.size() <= 800000));
+    }
+
     // Validate date / timestamp representation (Timestamp or ISO string)
     function isValidDate(val) {
       return val is timestamp || (val is string && val.size() >= 10 && val.size() <= 40);
@@ -152,7 +159,7 @@ service cloud.firestore {
         (!('description' in data) || data.description == null || (data.description is string && data.description.size() <= 10000)) &&
         data.price is number && data.price >= 0 && data.price <= 100000000 &&
         (!('comparePrice' in data) || data.comparePrice == null || (data.comparePrice is number && data.comparePrice >= 0 && data.comparePrice <= 100000000)) &&
-        data.image is string && isValidUrl(data.image) &&
+        isValidProductImage(data.image) &&
         (!('images' in data) || (data.images is list && data.images.size() <= 20)) &&
         data.category is string && data.category.size() >= 1 && data.category.size() <= 100 &&
         data.stock is number && data.stock >= 0 && data.stock <= 1000000 &&
@@ -160,6 +167,8 @@ service cloud.firestore {
         data.featured is bool &&
         (!('tags' in data) || (data.tags is list && data.tags.size() <= 30)) &&
         (!('specs' in data) || (data.specs is map && data.specs.size() <= 50)) &&
+        (!('rating' in data) || data.rating == null || (data.rating is number && data.rating >= 0 && data.rating <= 5)) &&
+        (!('reviewCount' in data) || data.reviewCount == null || (data.reviewCount is number && data.reviewCount >= 0)) &&
         (!('id' in data) || data.id == null || (data.id is string && data.id.size() <= 100)) &&
         (!('createdAt' in data) || isValidDate(data.createdAt)) &&
         (!('updatedAt' in data) || isValidDate(data.updatedAt));
@@ -191,7 +200,7 @@ service cloud.firestore {
         data.total is number && data.total >= 0 && data.total <= 100000000 &&
         data.paymentMethod in ['promptpay', 'bank_transfer', 'credit_card', 'wallet'] &&
         data.status in ['pending', 'paid', 'processing', 'completed', 'cancelled'] &&
-        (!('paymentProofUrl' in data) || data.paymentProofUrl == null || (data.paymentProofUrl is string && isValidUrl(data.paymentProofUrl))) &&
+        (!('paymentProofUrl' in data) || data.paymentProofUrl == null || (data.paymentProofUrl is string && (isValidUrl(data.paymentProofUrl) || (data.paymentProofUrl.matches("^data:image/.*") && data.paymentProofUrl.size() <= 800000)))) &&
         (!('transactionRef' in data) || data.transactionRef == null || (data.transactionRef is string && data.transactionRef.size() <= 100)) &&
         (!('createdAt' in data) || isValidDate(data.createdAt)) &&
         (!('updatedAt' in data) || isValidDate(data.updatedAt));

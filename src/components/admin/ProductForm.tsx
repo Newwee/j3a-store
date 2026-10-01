@@ -19,6 +19,7 @@ import { Product, ProductFormData, ProductStatus } from '@/types/product';
 import { uploadProductImage, deleteProductImage } from '@/lib/storage/upload';
 import { createProduct, updateProduct } from '@/lib/firestore/products';
 import { slugify } from '@/lib/utils/formatters';
+import { compressImageToDataUrl } from '@/lib/utils/image';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useToast } from '@/context/ToastContext';
@@ -79,11 +80,17 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
   };
 
   // Image selection
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setSelectedFile(file);
-      setImagePreview(URL.createObjectURL(file));
+      try {
+        const compressed = await compressImageToDataUrl(file, 800, 800, 0.75);
+        setImagePreview(compressed);
+      } catch (err) {
+        console.warn('Could not compress image preview:', err);
+        setImagePreview(URL.createObjectURL(file));
+      }
       setUploadProgress(0);
     }
   };
@@ -126,7 +133,8 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
           const { downloadUrl } = await uploadProductImage(
             selectedFile,
             'products',
-            (progress) => setUploadProgress(progress)
+            (progress) => setUploadProgress(progress),
+            4000
           );
           finalImageUrl = downloadUrl;
 
@@ -135,12 +143,24 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
             await deleteProductImage(initialData.image);
           }
         } catch (uploadErr: any) {
-          console.warn('Storage upload error, using local/preview URL:', uploadErr);
-          // If storage isn't configured, fallback gracefully so demo or dev is not broken
-          toast('บันทึกรูปภาพแบบ URL สำรอง (ตรวจสอบ Firebase Storage Config)', 'info');
+          console.warn('Firebase Storage upload blocked (CORS) or timed out, using compressed data URL:', uploadErr);
+          // If storage isn't configured or CORS blocked, use compressed data URL so product creation succeeds immediately!
+          if (!imagePreview || imagePreview.startsWith('blob:')) {
+            finalImageUrl = await compressImageToDataUrl(selectedFile, 800, 800, 0.75);
+          } else {
+            finalImageUrl = imagePreview;
+          }
+          toast('บันทึกรูปภาพลงฐานข้อมูลเรียบร้อย (ระบบใช้ Compressed Fallback อัตโนมัติ)', 'info');
         } finally {
           setIsUploading(false);
         }
+      }
+
+      // Safeguard: Ensure finalImageUrl is never a temporary blob: URL
+      if (finalImageUrl.startsWith('blob:') && selectedFile) {
+        finalImageUrl = await compressImageToDataUrl(selectedFile, 800, 800, 0.75);
+      } else if (finalImageUrl.startsWith('blob:')) {
+        finalImageUrl = '/logo.png';
       }
 
       // 2. Prepare payload
@@ -154,7 +174,7 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
         slug: slug.trim(),
         description: description.trim(),
         price: Number(price),
-        comparePrice: comparePrice !== '' ? Number(comparePrice) : undefined,
+        ...(comparePrice !== '' && !isNaN(Number(comparePrice)) ? { comparePrice: Number(comparePrice) } : {}),
         category,
         stock: Number(stock),
         status,
@@ -348,6 +368,7 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
                     src={imagePreview}
                     alt="Preview"
                     fill
+                    unoptimized
                     className="object-contain p-2"
                   />
                   <div className="absolute top-2 right-2 flex gap-1.5 z-10">
@@ -411,12 +432,12 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
               <div className="flex gap-2">
                 <input
                   type="text"
-                  value={imagePreview.startsWith('blob:') ? '' : imagePreview}
+                  value={imagePreview.startsWith('blob:') || imagePreview.startsWith('data:') ? '' : imagePreview}
                   onChange={(e) => {
                     setImagePreview(e.target.value);
                     setSelectedFile(null);
                   }}
-                  placeholder="https://..."
+                  placeholder={imagePreview.startsWith('data:') ? '(รูปภาพที่อัปโหลดถูกบีบอัดพร้อมใช้งานแล้ว)' : 'https://...'}
                   className="w-full bg-slate-950/80 text-xs text-slate-200 rounded-lg px-2.5 py-2 border border-slate-800 focus:border-cyan-500 outline-none"
                 />
               </div>

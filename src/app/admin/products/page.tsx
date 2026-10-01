@@ -223,6 +223,7 @@ export default function AdminProductsPage() {
                           src={product.image || '/logo.png'}
                           alt={product.name}
                           fill
+                          unoptimized={Boolean(product.image?.startsWith('data:'))}
                           className="object-contain p-1"
                         />
                       </div>

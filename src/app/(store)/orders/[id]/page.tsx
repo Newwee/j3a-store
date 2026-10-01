@@ -147,6 +147,7 @@ export default function OrderDetailPage({
                         src={item.image || '/logo.png'}
                         alt={item.name}
                         fill
+                        unoptimized={Boolean(item.image?.startsWith('data:'))}
                         className="object-contain p-1"
                       />
                     </div>

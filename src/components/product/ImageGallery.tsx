@@ -30,6 +30,7 @@ export function ImageGallery({
             alt={productName}
             fill
             priority
+            unoptimized={Boolean(selectedImage?.startsWith('data:'))}
             className="object-contain transition-transform duration-500 group-hover:scale-105"
           />
         </div>
@@ -60,6 +61,7 @@ export function ImageGallery({
                 src={img}
                 alt={`${productName} thumbnail ${index + 1}`}
                 fill
+                unoptimized={Boolean(img?.startsWith('data:'))}
                 className="object-cover"
               />
             </button>

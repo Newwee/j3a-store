@@ -15,7 +15,8 @@ export interface UploadProgressCallback {
 export async function uploadProductImage(
   file: File,
   folder: string = 'products',
-  onProgress?: UploadProgressCallback
+  onProgress?: UploadProgressCallback,
+  timeoutMs: number = 4000
 ): Promise<{ downloadUrl: string; storagePath: string }> {
   if (!storage) {
     throw new Error('Firebase Storage is not initialized. Please verify your environment variables.');
@@ -45,6 +46,21 @@ export async function uploadProductImage(
   });
 
   return new Promise((resolve, reject) => {
+    let timer: NodeJS.Timeout | null = null;
+    let isSettled = false;
+
+    if (timeoutMs > 0) {
+      timer = setTimeout(() => {
+        if (!isSettled) {
+          isSettled = true;
+          try {
+            uploadTask.cancel();
+          } catch {}
+          reject(new Error('Firebase Storage connection timed out (CORS or network policy).'));
+        }
+      }, timeoutMs);
+    }
+
     uploadTask.on(
       'state_changed',
       (snapshot) => {
@@ -56,15 +72,23 @@ export async function uploadProductImage(
         }
       },
       (error) => {
-        console.error('Storage upload error:', error);
-        reject(new Error(`เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ: ${error.message}`));
+        if (timer) clearTimeout(timer);
+        if (!isSettled) {
+          isSettled = true;
+          console.warn('Firebase Storage upload error (e.g. CORS preflight failed):', error);
+          reject(new Error(`เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ: ${error.message}`));
+        }
       },
       async () => {
-        try {
-          const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-          resolve({ downloadUrl, storagePath });
-        } catch (urlError) {
-          reject(urlError);
+        if (timer) clearTimeout(timer);
+        if (!isSettled) {
+          isSettled = true;
+          try {
+            const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+            resolve({ downloadUrl, storagePath });
+          } catch (urlError) {
+            reject(urlError);
+          }
         }
       }
     );
