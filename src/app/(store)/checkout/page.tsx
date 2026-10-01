@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -28,12 +28,28 @@ import { formatCurrency } from '@/lib/utils/formatters';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { uploadProductImage } from '@/lib/storage/upload';
+import { getStoreSettings, DEFAULT_STORE_SETTINGS } from '@/lib/firestore/settings';
+import { StoreSettings } from '@/types/settings';
 
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, subtotal, shipping, total, clearCart } = useCart();
   const { user, profile } = useAuth();
   const { success, error, toast } = useToast();
+
+  const [storeSettings, setStoreSettings] = useState<StoreSettings>(DEFAULT_STORE_SETTINGS);
+
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const s = await getStoreSettings();
+        setStoreSettings(s);
+      } catch (err) {
+        console.error('Failed to load store settings:', err);
+      }
+    }
+    loadSettings();
+  }, []);
 
   // Form Fields
   const [name, setName] = useState(profile?.displayName || user?.displayName || '');
@@ -164,7 +180,7 @@ export default function CheckoutPage() {
     }
   };
 
-  const promptpayNumber = process.env.NEXT_PUBLIC_PROMPTPAY_NUMBER || '081-234-5678';
+  const promptpayNumber = storeSettings.promptpay || process.env.NEXT_PUBLIC_PROMPTPAY_NUMBER || '081-234-5678';
 
   return (
     <div className="py-8 sm:py-12">
@@ -300,7 +316,7 @@ export default function CheckoutPage() {
                           </div>
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-slate-400">ชื่อบัญชี:</span>
-                            <span className="font-bold text-white">J3A STORE Co., Ltd.</span>
+                            <span className="font-bold text-white">{storeSettings.storeName || 'J3A STORE Co., Ltd.'}</span>
                           </div>
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-slate-400">ยอดชำระ:</span>

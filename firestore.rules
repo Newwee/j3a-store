@@ -313,5 +313,14 @@ service cloud.firestore {
       // Update / Delete: Admin only (for approving and rejecting requests)
       allow update, delete: if isAdmin();
     }
+
+    // 6. Settings Collection (Store Configuration & PromptPay Info)
+    match /settings/{settingId} {
+      // Read: Public read so users can view store info and PromptPay number
+      allow read: if true;
+
+      // Write: Admin only
+      allow write: if isAdmin();
+    }
   }
 }

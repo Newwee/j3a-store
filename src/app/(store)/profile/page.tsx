@@ -30,6 +30,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { updateUserProfile } from '@/lib/firestore/users';
 import { createTopupRequest, getUserTopups } from '@/lib/firestore/topups';
+import { getStoreSettings, DEFAULT_STORE_SETTINGS } from '@/lib/firestore/settings';
+import { StoreSettings } from '@/types/settings';
 import { TopupRequest } from '@/types/topup';
 import { TierBadge, RoleBadge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -50,6 +52,9 @@ function ProfileContent() {
   const [isSaving, setIsSaving] = useState(false);
   const [isRefreshingBalance, setIsRefreshingBalance] = useState(false);
 
+  // Store Settings (Dynamic PromptPay & Store Name from Admin)
+  const [storeSettings, setStoreSettings] = useState<StoreSettings>(DEFAULT_STORE_SETTINGS);
+
   // Top-up State
   const [topupAmount, setTopupAmount] = useState<number>(300);
   const [customAmount, setCustomAmount] = useState<string>('');
@@ -63,6 +68,19 @@ function ProfileContent() {
   const [viewingSlip, setViewingSlip] = useState<TopupRequest | null>(null);
 
   const effectiveAmount = customAmount && Number(customAmount) > 0 ? Number(customAmount) : topupAmount;
+
+  // Load Store Settings from Firestore
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const s = await getStoreSettings();
+        setStoreSettings(s);
+      } catch (err) {
+        console.error('Failed to load store settings:', err);
+      }
+    }
+    loadSettings();
+  }, []);
 
   const loadTopupHistory = async () => {
     if (!user) return;
@@ -129,8 +147,10 @@ function ProfileContent() {
     }
   };
 
+  const cleanPromptpay = (storeSettings.promptpay || '0812345678').replace(/[^0-9]/g, '');
+
   const handleCopyPromptPay = () => {
-    navigator.clipboard.writeText('0812345678');
+    navigator.clipboard.writeText(cleanPromptpay || storeSettings.promptpay);
     setCopiedPromptPay(true);
     success('คัดลอกหมายเลขพร้อมเพย์เรียบร้อยแล้ว');
     setTimeout(() => setCopiedPromptPay(false), 2000);
@@ -189,8 +209,8 @@ function ProfileContent() {
   const credits = profile?.credits || 0;
   const userInitials = (profile?.displayName || user.displayName || 'U').charAt(0).toUpperCase();
 
-  // Dynamic PromptPay QR Code Link
-  const qrCodeUrl = `https://promptpay.io/0812345678/${effectiveAmount}.png`;
+  // Dynamic PromptPay QR Code Link from Firestore Admin Settings
+  const qrCodeUrl = `https://promptpay.io/${cleanPromptpay || '0812345678'}/${effectiveAmount}.png`;
 
   return (
     <div className="py-8 sm:py-12">
@@ -461,12 +481,14 @@ function ProfileContent() {
                 <div className="bg-slate-950/80 rounded-2xl p-4 border border-slate-800 text-left space-y-2 text-xs">
                   <div className="flex justify-between items-center text-slate-400">
                     <span>ชื่อบัญชี:</span>
-                    <span className="font-bold text-white">J3A STORE OFFICIAL</span>
+                    <span className="font-bold text-white">{storeSettings.storeName || 'J3A STORE OFFICIAL'}</span>
                   </div>
                   <div className="flex justify-between items-center text-slate-400">
                     <span>พร้อมเพย์:</span>
                     <div className="flex items-center gap-1.5">
-                      <span className="font-mono font-bold text-cyan-300">081-234-5678</span>
+                      <span className="font-mono font-bold text-cyan-300">
+                        {storeSettings.promptpay || '081-234-5678'}
+                      </span>
                       <button
                         onClick={handleCopyPromptPay}
                         className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-white"
