@@ -38,6 +38,8 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
+import { compressImageToDataUrl } from '@/lib/utils/image';
+import { uploadProductImage } from '@/lib/storage/upload';
 
 function ProfileContent() {
   const searchParams = useSearchParams();
@@ -58,6 +60,7 @@ function ProfileContent() {
   // Top-up State
   const [topupAmount, setTopupAmount] = useState<number>(300);
   const [customAmount, setCustomAmount] = useState<string>('');
+  const [slipFile, setSlipFile] = useState<File | null>(null);
   const [slipPreview, setSlipPreview] = useState<string>('');
   const [isSubmittingTopup, setIsSubmittingTopup] = useState(false);
   const [copiedPromptPay, setCopiedPromptPay] = useState(false);
@@ -156,20 +159,23 @@ function ProfileContent() {
     setTimeout(() => setCopiedPromptPay(false), 2000);
   };
 
-  const handleSlipFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSlipFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      error('ขนาดไฟล์รูปภาพต้องไม่เกิน 5MB');
+    if (file.size > 20 * 1024 * 1024) {
+      error('ขนาดไฟล์รูปภาพต้องไม่เกิน 20MB');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      setSlipPreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    try {
+      setSlipFile(file);
+      // Auto compress to lightweight data URL (safe for Firestore < 600,000 bytes)
+      const compressed = await compressImageToDataUrl(file);
+      setSlipPreview(compressed);
+    } catch (err: any) {
+      error(err.message || 'ไม่สามารถประมวลผลรูปภาพได้');
+    }
   };
 
   const handleSubmitTopup = async (e: React.FormEvent) => {
@@ -186,15 +192,30 @@ function ProfileContent() {
 
     setIsSubmittingTopup(true);
     try {
+      let finalSlipUrl = slipPreview;
+
+      // 1. Try uploading to Firebase Storage first (gets clean short URL)
+      if (slipFile) {
+        try {
+          const uploadRes = await uploadProductImage(slipFile, 'slips');
+          if (uploadRes?.downloadUrl) {
+            finalSlipUrl = uploadRes.downloadUrl;
+          }
+        } catch (storageErr) {
+          console.warn('Firebase Storage upload skipped/failed, using compressed data URL fallback:', storageErr);
+        }
+      }
+
       await createTopupRequest({
         userId: user.uid,
         userEmail: user.email || '',
         userName: profile?.displayName || user.displayName || 'ลูกค้า',
         amount: effectiveAmount,
-        paymentSlipUrl: slipPreview,
+        paymentSlipUrl: finalSlipUrl,
       });
 
       success('แจ้งการโอนเงินเรียบร้อยแล้ว! แอดมินจะตรวจสอบและอนุมัติเครดิตเข้าบัญชีของคุณ');
+      setSlipFile(null);
       setSlipPreview('');
       setCustomAmount('');
       // Reload top-up history
@@ -398,7 +419,10 @@ function ProfileContent() {
                       {slipPreview && (
                         <button
                           type="button"
-                          onClick={() => setSlipPreview('')}
+                          onClick={() => {
+                            setSlipPreview('');
+                            setSlipFile(null);
+                          }}
                           className="text-[11px] text-rose-400 hover:underline"
                         >
                           ลบรูปภาพ
@@ -422,7 +446,7 @@ function ProfileContent() {
                           คลิกเพื่อเลือกไฟล์รูปภาพสลิปโอนเงิน
                         </span>
                         <span className="text-[11px] text-slate-500">
-                          รองรับไฟล์ JPG, PNG, WEBP (สูงสุด 5MB)
+                          รองรับไฟล์ JPG, PNG, WEBP, GIF (ระบบบีบอัดรูปภาพอัตโนมัติ)
                         </span>
                         <input
                           type="file"
