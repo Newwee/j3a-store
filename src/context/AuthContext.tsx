@@ -50,15 +50,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProfile(p);
     } catch (err) {
       console.error('Error syncing user profile from Firestore:', err);
-      // Fallback guest profile if firestore unavailable
+      const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || '')
+        .toLowerCase()
+        .split(',')
+        .map((e) => e.trim())
+        .filter(Boolean);
+      const isMaster = Boolean(
+        firebaseUser.email && adminEmails.includes(firebaseUser.email.toLowerCase())
+      );
+
+      // Fallback profile if firestore unavailable
       setProfile({
         uid: firebaseUser.uid,
         email: firebaseUser.email,
         displayName: firebaseUser.displayName || 'Customer',
         photoURL: firebaseUser.photoURL,
-        role: 'customer',
+        role: isMaster ? 'admin' : 'customer',
         credits: 0,
-        tier: 'Bronze',
+        tier: isMaster ? 'VIP' : 'Bronze',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
@@ -123,8 +132,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await sendPasswordResetEmail(auth, email);
   };
 
-  const role: UserRole = profile?.role || 'customer';
-  const isAdmin = role === 'admin';
+  const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || '')
+    .toLowerCase()
+    .split(',')
+    .map((e) => e.trim())
+    .filter(Boolean);
+
+  const isMasterAdmin = Boolean(
+    user?.email && adminEmails.includes(user.email.toLowerCase())
+  );
+  const role: UserRole = isMasterAdmin ? 'admin' : (profile?.role || 'customer');
+  const isAdmin = role === 'admin' || isMasterAdmin;
 
   return (
     <AuthContext.Provider

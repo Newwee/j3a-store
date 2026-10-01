@@ -45,6 +45,14 @@ function mapDocToUserProfile(docSnap: { id: string; data: () => Record<string, u
     updatedAt,
   };
 }
+function getAdminEmails(): string[] {
+  const envEmails = process.env.NEXT_PUBLIC_ADMIN_EMAIL || '';
+  return envEmails
+    .toLowerCase()
+    .split(',')
+    .map((e) => e.trim())
+    .filter(Boolean);
+}
 
 /**
  * Fetch a user profile from Firestore by UID
@@ -60,7 +68,12 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
       return null;
     }
 
-    return mapDocToUserProfile(snap);
+    const profile = mapDocToUserProfile(snap);
+    const adminEmails = getAdminEmails();
+    if (profile.email && adminEmails.includes(profile.email.toLowerCase())) {
+      profile.role = 'admin';
+    }
+    return profile;
   } catch (error) {
     console.error('Error fetching user profile:', error);
     return null;
@@ -80,19 +93,34 @@ export async function createUserProfile(
   const docRef = doc(db, USERS_COLLECTION, uid);
   const existing = await getDoc(docRef);
 
+  const adminEmails = getAdminEmails();
+  const isMasterAdmin = Boolean(
+    data.email && adminEmails.includes(data.email.toLowerCase())
+  );
+
   if (existing.exists()) {
-    // Return existing profile, do not overwrite role
-    return mapDocToUserProfile(existing);
+    const profile = mapDocToUserProfile(existing);
+    if (isMasterAdmin && profile.role !== 'admin') {
+      try {
+        await updateDoc(docRef, { role: 'admin', updatedAt: serverTimestamp() });
+        profile.role = 'admin';
+      } catch (e) {
+        profile.role = 'admin';
+      }
+    }
+    return profile;
   }
+
+  const initialRole: UserRole = isMasterAdmin ? 'admin' : 'customer';
 
   const profileData = {
     uid,
     email: data.email || null,
     displayName: data.displayName || 'Customer',
     photoURL: data.photoURL || null,
-    role: 'customer' as UserRole, // ALWAYS default to 'customer'
+    role: initialRole,
     credits: 0,
-    tier: 'Bronze' as UserTier,
+    tier: (isMasterAdmin ? 'VIP' : 'Bronze') as UserTier,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
