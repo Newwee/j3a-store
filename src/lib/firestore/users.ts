@@ -46,7 +46,7 @@ function mapDocToUserProfile(docSnap: { id: string; data: () => Record<string, u
   };
 }
 function getAdminEmails(): string[] {
-  const envEmails = process.env.NEXT_PUBLIC_ADMIN_EMAIL || '';
+  const envEmails = process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'mynameisyee0@gmail.com';
   return envEmails
     .toLowerCase()
     .split(',')
