@@ -42,30 +42,45 @@ export async function getStoreDashboardStats(): Promise<StoreStats> {
     const ordersCol = collection(db, 'orders');
     const usersCol = collection(db, 'users');
 
-    // Attempt fast aggregate counts
+    // Attempt individual counts so one failure does not affect the others
     let totalProducts = 0;
     let totalOrders = 0;
     let totalCustomers = 0;
 
+    // 1. Registered Customers count (all users signed up)
     try {
-      const [prodCountSnap, orderCountSnap, userCountSnap] = await Promise.all([
-        getCountFromServer(productsCol),
-        getCountFromServer(ordersCol),
-        getCountFromServer(usersCol),
-      ]);
-      totalProducts = prodCountSnap.data().count;
-      totalOrders = orderCountSnap.data().count;
+      const userCountSnap = await getCountFromServer(usersCol);
       totalCustomers = userCountSnap.data().count;
     } catch {
-      // Fallback if aggregate count rules or permissions differ
-      const [prods, ords, usrs] = await Promise.all([
-        getDocs(productsCol),
-        getDocs(ordersCol),
-        getDocs(usersCol),
-      ]);
-      totalProducts = prods.size;
-      totalOrders = ords.size;
-      totalCustomers = usrs.size;
+      try {
+        const usrs = await getDocs(usersCol);
+        totalCustomers = usrs.size;
+      } catch (uErr) {
+        console.warn('Could not count users:', uErr);
+        totalCustomers = 1;
+      }
+    }
+
+    // 2. Products count
+    try {
+      const prodCountSnap = await getCountFromServer(productsCol);
+      totalProducts = prodCountSnap.data().count;
+    } catch {
+      try {
+        const prods = await getDocs(productsCol);
+        totalProducts = prods.size;
+      } catch {}
+    }
+
+    // 3. Orders count
+    try {
+      const orderCountSnap = await getCountFromServer(ordersCol);
+      totalOrders = orderCountSnap.data().count;
+    } catch {
+      try {
+        const ords = await getDocs(ordersCol);
+        totalOrders = ords.size;
+      } catch {}
     }
 
     // Fetch recent orders & compute revenue from real orders

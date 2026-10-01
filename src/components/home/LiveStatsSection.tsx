@@ -5,6 +5,8 @@ import { Users, ShoppingBag, Box, Star } from 'lucide-react';
 import { formatNumber } from '@/lib/utils/formatters';
 import { getStoreDashboardStats } from '@/lib/firestore/stats';
 
+import { CountUp } from '@/components/ui/CountUp';
+
 export function LiveStatsSection() {
   const [stats, setStats] = useState({
     members: 1,
@@ -73,22 +75,22 @@ export function LiveStatsSection() {
 
           {/* Stat Cards Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Card 1: สมาชิกทั้งหมด */}
+            {/* Card 1: สมาชิกทั้งหมด (คนที่สมัคร) */}
             <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 sm:p-5 flex items-center justify-between gap-4 hover:border-cyan-500/40 transition-colors">
               <div className="flex items-center gap-3.5">
                 <div className="w-11 h-11 rounded-xl bg-slate-800/80 border border-slate-700/60 flex items-center justify-center text-cyan-400 shrink-0 shadow-inner">
                   <Users className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-slate-300 leading-tight">
+                  <p className="text-xs font-bold text-slate-200 leading-tight">
                     สมาชิกทั้งหมด
                   </p>
-                  <p className="text-[11px] text-slate-500">ผู้ใช้งาน</p>
+                  <p className="text-[11px] text-cyan-400/90 font-medium">คนที่สมัครทั้งหมด</p>
                 </div>
               </div>
               <div className="text-right">
                 <span className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                  {formatNumber(stats.members)}
+                  <CountUp to={stats.members} />
                 </span>
                 <span className="text-xs text-slate-400 ml-1.5 font-medium">คน</span>
               </div>
@@ -109,7 +111,7 @@ export function LiveStatsSection() {
               </div>
               <div className="text-right">
                 <span className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                  {formatNumber(stats.orders)}
+                  <CountUp to={stats.orders} />
                 </span>
                 <span className="text-xs text-slate-400 ml-1.5 font-medium">รายการ</span>
               </div>
@@ -130,7 +132,7 @@ export function LiveStatsSection() {
               </div>
               <div className="text-right">
                 <span className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                  {stats.products}
+                  <CountUp to={stats.products} />
                 </span>
                 <span className="text-xs text-slate-400 ml-1.5 font-medium">รายการ</span>
               </div>

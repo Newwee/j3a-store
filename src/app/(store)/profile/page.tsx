@@ -25,11 +25,16 @@ import {
   ExternalLink,
   Receipt,
   FileImage,
+  Gift,
+  Building2,
+  Send,
+  Ticket,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { updateUserProfile } from '@/lib/firestore/users';
 import { createTopupRequest, getUserTopups } from '@/lib/firestore/topups';
+import { redeemCodeForUser } from '@/lib/firestore/redeem';
 import { getStoreSettings, DEFAULT_STORE_SETTINGS } from '@/lib/firestore/settings';
 import { StoreSettings } from '@/types/settings';
 import { TopupRequest } from '@/types/topup';
@@ -40,37 +45,43 @@ import { Modal } from '@/components/ui/Modal';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
 import { compressImageToDataUrl } from '@/lib/utils/image';
 import { uploadProductImage } from '@/lib/storage/upload';
+import { SettingsTabContent } from '@/components/profile/SettingsTabContent';
 
 function ProfileContent() {
   const searchParams = useSearchParams();
   const initialTab = searchParams.get('tab') || 'overview';
 
   const { user, profile, refreshProfile } = useAuth();
-  const { success, error } = useToast();
+  const { success, error, toast } = useToast();
 
   const [activeTab, setActiveTab] = useState(initialTab);
-  const [displayName, setDisplayName] = useState(profile?.displayName || user?.displayName || '');
-  const [phone, setPhone] = useState(profile?.phone || '');
-  const [isSaving, setIsSaving] = useState(false);
   const [isRefreshingBalance, setIsRefreshingBalance] = useState(false);
 
   // Store Settings (Dynamic PromptPay & Store Name from Admin)
   const [storeSettings, setStoreSettings] = useState<StoreSettings>(DEFAULT_STORE_SETTINGS);
 
+  // Top-up Method selection: 'promptpay_slip' | 'bank_auto' | 'angpao' | 'redeem'
+  const [topupMethod, setTopupMethod] = useState<'promptpay_slip' | 'bank_auto' | 'angpao' | 'redeem'>('promptpay_slip');
+
   // Top-up State
-  const [topupAmount, setTopupAmount] = useState<number>(300);
+  const [selectedPreset, setSelectedPreset] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState<string>('');
   const [slipFile, setSlipFile] = useState<File | null>(null);
   const [slipPreview, setSlipPreview] = useState<string>('');
   const [isSubmittingTopup, setIsSubmittingTopup] = useState(false);
   const [copiedPromptPay, setCopiedPromptPay] = useState(false);
 
+  // Redeem Code state
+  const [redeemCodeInput, setRedeemCodeInput] = useState('');
+  const [isRedeeming, setIsRedeeming] = useState(false);
+
   // Top-up History
   const [userTopups, setUserTopups] = useState<TopupRequest[]>([]);
   const [loadingTopups, setLoadingTopups] = useState(false);
   const [viewingSlip, setViewingSlip] = useState<TopupRequest | null>(null);
 
-  const effectiveAmount = customAmount && Number(customAmount) > 0 ? Number(customAmount) : topupAmount;
+  const effectiveAmount = customAmount && Number(customAmount) > 0 ? Number(customAmount) : (selectedPreset || 0);
+  const hasSelectedAmount = effectiveAmount > 0;
 
   // Load Store Settings from Firestore
   useEffect(() => {
@@ -118,23 +129,6 @@ function ProfileContent() {
     );
   }
 
-  const handleUpdateProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSaving(true);
-    try {
-      await updateUserProfile(user.uid, {
-        displayName: displayName.trim(),
-        phone: phone.trim(),
-      });
-      await refreshProfile();
-      success('อัปเดตข้อมูลบัญชีสำเร็จแล้ว');
-    } catch (err: any) {
-      error(`เกิดข้อผิดพลาด: ${err.message || 'กรุณาลองใหม่อีกครั้ง'}`);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   const handleRefreshBalance = async () => {
     setIsRefreshingBalance(true);
     try {
@@ -143,7 +137,7 @@ function ProfileContent() {
         await loadTopupHistory();
       }
       success('อัปเดตยอดเครดิตล่าสุดแล้ว');
-    } catch (err) {
+    } catch {
       error('ไม่สามารถรีเฟรชยอดเงินได้');
     } finally {
       setIsRefreshingBalance(false);
@@ -180,13 +174,12 @@ function ProfileContent() {
 
   const handleSubmitTopup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!slipPreview) {
-      error('กรุณาอัปโหลดรูปภาพสลิปหลักฐานการโอนเงิน');
+    if (!hasSelectedAmount) {
+      error('กรุณาเลือกหรือระบุจำนวนเงินที่ต้องการเติมก่อน');
       return;
     }
-
-    if (effectiveAmount <= 0) {
-      error('ยอดเงินเติมต้องมากกว่า 0 บาท');
+    if (!slipPreview) {
+      error('กรุณาอัปโหลดรูปภาพสลิปหลักฐานการโอนเงิน');
       return;
     }
 
@@ -217,6 +210,7 @@ function ProfileContent() {
       success('แจ้งการโอนเงินเรียบร้อยแล้ว! แอดมินจะตรวจสอบและอนุมัติเครดิตเข้าบัญชีของคุณ');
       setSlipFile(null);
       setSlipPreview('');
+      setSelectedPreset(null);
       setCustomAmount('');
       // Reload top-up history
       await loadTopupHistory();
@@ -224,6 +218,29 @@ function ProfileContent() {
       error(`เกิดข้อผิดพลาด: ${err.message || 'ไม่สามารถส่งคำขอเติมเงินได้'}`);
     } finally {
       setIsSubmittingTopup(false);
+    }
+  };
+
+  const handleRedeemCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!redeemCodeInput.trim()) {
+      error('กรุณากรอกโค้ดของขวัญ');
+      return;
+    }
+    setIsRedeeming(true);
+    try {
+      const res = await redeemCodeForUser(redeemCodeInput, user.uid);
+      if (res.success) {
+        success(res.message);
+        setRedeemCodeInput('');
+        await refreshProfile();
+      } else {
+        error(res.message);
+      }
+    } catch (err: any) {
+      error(err.message || 'เกิดข้อผิดพลาดในการแลกโค้ด');
+    } finally {
+      setIsRedeeming(false);
     }
   };
 
@@ -286,7 +303,7 @@ function ProfileContent() {
               onClick={handleRefreshBalance}
               disabled={isRefreshingBalance}
               title="รีเฟรชยอดเงิน"
-              className="p-2 rounded-xl bg-slate-900 border border-slate-700 hover:border-cyan-400 text-slate-400 hover:text-cyan-300 transition-colors"
+              className="p-2 rounded-xl bg-slate-900 border border-slate-700 hover:border-cyan-400 text-slate-400 hover:text-cyan-300 transition-colors cursor-pointer"
             >
               <RefreshCw className={`w-4 h-4 ${isRefreshingBalance ? 'animate-spin text-cyan-400' : ''}`} />
             </button>
@@ -297,9 +314,9 @@ function ProfileContent() {
         <div className="flex items-center gap-2 border-b border-slate-800 pb-3 overflow-x-auto scrollbar-none text-xs sm:text-sm font-semibold">
           <button
             onClick={() => setActiveTab('overview')}
-            className={`px-4 py-2 rounded-xl transition-all ${
+            className={`px-4 py-2 rounded-xl transition-all cursor-pointer ${
               activeTab === 'overview'
-                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-[0_0_12px_rgba(6,182,212,0.2)]'
                 : 'text-slate-400 hover:text-white hover:bg-slate-900'
             }`}
           >
@@ -307,19 +324,19 @@ function ProfileContent() {
           </button>
           <button
             onClick={() => setActiveTab('topup')}
-            className={`px-4 py-2 rounded-xl transition-all ${
+            className={`px-4 py-2 rounded-xl transition-all cursor-pointer ${
               activeTab === 'topup'
-                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-[0_0_12px_rgba(6,182,212,0.2)]'
                 : 'text-slate-400 hover:text-white hover:bg-slate-900'
             }`}
           >
-            เติมเงินเข้าระบบ (Top-up Slip)
+            เติมเงินเข้าระบบ (Top-up & Redeem)
           </button>
           <button
             onClick={() => setActiveTab('settings')}
-            className={`px-4 py-2 rounded-xl transition-all ${
+            className={`px-4 py-2 rounded-xl transition-all cursor-pointer ${
               activeTab === 'settings'
-                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-[0_0_12px_rgba(6,182,212,0.2)]'
                 : 'text-slate-400 hover:text-white hover:bg-slate-900'
             }`}
           >
@@ -360,184 +377,357 @@ function ProfileContent() {
           </div>
         )}
 
-        {/* Tab 2: Topup (PromptPay QR + Slip Upload + Admin Approval) */}
+        {/* Tab 2: Topup (Methods + Redeem) */}
         {activeTab === 'topup' && (
           <div className="space-y-8">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-              {/* Left Column: Form & Amount Picker */}
-              <div className="lg:col-span-7 bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8 backdrop-blur-md space-y-6">
-                <div>
-                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                    <QrCode className="w-5 h-5 text-cyan-400" />
-                    <span>แจ้งเติมเงินเข้ากระเป๋าเครดิต (PromptPay QR)</span>
-                  </h2>
-                  <p className="text-xs text-slate-400 mt-1">
-                    สแกน QR Code โอนเงิน แล้วแนบสลิปเพื่อให้แอดมินตรวจสอบและอนุมัติเครดิตเข้า User ID ของคุณ
+            {/* Top-up Method Switcher Pill Header */}
+            <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-2 backdrop-blur-md grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <button
+                type="button"
+                onClick={() => setTopupMethod('promptpay_slip')}
+                className={`flex items-center justify-center gap-2 py-3 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                  topupMethod === 'promptpay_slip'
+                    ? 'bg-cyan-500 text-slate-950 shadow-[0_0_15px_rgba(6,182,212,0.4)]'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                <QrCode className="w-4 h-4" />
+                <span>1. อัปโหลดสลิป</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setTopupMethod('bank_auto')}
+                className={`flex items-center justify-center gap-2 py-3 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                  topupMethod === 'bank_auto'
+                    ? 'bg-cyan-500 text-slate-950 shadow-[0_0_15px_rgba(6,182,212,0.4)]'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                <Building2 className="w-4 h-4" />
+                <span>2. โอนธนาคารอัตโนมัติ</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setTopupMethod('angpao')}
+                className={`flex items-center justify-center gap-2 py-3 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                  topupMethod === 'angpao'
+                    ? 'bg-rose-500 text-white shadow-[0_0_15px_rgba(244,63,94,0.4)]'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                <Gift className="w-4 h-4" />
+                <span>3. ซองอั่งเปา</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setTopupMethod('redeem')}
+                className={`flex items-center justify-center gap-2 py-3 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                  topupMethod === 'redeem'
+                    ? 'bg-amber-400 text-slate-950 shadow-[0_0_15px_rgba(251,191,36,0.4)]'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                <Ticket className="w-4 h-4" />
+                <span>4. Redeem Code</span>
+              </button>
+            </div>
+
+            {/* Method 1: PromptPay Slip Upload */}
+            {topupMethod === 'promptpay_slip' && (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                {/* Left Column: Form & Amount Picker */}
+                <div className="lg:col-span-7 bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8 backdrop-blur-md space-y-6">
+                  <div>
+                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                      <QrCode className="w-5 h-5 text-cyan-400" />
+                      <span>แจ้งเติมเงินเข้ากระเป๋าเครดิต (พร้อมเพย์สลิป)</span>
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-1">
+                      เลือกจำนวนเงินที่ต้องการเติม → QR Code จะแสดงผลทันที → โอนเงินแล้วแนบสลิปเพื่อให้แอดมินอนุมัติ
+                    </p>
+                  </div>
+
+                  {/* Step 1: Amount presets */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+                      <span>ขั้นตอนที่ 1: เลือกจำนวนเงินที่ต้องการเติม</span>
+                      {hasSelectedAmount && (
+                        <span className="text-xs font-bold text-cyan-400">
+                          เลือกแล้ว: {formatCurrency(effectiveAmount)}
+                        </span>
+                      )}
+                    </label>
+                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                      {[50, 100, 300, 500, 1000, 2000].map((amt) => (
+                        <button
+                          key={amt}
+                          type="button"
+                          onClick={() => {
+                            setSelectedPreset(amt);
+                            setCustomAmount('');
+                          }}
+                          className={`py-2.5 px-2 rounded-xl border font-bold text-xs sm:text-sm transition-all cursor-pointer ${
+                            selectedPreset === amt && !customAmount
+                              ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.4)]'
+                              : 'bg-slate-950/60 text-slate-300 border-slate-800 hover:border-slate-700 hover:text-white'
+                          }`}
+                        >
+                          {amt}฿
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Custom amount */}
+                    <div className="pt-2">
+                      <input
+                        type="number"
+                        min="1"
+                        placeholder="หรือระบุจำนวนเงินอื่น ๆ (บาท)..."
+                        value={customAmount}
+                        onChange={(e) => {
+                          setCustomAmount(e.target.value);
+                          setSelectedPreset(null);
+                        }}
+                        className="w-full bg-slate-950/80 text-sm text-slate-100 placeholder:text-slate-500 rounded-xl px-4 py-2.5 border border-slate-800 focus:border-cyan-400 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Step 2: Upload Slip (Unlocks only when amount is chosen) */}
+                  {hasSelectedAmount ? (
+                    <form onSubmit={handleSubmitTopup} className="space-y-5 pt-3 border-t border-slate-800 animate-in fade-in">
+                      <div className="space-y-2">
+                        <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+                          <span>ขั้นตอนที่ 2: แนบรูปภาพสลิปหลักฐานการโอนเงิน (Slip)</span>
+                          {slipPreview && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSlipPreview('');
+                                setSlipFile(null);
+                              }}
+                              className="text-[11px] text-rose-400 hover:underline cursor-pointer"
+                            >
+                              ลบรูปภาพ
+                            </button>
+                          )}
+                        </label>
+
+                        {slipPreview ? (
+                          <div className="relative w-full aspect-[4/3] max-h-60 rounded-2xl overflow-hidden border border-cyan-500/40 bg-slate-950 flex items-center justify-center">
+                            <Image
+                              src={slipPreview}
+                              alt="Slip Preview"
+                              fill
+                              className="object-contain p-2"
+                            />
+                          </div>
+                        ) : (
+                          <label className="border-2 border-dashed border-slate-700 hover:border-cyan-400/60 rounded-2xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer bg-slate-950/40 hover:bg-slate-950/80 transition-colors">
+                            <UploadCloud className="w-8 h-8 text-cyan-400" />
+                            <span className="text-xs font-bold text-slate-200">
+                              คลิกเพื่อเลือกไฟล์รูปภาพสลิปโอนเงิน
+                            </span>
+                            <span className="text-[11px] text-slate-500">
+                              รองรับไฟล์ JPG, JPEG, PNG, GIF, WEBP (บีบอัดอัตโนมัติ)
+                            </span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleSlipFileChange}
+                              className="hidden"
+                            />
+                          </label>
+                        )}
+                      </div>
+
+                      <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+                        <div>
+                          <span className="text-xs text-slate-400 block">ยอดเงินที่จะแจ้งเติม:</span>
+                          <span className="text-xl font-black text-cyan-400">
+                            {formatCurrency(effectiveAmount)}
+                          </span>
+                        </div>
+                        <Button
+                          type="submit"
+                          variant="primary"
+                          size="md"
+                          disabled={isSubmittingTopup || !slipPreview}
+                          isLoading={isSubmittingTopup}
+                          leftIcon={<Sparkles className="w-4 h-4" />}
+                        >
+                          แจ้งโอนเงินให้แอดมินอนุมัติ
+                        </Button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div className="p-4 rounded-2xl bg-slate-950/40 border border-slate-800 text-center text-xs text-slate-400 space-y-1">
+                      <p className="font-semibold text-slate-300">
+                        กรุณาเลือกจำนวนเงินด้านบนก่อน
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        ช่องอัปโหลดสลิปและ QR Code พร้อมเพย์จะแสดงเมื่อคุณเลือกราคาแล้ว
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right Column: QR Code (Appears only after choosing price) */}
+                <div className="lg:col-span-5 bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-md space-y-5 text-center">
+                  <div className="space-y-1">
+                    <span className="text-xs font-bold uppercase tracking-wider text-cyan-400">
+                      Thai QR Payment
+                    </span>
+                    <h3 className="text-base font-bold text-white">พร้อมเพย์ (PromptPay QR)</h3>
+                  </div>
+
+                  {hasSelectedAmount ? (
+                    <div className="space-y-4 animate-in zoom-in-95">
+                      <div className="bg-white p-4 rounded-2xl inline-block shadow-2xl mx-auto border-4 border-slate-800">
+                        <div className="relative w-48 h-48 sm:w-56 sm:h-56 mx-auto">
+                          <Image
+                            src={qrCodeUrl}
+                            alt="PromptPay QR Code"
+                            fill
+                            className="object-contain"
+                            unoptimized
+                          />
+                        </div>
+                      </div>
+
+                      <div className="bg-slate-950/80 rounded-2xl p-4 border border-slate-800 text-left space-y-2 text-xs">
+                        <div className="flex justify-between items-center text-slate-400">
+                          <span>ชื่อบัญชี:</span>
+                          <span className="font-bold text-white">{storeSettings.storeName || 'J3A STORE OFFICIAL'}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-slate-400">
+                          <span>พร้อมเพย์:</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono font-bold text-cyan-300">
+                              {storeSettings.promptpay || '081-234-5678'}
+                            </span>
+                            <button
+                              onClick={handleCopyPromptPay}
+                              className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-white cursor-pointer"
+                              title="คัดลอกเบอร์พร้อมเพย์"
+                            >
+                              {copiedPromptPay ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex justify-between items-center text-slate-400 pt-1 border-t border-slate-800">
+                          <span>ยอดที่ต้องโอน:</span>
+                          <span className="font-black text-cyan-400 text-base">
+                            {formatCurrency(effectiveAmount)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="py-16 px-4 rounded-2xl border-2 border-dashed border-slate-800 flex flex-col items-center justify-center text-center space-y-2">
+                      <QrCode className="w-12 h-12 text-slate-600 animate-pulse" />
+                      <p className="text-xs font-semibold text-slate-300">
+                        QR Code จะแสดงที่นี่
+                      </p>
+                      <p className="text-[11px] text-slate-500 max-w-xs">
+                        เลือกจำนวนเงินที่ต้องการเติมในกล่องซ้ายมือ แล้ว QR Code ยอดตรงจะถูกสร้างขึ้นอัตโนมัติ
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Method 2: Bank Auto Transfer (Coming Soon) */}
+            {topupMethod === 'bank_auto' && (
+              <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-8 backdrop-blur-md text-center max-w-2xl mx-auto space-y-4">
+                <div className="w-16 h-16 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 mx-auto">
+                  <Building2 className="w-8 h-8" />
+                </div>
+                <h3 className="text-lg font-bold text-white">
+                  โอนผ่านธนาคารเงินเข้าอัตโนมัติ (Automated Bank Transfer)
+                </h3>
+                <span className="inline-block px-3 py-1 rounded-full text-xs font-black bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                  ⚡ Coming Soon
+                </span>
+                <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+                  ระบบเชื่อมต่อ Payment Gateway และ Slip Verification อัตโนมัติกำลังอยู่ระหว่างการพัฒนา ในระหว่างนี้ กรุณาใช้ช่องทาง <strong>"1. อัปโหลดสลิป"</strong> หรือ <strong>"4. Redeem Code"</strong> ในการเติมเครดิต
+                </p>
+              </div>
+            )}
+
+            {/* Method 3: Angpao Voucher (Coming Soon) */}
+            {topupMethod === 'angpao' && (
+              <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-8 backdrop-blur-md text-center max-w-2xl mx-auto space-y-4">
+                <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 mx-auto">
+                  <Gift className="w-8 h-8" />
+                </div>
+                <h3 className="text-lg font-bold text-white">
+                  ซองอั่งเปา TrueMoney Wallet (Angpao Voucher)
+                </h3>
+                <span className="inline-block px-3 py-1 rounded-full text-xs font-black bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                  🧧 Coming Soon
+                </span>
+                <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+                  ระบบตัดยอดซองของขวัญ TrueMoney Wallet อัตโนมัติ 24 ชม. กำลังอยู่ระหว่างการเชื่อมต่อ API ในระหว่างนี้ กรุณาแจ้งเติมเงินผ่าน <strong>"1. อัปโหลดสลิป"</strong> ได้ตามปกติครับ
+                </p>
+              </div>
+            )}
+
+            {/* Method 4: Redeem Code */}
+            {topupMethod === 'redeem' && (
+              <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8 backdrop-blur-md max-w-2xl mx-auto space-y-6">
+                <div className="text-center space-y-1">
+                  <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mx-auto mb-3">
+                    <Ticket className="w-7 h-7" />
+                  </div>
+                  <h3 className="text-lg font-black text-white">
+                    แลกรับโค้ดของขวัญ (Redeem Code)
+                  </h3>
+                  <p className="text-xs text-slate-400 max-w-md mx-auto">
+                    กรอกโค้ดแจกฟรีจากกิจกรรมของร้าน J3A STORE เพื่อรับเครดิตเข้าบัญชีของคุณทันที
                   </p>
                 </div>
 
-                {/* Amount presets */}
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold text-slate-300">
-                    ขั้นตอนที่ 1: เลือกหรือระบุจำนวนเงินที่ต้องการเติม
-                  </label>
-                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                    {[50, 100, 300, 500, 1000, 2000].map((amt) => (
-                      <button
-                        key={amt}
-                        type="button"
-                        onClick={() => {
-                          setTopupAmount(amt);
-                          setCustomAmount('');
-                        }}
-                        className={`py-2.5 px-2 rounded-xl border font-bold text-xs sm:text-sm transition-all cursor-pointer ${
-                          topupAmount === amt && !customAmount
-                            ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.4)]'
-                            : 'bg-slate-950/60 text-slate-300 border-slate-800 hover:border-slate-700 hover:text-white'
-                        }`}
-                      >
-                        {amt}฿
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Custom amount */}
-                  <div className="pt-2">
-                    <input
-                      type="number"
-                      min="1"
-                      placeholder="หรือระบุจำนวนเงินอื่น ๆ (บาท)..."
-                      value={customAmount}
-                      onChange={(e) => setCustomAmount(e.target.value)}
-                      className="w-full bg-slate-950/80 text-sm text-slate-100 placeholder:text-slate-500 rounded-xl px-4 py-2.5 border border-slate-800 focus:border-cyan-400 outline-none"
-                    />
-                  </div>
-                </div>
-
-                {/* Step 2: Upload Slip */}
-                <form onSubmit={handleSubmitTopup} className="space-y-5 pt-3 border-t border-slate-800">
-                  <div className="space-y-2">
-                    <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
-                      <span>ขั้นตอนที่ 2: แนบรูปภาพสลิปหลักฐานการโอนเงิน (Slip)</span>
-                      {slipPreview && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSlipPreview('');
-                            setSlipFile(null);
-                          }}
-                          className="text-[11px] text-rose-400 hover:underline"
-                        >
-                          ลบรูปภาพ
-                        </button>
-                      )}
+                <form onSubmit={handleRedeemCode} className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold text-slate-300">
+                      รหัสโค้ดของขวัญ (Code) *
                     </label>
-
-                    {slipPreview ? (
-                      <div className="relative w-full aspect-[4/3] max-h-60 rounded-2xl overflow-hidden border border-cyan-500/40 bg-slate-950 flex items-center justify-center">
-                        <Image
-                          src={slipPreview}
-                          alt="Slip Preview"
-                          fill
-                          className="object-contain p-2"
-                        />
-                      </div>
-                    ) : (
-                      <label className="border-2 border-dashed border-slate-700 hover:border-cyan-400/60 rounded-2xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer bg-slate-950/40 hover:bg-slate-950/80 transition-colors">
-                        <UploadCloud className="w-8 h-8 text-cyan-400" />
-                        <span className="text-xs font-bold text-slate-200">
-                          คลิกเพื่อเลือกไฟล์รูปภาพสลิปโอนเงิน
-                        </span>
-                        <span className="text-[11px] text-slate-500">
-                          รองรับไฟล์ JPG, PNG, WEBP, GIF (ระบบบีบอัดรูปภาพอัตโนมัติ)
-                        </span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleSlipFileChange}
-                          className="hidden"
-                        />
-                      </label>
-                    )}
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
-                    <div>
-                      <span className="text-xs text-slate-400 block">ยอดเงินที่จะแจ้งเติม:</span>
-                      <span className="text-xl font-black text-cyan-400">
-                        {formatCurrency(effectiveAmount)}
-                      </span>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={redeemCodeInput}
+                        onChange={(e) => setRedeemCodeInput(e.target.value.toUpperCase())}
+                        placeholder="เช่น J3A-WELCOME, NEWYEAR2026"
+                        className="flex-1 bg-slate-950/80 text-white font-mono font-bold tracking-wider uppercase text-sm rounded-xl px-4 py-3 border border-slate-800 focus:border-amber-400 outline-none"
+                      />
+                      <Button
+                        type="submit"
+                        variant="primary"
+                        size="md"
+                        isLoading={isRedeeming}
+                        disabled={!redeemCodeInput.trim() || isRedeeming}
+                        leftIcon={<Sparkles className="w-4 h-4" />}
+                        className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-black shadow-[0_0_15px_rgba(251,191,36,0.3)]"
+                      >
+                        แลกรับเครดิต
+                      </Button>
                     </div>
-                    <Button
-                      type="submit"
-                      variant="primary"
-                      size="md"
-                      disabled={isSubmittingTopup || !slipPreview}
-                      isLoading={isSubmittingTopup}
-                      leftIcon={<Sparkles className="w-4 h-4" />}
-                    >
-                      แจ้งโอนเงินให้แอดมินอนุมัติ
-                    </Button>
                   </div>
                 </form>
+
+                <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 text-xs text-slate-400 space-y-1">
+                  <p className="font-bold text-slate-300">💡 เงื่อนไขการใช้งาน:</p>
+                  <p>• แต่ละโค้ดสามารถใช้ได้ 1 ครั้งต่อ 1 บัญชีผู้ใช้งาน</p>
+                  <p>• โค้ดมีจำนวนจำกัดและมีวันหมดอายุตามช่วงเวลากิจกรรม</p>
+                  <p>• ติดตามโค้ดแจกฟรีได้ทาง Discord และ LINE Official ของทางร้าน</p>
+                </div>
               </div>
-
-              {/* Right Column: QR Code & PromptPay Information */}
-              <div className="lg:col-span-5 bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-md space-y-5 text-center">
-                <div className="space-y-1">
-                  <span className="text-xs font-bold uppercase tracking-wider text-cyan-400">
-                    Thai QR Payment
-                  </span>
-                  <h3 className="text-base font-bold text-white">พร้อมเพย์ (PromptPay)</h3>
-                </div>
-
-                {/* QR Code Frame */}
-                <div className="bg-white p-4 rounded-2xl inline-block shadow-2xl mx-auto border-4 border-slate-800">
-                  <div className="relative w-48 h-48 sm:w-56 sm:h-56 mx-auto">
-                    <Image
-                      src={qrCodeUrl}
-                      alt="PromptPay QR Code"
-                      fill
-                      className="object-contain"
-                      unoptimized
-                    />
-                  </div>
-                </div>
-
-                {/* Transfer Info Details */}
-                <div className="bg-slate-950/80 rounded-2xl p-4 border border-slate-800 text-left space-y-2 text-xs">
-                  <div className="flex justify-between items-center text-slate-400">
-                    <span>ชื่อบัญชี:</span>
-                    <span className="font-bold text-white">{storeSettings.storeName || 'J3A STORE OFFICIAL'}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-slate-400">
-                    <span>พร้อมเพย์:</span>
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-mono font-bold text-cyan-300">
-                        {storeSettings.promptpay || '081-234-5678'}
-                      </span>
-                      <button
-                        onClick={handleCopyPromptPay}
-                        className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-white"
-                        title="คัดลอกเบอร์พร้อมเพย์"
-                      >
-                        {copiedPromptPay ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center text-slate-400 pt-1 border-t border-slate-800">
-                    <span>ยอดที่ต้องโอน:</span>
-                    <span className="font-black text-cyan-400 text-sm">
-                      {formatCurrency(effectiveAmount)}
-                    </span>
-                  </div>
-                </div>
-
-                <p className="text-[11px] text-slate-400 leading-relaxed">
-                  * เมื่อโอนเงินแล้ว กรุณาอัปโหลดรูปภาพสลิปในฟอร์มด้านซ้าย จากนั้นแอดมินจะตรวจสอบและอนุมัติเครดิตเข้ากระเป๋าของคุณทันที
-                </p>
-              </div>
-            </div>
+            )}
 
             {/* Bottom Section: Top-up History */}
             <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8 backdrop-blur-md space-y-4">
@@ -552,7 +742,7 @@ function ProfileContent() {
                 <button
                   onClick={loadTopupHistory}
                   disabled={loadingTopups}
-                  className="text-xs text-cyan-400 hover:underline flex items-center gap-1"
+                  className="text-xs text-cyan-400 hover:underline flex items-center gap-1 cursor-pointer"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${loadingTopups ? 'animate-spin' : ''}`} />
                   <span>รีเฟรชประวัติ</span>
@@ -614,7 +804,7 @@ function ProfileContent() {
                             {topup.paymentSlipUrl ? (
                               <button
                                 onClick={() => setViewingSlip(topup)}
-                                className="inline-flex items-center gap-1 text-cyan-400 hover:underline text-[11px] font-semibold"
+                                className="inline-flex items-center gap-1 text-cyan-400 hover:underline text-[11px] font-semibold cursor-pointer"
                               >
                                 <FileImage className="w-3.5 h-3.5" />
                                 <span>ดูสลิป</span>
@@ -636,55 +826,8 @@ function ProfileContent() {
           </div>
         )}
 
-        {/* Tab 3: Settings */}
-        {activeTab === 'settings' && (
-          <form
-            onSubmit={handleUpdateProfile}
-            className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 sm:p-8 backdrop-blur-md space-y-5 max-w-xl"
-          >
-            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              <Settings className="w-5 h-5 text-cyan-400" />
-              <span>แก้ไขข้อมูลส่วนตัว</span>
-            </h2>
-
-            <Input
-              label="ชื่อที่ต้องการแสดง (Display Name)"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="ชื่อของคุณ"
-              required
-            />
-
-            <Input
-              label="เบอร์โทรศัพท์ (Phone)"
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="0812345678"
-            />
-
-            <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-slate-400">อีเมล (ไม่สามารถเปลี่ยนได้)</label>
-              <input
-                type="text"
-                disabled
-                value={user.email || ''}
-                className="w-full bg-slate-950/50 text-slate-500 text-sm rounded-xl px-3.5 py-2.5 border border-slate-800 cursor-not-allowed"
-              />
-            </div>
-
-            <Button
-              type="submit"
-              variant="primary"
-              size="md"
-              isLoading={isSaving}
-              leftIcon={<Save className="w-4 h-4" />}
-              className="mt-2"
-            >
-              บันทึกการเปลี่ยนแปลง
-            </Button>
-          </form>
-        )}
+        {/* Tab 3: Settings (Full 5 categories) */}
+        {activeTab === 'settings' && <SettingsTabContent />}
 
         {/* Slip Modal View */}
         {viewingSlip && (

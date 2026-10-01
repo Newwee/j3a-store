@@ -143,37 +143,37 @@ export function ProductReviewsSection({
           </div>
 
           {/* Action / Eligibility Button */}
-          <div>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
             {eligibility.canReview ? (
               <Button
                 variant="primary"
                 size="md"
                 onClick={() => setIsModalOpen(true)}
                 leftIcon={<Star className="w-4 h-4 fill-amber-300 text-amber-300" />}
-                className="shadow-[0_0_20px_rgba(245,158,11,0.3)] bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black"
+                className="shadow-[0_0_25px_rgba(245,158,11,0.45)] bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black animate-pulse"
               >
                 ⭐ ให้คะแนนสินค้านี้ (Rate Product)
               </Button>
             ) : !user ? (
               <Link href={`/login?redirect=/products/${productSlug || productId}`}>
-                <Button variant="secondary" size="sm" leftIcon={<Lock className="w-3.5 h-3.5" />}>
+                <Button variant="secondary" size="sm" leftIcon={<Lock className="w-3.5 h-3.5 text-amber-400" />}>
                   เข้าสู่ระบบเพื่อตรวจสอบสิทธิ์รีวิว
                 </Button>
               </Link>
             ) : eligibility.reason === 'already_reviewed' ? (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
+              <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold">
                 <CheckCircle2 className="w-4 h-4" />
                 <span>คุณได้ให้คะแนนสินค้านี้แล้ว</span>
               </div>
             ) : eligibility.reason === 'order_pending_admin' ? (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-medium">
-                <Clock className="w-4 h-4" />
-                <span>รอแอดมินอนุมัติคำสั่งซื้อจึงจะให้คะแนนได้</span>
+              <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-semibold">
+                <Clock className="w-4 h-4 animate-spin text-amber-400" />
+                <span>รอแอดมินอนุมัติคำสั่งซื้อจึงจะปลดล็อกปุ่มให้คะแนน</span>
               </div>
             ) : (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 text-xs">
-                <Lock className="w-3.5 h-3.5 text-slate-500" />
-                <span>ปลดล็อกเมื่อซื้อสินค้าและแอดมินยืนยัน</span>
+              <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900/90 border border-slate-700/80 text-slate-300 text-xs font-medium">
+                <Lock className="w-3.5 h-3.5 text-amber-400" />
+                <span>ปุ่มให้คะแนนจะปลดล็อกเมื่อซื้อสินค้าและแอดมินอนุมัติแล้ว</span>
               </div>
             )}
           </div>

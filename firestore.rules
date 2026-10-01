@@ -217,8 +217,8 @@ service cloud.firestore {
 
     // 1. Users Collection
     match /users/{userId} {
-      // Read: Allowed if user is reading their own document or is an admin
-      allow read: if isOwner(userId) || isAdmin();
+      // Read: Users can read their own profile, admin can read all, or public read for member count/profiles
+      allow read: if true;
 
       // Create: Authenticated user can create their own profile with role 'customer', or admin can create
       allow create: if (
@@ -330,6 +330,15 @@ service cloud.firestore {
 
       // Write: Admin only
       allow write: if isAdmin();
+    }
+
+    // 7. Redeem Codes Collection
+    match /redeem_codes/{codeId} {
+      // Read: Authenticated users can check active codes
+      allow read: if isSignedIn();
+      // Write: Signed in users can redeem via transaction, Admin can manage
+      allow update: if isSignedIn();
+      allow create, delete: if isAdmin();
     }
   }
 }

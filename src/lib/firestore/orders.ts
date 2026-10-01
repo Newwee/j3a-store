@@ -75,8 +75,13 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
 
   const orderNumber = generateOrderNumber();
 
+  // Strip undefined fields so Firestore doesn't reject addDoc
+  const sanitizedInput = Object.fromEntries(
+    Object.entries(input).filter(([_, v]) => v !== undefined)
+  );
+
   const newDoc = {
-    ...input,
+    ...sanitizedInput,
     orderNumber,
     status: 'pending' as OrderStatus,
     createdAt: serverTimestamp(),

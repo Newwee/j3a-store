@@ -125,7 +125,13 @@ export default function CheckoutPage() {
           const uploadRes = await uploadProductImage(slipFile, 'slips');
           slipUrl = uploadRes.downloadUrl;
         } catch (slipErr) {
-          console.warn('Could not upload slip to Firebase Storage, continuing with order:', slipErr);
+          console.warn('Could not upload slip to Firebase Storage, using compressed fallback:', slipErr);
+          try {
+            const { compressImageToDataUrl } = await import('@/lib/utils/image');
+            slipUrl = await compressImageToDataUrl(slipFile);
+          } catch {
+            slipUrl = undefined;
+          }
         }
       }
 
@@ -233,7 +239,7 @@ export default function CheckoutPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="customer@example.com"
+                  placeholder="example@gmail.com"
                   error={formErrors.email}
                   required
                 />

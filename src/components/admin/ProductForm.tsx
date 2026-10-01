@@ -356,7 +356,7 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
               type="file"
               ref={fileInputRef}
               onChange={handleFileChange}
-              accept="image/png, image/jpeg, image/webp"
+              accept="image/png, image/jpeg, image/jpg, image/gif, image/webp"
               className="hidden"
             />
 
@@ -402,7 +402,7 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
                     คลิกเพื่ออัปโหลดรูปภาพ
                   </p>
                   <p className="text-[11px] text-slate-500 mt-1">
-                    รองรับ PNG, JPG, WEBP ขนาดไม่เกิน 5MB
+                    รองรับ JPG, JPEG, PNG, GIF, WEBP
                   </p>
                 </div>
               )}

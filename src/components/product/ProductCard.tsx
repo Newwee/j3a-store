@@ -8,6 +8,7 @@ import { Product } from '@/types/product';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { useCart } from '@/context/CartContext';
 import { ProductStatusBadge } from '@/components/ui/Badge';
+import { GlareHover } from '@/components/ui/GlareHover';
 
 export function ProductCard({ product }: { product: Product }) {
   const { addItem } = useCart();
@@ -19,7 +20,7 @@ export function ProductCard({ product }: { product: Product }) {
       : null;
 
   return (
-    <div className="group relative flex flex-col rb-card overflow-hidden transition-all duration-300">
+    <GlareHover className="group relative flex flex-col rb-card overflow-hidden transition-all duration-300">
       {/* Top Image Banner */}
       <div className="relative w-full aspect-square bg-slate-950/60 overflow-hidden flex items-center justify-center p-3">
         <Image
@@ -130,6 +131,6 @@ export function ProductCard({ product }: { product: Product }) {
           </button>
         </div>
       </div>
-    </div>
+    </GlareHover>
   );
 }
