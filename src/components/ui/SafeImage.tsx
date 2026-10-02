@@ -55,6 +55,23 @@ export function SafeImage({
     );
   }
 
+  const isGif =
+    typeof currentSrc === 'string' &&
+    (currentSrc.includes('.gif') || currentSrc.startsWith('data:image/gif'));
+
+  if (isGif) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={currentSrc}
+        alt={alt}
+        className={`${props.fill ? 'absolute inset-0 w-full h-full object-contain' : ''} ${className}`}
+        style={props.fill ? { position: 'absolute', height: '100%', width: '100%', inset: 0 } : undefined}
+        onError={handleError}
+      />
+    );
+  }
+
   return (
     <Image
       {...props}

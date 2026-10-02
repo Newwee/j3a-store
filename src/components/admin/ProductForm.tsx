@@ -2,6 +2,7 @@
 
 import React, { useState, useRef } from 'react';
 import Image from 'next/image';
+import { SafeImage } from '@/components/ui/SafeImage';
 import { useRouter } from 'next/navigation';
 import {
   Upload,
@@ -85,8 +86,16 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
       const file = e.target.files[0];
       setSelectedFile(file);
       try {
-        const compressed = await compressImageToDataUrl(file, 800, 800, 0.75);
-        setImagePreview(compressed);
+        if (file.type === 'image/gif' || file.name.toLowerCase().endsWith('.gif')) {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            setImagePreview(ev.target?.result as string);
+          };
+          reader.readAsDataURL(file);
+        } else {
+          const compressed = await compressImageToDataUrl(file, 800, 800, 0.75);
+          setImagePreview(compressed);
+        }
       } catch (err) {
         console.warn('Could not compress image preview:', err);
         setImagePreview(URL.createObjectURL(file));
@@ -364,13 +373,19 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
             <div className="relative w-full aspect-square rounded-2xl border-2 border-dashed border-slate-700 hover:border-cyan-500/50 bg-slate-950/60 overflow-hidden flex flex-col items-center justify-center p-4 transition-colors">
               {imagePreview ? (
                 <>
-                  <Image
+                  <SafeImage
                     src={imagePreview}
                     alt="Preview"
                     fill
-                    unoptimized
                     className="object-contain p-2"
                   />
+                  {(imagePreview.includes('.gif') || imagePreview.startsWith('data:image/gif')) && (
+                    <div className="absolute bottom-2 left-2 z-10">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 backdrop-blur-md shadow-sm">
+                        🎬 ANIMATED GIF
+                      </span>
+                    </div>
+                  )}
                   <div className="absolute top-2 right-2 flex gap-1.5 z-10">
                     <button
                       type="button"
