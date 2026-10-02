@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
+import { SafeImage } from '@/components/ui/SafeImage';
 import { ShoppingBag, ArrowRight, Trash2, Plus, Minus, ArrowLeft, ShieldCheck } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { formatCurrency } from '@/lib/utils/formatters';
@@ -69,11 +69,10 @@ export default function CartPage() {
                   {/* Item Image and Info */}
                   <div className="flex items-center gap-4 flex-1 min-w-0">
                     <div className="relative w-20 h-20 rounded-xl overflow-hidden bg-slate-950 border border-slate-700/60 shrink-0">
-                      <Image
-                        src={item.product.image || '/logo.png'}
+                      <SafeImage
+                        src={item.product.image}
                         alt={item.product.name}
                         fill
-                        unoptimized={Boolean(item.product.image?.startsWith('data:'))}
                         className="object-contain p-1"
                       />
                     </div>

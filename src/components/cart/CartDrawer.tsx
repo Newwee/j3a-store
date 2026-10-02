@@ -2,7 +2,7 @@
 
 import React, { useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
+import { SafeImage } from '@/components/ui/SafeImage';
 import { X, Plus, Minus, Trash2, ShoppingBag, ArrowRight } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { formatCurrency } from '@/lib/utils/formatters';
@@ -88,11 +88,10 @@ export function CartDrawer() {
                 <div key={item.product.id} className="py-4 flex gap-4 first:pt-0 last:pb-0">
                   {/* Thumbnail */}
                   <div className="relative w-18 h-18 rounded-xl overflow-hidden bg-slate-800 border border-slate-700/60 shrink-0">
-                    <Image
-                      src={item.product.image || '/logo.png'}
+                    <SafeImage
+                      src={item.product.image}
                       alt={item.product.name}
                       fill
-                      unoptimized={Boolean(item.product.image?.startsWith('data:'))}
                       className="object-cover"
                     />
                   </div>

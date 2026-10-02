@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Search, SlidersHorizontal, ArrowUpDown, X } from 'lucide-react';
+import { Search, SlidersHorizontal, ArrowUpDown, X, Tag } from 'lucide-react';
+import { CustomDropdown, DropdownOption } from '@/components/ui/CustomDropdown';
 
 interface ProductFilterProps {
   search: string;
@@ -30,6 +31,18 @@ export function ProductFilter({
 }: ProductFilterProps) {
   const isFiltered = search || (category && category !== 'all' && category !== 'ทั้งหมด') || inStockOnly || sortBy !== 'newest';
 
+  const categoryOptions: DropdownOption[] = [
+    { value: 'all', label: 'ทุกหมวดหมู่ (All)' },
+    ...categories.map((c) => ({ value: c, label: c })),
+  ];
+
+  const sortOptions: DropdownOption[] = [
+    { value: 'newest', label: 'ใหม่ล่าสุด (Newest)' },
+    { value: 'price-asc', label: 'ราคา: ต่ำไปสูง' },
+    { value: 'price-desc', label: 'ราคา: สูงไปต่ำ' },
+    { value: 'name-asc', label: 'ชื่อสินค้า A-Z' },
+  ];
+
   return (
     <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 sm:p-5 backdrop-blur-md mb-8 space-y-4">
       <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
@@ -56,34 +69,24 @@ export function ProductFilter({
         {/* Sort and Filters */}
         <div className="flex flex-wrap items-center gap-3">
           {/* Category Dropdown */}
-          <div className="relative">
-            <select
-              value={category}
-              onChange={(e) => onCategoryChange(e.target.value)}
-              className="bg-slate-950/80 text-xs sm:text-sm text-slate-200 rounded-xl px-3.5 py-2.5 border border-slate-800 focus:border-cyan-400 outline-none cursor-pointer"
-            >
-              <option value="all">ทุกหมวดหมู่ (All)</option>
-              {categories.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </div>
+          <CustomDropdown
+            value={category || 'all'}
+            onChange={onCategoryChange}
+            options={categoryOptions}
+            icon={<SlidersHorizontal className="w-4 h-4" />}
+            placeholder="เลือกหมวดหมู่"
+            menuWidth="w-56"
+          />
 
           {/* Sort Selector */}
-          <div className="relative">
-            <select
-              value={sortBy}
-              onChange={(e) => onSortByChange(e.target.value)}
-              className="bg-slate-950/80 text-xs sm:text-sm text-slate-200 rounded-xl px-3.5 py-2.5 border border-slate-800 focus:border-cyan-400 outline-none cursor-pointer"
-            >
-              <option value="newest">ใหม่ล่าสุด (Newest)</option>
-              <option value="price-asc">ราคา: ต่ำไปสูง</option>
-              <option value="price-desc">ราคา: สูงไปต่ำ</option>
-              <option value="name-asc">ชื่อสินค้า A-Z</option>
-            </select>
-          </div>
+          <CustomDropdown
+            value={sortBy}
+            onChange={onSortByChange}
+            options={sortOptions}
+            icon={<ArrowUpDown className="w-4 h-4" />}
+            placeholder="จัดเรียงตาม"
+            menuWidth="w-52"
+          />
 
           {/* In Stock Only Checkbox */}
           <label className="flex items-center gap-2 text-xs sm:text-sm text-slate-300 bg-slate-950/80 px-3.5 py-2.5 rounded-xl border border-slate-800 cursor-pointer select-none hover:border-slate-700">

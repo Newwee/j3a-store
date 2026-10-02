@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
+import { SafeImage } from '@/components/ui/SafeImage';
 import { ShoppingCart, Eye, Sparkles, Star } from 'lucide-react';
 import { Product } from '@/types/product';
 import { formatCurrency } from '@/lib/utils/formatters';
@@ -23,11 +23,10 @@ export function ProductCard({ product }: { product: Product }) {
     <GlareHover className="group relative flex flex-col rb-card overflow-hidden transition-all duration-300">
       {/* Top Image Banner */}
       <div className="relative w-full aspect-square bg-slate-950/60 overflow-hidden flex items-center justify-center p-3">
-        <Image
-          src={product.image || '/logo.png'}
+        <SafeImage
+          src={product.image}
           alt={product.name}
           fill
-          unoptimized={Boolean(product.image?.startsWith('data:'))}
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
           className="object-contain p-2 group-hover:scale-105 transition-transform duration-500"
         />

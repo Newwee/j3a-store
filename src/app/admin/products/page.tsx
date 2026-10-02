@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
+import { SafeImage } from '@/components/ui/SafeImage';
 import {
   Package,
   Plus,
@@ -26,6 +26,7 @@ import { DeleteConfirmModal } from '@/components/admin/DeleteConfirmModal';
 import { ProductStatusBadge } from '@/components/ui/Badge';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
 import { Button } from '@/components/ui/Button';
+import { CustomDropdown, DropdownOption } from '@/components/ui/CustomDropdown';
 import { useToast } from '@/context/ToastContext';
 import { EmptyState } from '@/components/ui/EmptyState';
 
@@ -154,29 +155,29 @@ export default function AdminProductsPage() {
 
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-3">
-          <select
+          <CustomDropdown
             value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="bg-slate-950/80 text-xs sm:text-sm text-slate-200 rounded-xl px-3.5 py-2.5 border border-slate-800 focus:border-cyan-400 outline-none cursor-pointer"
-          >
-            <option value="all">ทุกหมวดหมู่</option>
-            {categories.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
+            onChange={setCategoryFilter}
+            options={[
+              { value: 'all', label: 'ทุกหมวดหมู่' },
+              ...categories.map((c) => ({ value: c, label: c })),
+            ]}
+            placeholder="หมวดหมู่"
+            menuWidth="w-52"
+          />
 
-          <select
+          <CustomDropdown
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-slate-950/80 text-xs sm:text-sm text-slate-200 rounded-xl px-3.5 py-2.5 border border-slate-800 focus:border-cyan-400 outline-none cursor-pointer"
-          >
-            <option value="all">ทุกสถานะ</option>
-            <option value="active">พร้อมจำหน่าย (Active)</option>
-            <option value="draft">ฉบับร่าง (Draft)</option>
-            <option value="out_of_stock">สินค้าหมด (Out of Stock)</option>
-          </select>
+            onChange={setStatusFilter}
+            options={[
+              { value: 'all', label: 'ทุกสถานะ' },
+              { value: 'active', label: '🟢 พร้อมจำหน่าย (Active)' },
+              { value: 'draft', label: '🟡 ฉบับร่าง (Draft)' },
+              { value: 'out_of_stock', label: '🔴 สินค้าหมด (Out of Stock)' },
+            ]}
+            placeholder="สถานะ"
+            menuWidth="w-56"
+          />
         </div>
       </div>
 
@@ -219,11 +220,10 @@ export default function AdminProductsPage() {
                     {/* Image */}
                     <td className="py-3 px-4 sm:px-6">
                       <div className="relative w-12 h-12 rounded-xl bg-slate-950 border border-slate-800 overflow-hidden shrink-0">
-                        <Image
-                          src={product.image || '/logo.png'}
+                        <SafeImage
+                          src={product.image}
                           alt={product.name}
                           fill
-                          unoptimized={Boolean(product.image?.startsWith('data:'))}
                           className="object-contain p-1"
                         />
                       </div>

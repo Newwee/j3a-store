@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import Image from 'next/image';
+import { SafeImage } from '@/components/ui/SafeImage';
 import { Sparkles } from 'lucide-react';
 
 interface ImageGalleryProps {
@@ -25,12 +25,11 @@ export function ImageGallery({
       {/* Main Image Container */}
       <div className="relative w-full aspect-square rounded-3xl bg-slate-900/80 border border-slate-800 overflow-hidden flex items-center justify-center p-6 shadow-2xl group">
         <div className="relative w-full h-full">
-          <Image
+          <SafeImage
             src={selectedImage}
             alt={productName}
             fill
             priority
-            unoptimized={Boolean(selectedImage?.startsWith('data:'))}
             className="object-contain transition-transform duration-500 group-hover:scale-105"
           />
         </div>
@@ -57,11 +56,10 @@ export function ImageGallery({
                   : 'border-slate-800 opacity-60 hover:opacity-100 hover:border-slate-600'
               }`}
             >
-              <Image
+              <SafeImage
                 src={img}
                 alt={`${productName} thumbnail ${index + 1}`}
                 fill
-                unoptimized={Boolean(img?.startsWith('data:'))}
                 className="object-cover"
               />
             </button>

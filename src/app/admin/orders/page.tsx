@@ -22,6 +22,7 @@ import { formatCurrency, formatDate } from '@/lib/utils/formatters';
 import { useToast } from '@/context/ToastContext';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Modal } from '@/components/ui/Modal';
+import { CustomDropdown } from '@/components/ui/CustomDropdown';
 
 export default function AdminOrdersPage() {
   const { success, error } = useToast();
@@ -112,18 +113,20 @@ export default function AdminOrdersPage() {
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
         </div>
 
-        <select
+        <CustomDropdown
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as any)}
-          className="bg-slate-950/80 text-xs sm:text-sm text-slate-200 rounded-xl px-3.5 py-2.5 border border-slate-800 focus:border-cyan-400 outline-none cursor-pointer"
-        >
-          <option value="all">ทุกสถานะคำสั่งซื้อ</option>
-          <option value="pending">รอชำระเงิน (Pending)</option>
-          <option value="paid">ชำระแล้ว (Paid)</option>
-          <option value="processing">กำลังดำเนินการ (Processing)</option>
-          <option value="completed">สำเร็จเรียบร้อย (Completed)</option>
-          <option value="cancelled">ยกเลิก (Cancelled)</option>
-        </select>
+          onChange={(val) => setStatusFilter(val as any)}
+          options={[
+            { value: 'all', label: 'ทุกสถานะคำสั่งซื้อ' },
+            { value: 'pending', label: '🟡 รอชำระเงิน (Pending)' },
+            { value: 'paid', label: '🔵 ชำระแล้ว (Paid)' },
+            { value: 'processing', label: '🟣 กำลังดำเนินการ (Processing)' },
+            { value: 'completed', label: '🟢 สำเร็จเรียบร้อย (Completed)' },
+            { value: 'cancelled', label: '🔴 ยกเลิก (Cancelled)' },
+          ]}
+          placeholder="สถานะคำสั่งซื้อ"
+          menuWidth="w-60"
+        />
       </div>
 
       {/* Orders Table */}

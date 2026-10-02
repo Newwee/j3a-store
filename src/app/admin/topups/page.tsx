@@ -23,6 +23,7 @@ import { formatCurrency, formatDate } from '@/lib/utils/formatters';
 import { useToast } from '@/context/ToastContext';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Modal } from '@/components/ui/Modal';
+import { CustomDropdown } from '@/components/ui/CustomDropdown';
 import { Button } from '@/components/ui/Button';
 
 export default function AdminTopupsPage() {
@@ -142,16 +143,18 @@ export default function AdminTopupsPage() {
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
         </div>
 
-        <select
+        <CustomDropdown
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as any)}
-          className="bg-slate-950/80 text-xs sm:text-sm text-slate-200 rounded-xl px-3.5 py-2.5 border border-slate-800 focus:border-cyan-400 outline-none cursor-pointer"
-        >
-          <option value="all">ทุกสถานะการเติมเงิน</option>
-          <option value="pending">รอการตรวจสอบ (Pending)</option>
-          <option value="approved">อนุมัติแล้ว (Approved)</option>
-          <option value="rejected">ปฏิเสธ (Rejected)</option>
-        </select>
+          onChange={(val) => setStatusFilter(val as any)}
+          options={[
+            { value: 'all', label: 'ทุกสถานะการเติมเงิน' },
+            { value: 'pending', label: '🟡 รอการตรวจสอบ (Pending)' },
+            { value: 'approved', label: '🟢 อนุมัติแล้ว (Approved)' },
+            { value: 'rejected', label: '🔴 ปฏิเสธ (Rejected)' },
+          ]}
+          placeholder="สถานะการเติมเงิน"
+          menuWidth="w-60"
+        />
       </div>
 
       {/* Topups Table */}
