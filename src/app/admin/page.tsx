@@ -30,7 +30,7 @@ export default function AdminDashboardPage() {
     let isMounted = true;
     async function loadStats() {
       try {
-        const data = await getStoreDashboardStats();
+        const data = await getStoreDashboardStats(true);
         if (isMounted) {
           setStats(data);
         }

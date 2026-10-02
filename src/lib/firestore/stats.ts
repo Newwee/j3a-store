@@ -20,12 +20,13 @@ export interface StoreStats {
 
 /**
  * Fetch overview statistics for Admin Dashboard and Live Stats widgets
+ * Designed to gracefully fall back without throwing permission errors to ordinary users
  */
-export async function getStoreDashboardStats(): Promise<StoreStats> {
+export async function getStoreDashboardStats(isAdmin = false): Promise<StoreStats> {
   const fallbackStats: StoreStats = {
     totalProducts: 0,
     totalOrders: 0,
-    totalCustomers: 0,
+    totalCustomers: 1,
     totalRevenue: 0,
     averageRating: 5.0,
     totalReviews: 0,
@@ -37,118 +38,97 @@ export async function getStoreDashboardStats(): Promise<StoreStats> {
 
   if (!db) return fallbackStats;
 
+  let totalProducts = 0;
+  let totalOrders = 0;
+  let totalCustomers = 1;
+  let totalRevenue = 0;
+  let pendingTopupsCount = 0;
+  let recentOrders: Order[] = [];
+  let recentProducts: Product[] = [];
+  let averageRating = 5.0;
+  let totalReviews = 0;
+  let satisfactionRate = '100%';
+
+  // 1. Products: Fetch publicly active products count & list
   try {
-    const productsCol = collection(db, 'products');
-    const ordersCol = collection(db, 'orders');
+    const products = await getProducts({ status: 'active', limitCount: 8, sortBy: 'newest' });
+    recentProducts = products;
+    totalProducts = products.length;
+  } catch {
+    // Non-blocking
+  }
+
+  // 2. Members count: Try reading total registered members
+  try {
     const usersCol = collection(db, 'users');
-
-    // Attempt individual counts so one failure does not affect the others
-    let totalProducts = 0;
-    let totalOrders = 0;
-    let totalCustomers = 0;
-
-    // 1. Registered Customers count (all users signed up)
+    const userCountSnap = await getCountFromServer(usersCol);
+    totalCustomers = userCountSnap.data().count;
+  } catch {
     try {
-      const userCountSnap = await getCountFromServer(usersCol);
-      totalCustomers = userCountSnap.data().count;
+      const usersCol = collection(db, 'users');
+      const usrs = await getDocs(usersCol);
+      if (usrs.size > 0) totalCustomers = usrs.size;
     } catch {
-      try {
-        const usrs = await getDocs(usersCol);
-        totalCustomers = usrs.size;
-      } catch (uErr) {
-        console.warn('Could not count users:', uErr);
-        totalCustomers = 1;
-      }
+      // Default fallback
+      totalCustomers = 1;
+    }
+  }
+
+  // 3. Admin-only stats: only fetch when isAdmin is true
+  if (isAdmin) {
+    try {
+      const orders = await getOrders({ limitCount: 50 });
+      recentOrders = orders;
+      totalOrders = orders.length;
+      totalRevenue = orders.reduce((sum, ord) => {
+        if (ord.status === 'paid' || ord.status === 'completed' || ord.status === 'processing') {
+          return sum + (ord.total || 0);
+        }
+        return sum;
+      }, 0);
+    } catch {
+      // Non-blocking
     }
 
-    // 2. Products count
-    try {
-      const prodCountSnap = await getCountFromServer(productsCol);
-      totalProducts = prodCountSnap.data().count;
-    } catch {
-      try {
-        const prods = await getDocs(productsCol);
-        totalProducts = prods.size;
-      } catch {}
-    }
-
-    // 3. Orders count
-    try {
-      const orderCountSnap = await getCountFromServer(ordersCol);
-      totalOrders = orderCountSnap.data().count;
-    } catch {
-      try {
-        const ords = await getDocs(ordersCol);
-        totalOrders = ords.size;
-      } catch {}
-    }
-
-    // Fetch recent orders & compute revenue from real orders
-    const recentOrders = await getOrders({ limitCount: 50 });
-    const totalRevenue = recentOrders.reduce((sum, ord) => {
-      if (ord.status === 'paid' || ord.status === 'completed' || ord.status === 'processing') {
-        return sum + (ord.total || 0);
-      }
-      return sum;
-    }, 0);
-
-    // Fetch pending topups count
-    let pendingTopupsCount = 0;
     try {
       const topupsCol = collection(db, 'topups');
-      const q = query(topupsCol);
-      const topupSnap = await getDocs(q);
+      const topupSnap = await getDocs(query(topupsCol));
       pendingTopupsCount = topupSnap.docs.filter((d) => d.data().status === 'pending').length;
-    } catch (err) {
-      console.warn('Could not load pending topups:', err);
+    } catch {
+      // Non-blocking
     }
-
-    // Fetch recent products
-    const recentProducts = await getProducts({ limitCount: 8, sortBy: 'newest' });
-
-    // Fetch review statistics
-    let averageRating = 5.0;
-    let totalReviews = 0;
-    let satisfactionRate = '100%';
-
-    try {
-      const reviewsCol = collection(db, 'reviews');
-      const revSnap = await getDocs(reviewsCol);
-      if (!revSnap.empty) {
-        totalReviews = revSnap.size;
-        let sum = 0;
-        let high = 0;
-        revSnap.forEach((d) => {
-          const r = Number(d.data().rating) || 5;
-          sum += r;
-          if (r >= 4) high++;
-        });
-        averageRating = Number((sum / totalReviews).toFixed(1));
-        satisfactionRate = Math.round((high / totalReviews) * 100) + '%';
-      }
-    } catch (err) {
-      console.warn('Could not load reviews for stats:', err);
-    }
-
-    return {
-      totalProducts,
-      totalOrders,
-      totalCustomers,
-      totalRevenue,
-      averageRating,
-      totalReviews,
-      satisfactionRate,
-      pendingTopupsCount,
-      recentOrders,
-      recentProducts,
-    };
-  } catch (error) {
-    console.error('Error fetching dashboard stats:', error);
-    return {
-      ...fallbackStats,
-      averageRating: 5.0,
-      totalReviews: 0,
-      satisfactionRate: '100%',
-    };
   }
+
+  // 4. Reviews: Try reading public reviews
+  try {
+    const reviewsCol = collection(db, 'reviews');
+    const revSnap = await getDocs(reviewsCol);
+    if (!revSnap.empty) {
+      totalReviews = revSnap.size;
+      let sum = 0;
+      let high = 0;
+      revSnap.forEach((d) => {
+        const r = Number(d.data().rating) || 5;
+        sum += r;
+        if (r >= 4) high++;
+      });
+      averageRating = Number((sum / totalReviews).toFixed(1));
+      satisfactionRate = Math.round((high / totalReviews) * 100) + '%';
+    }
+  } catch {
+    // Non-blocking
+  }
+
+  return {
+    totalProducts,
+    totalOrders,
+    totalCustomers,
+    totalRevenue,
+    averageRating,
+    totalReviews,
+    satisfactionRate,
+    pendingTopupsCount,
+    recentOrders,
+    recentProducts,
+  };
 }
