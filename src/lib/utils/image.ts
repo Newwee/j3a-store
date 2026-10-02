@@ -9,8 +9,24 @@ export async function compressImageToDataUrl(
   initialQuality = 0.75
 ): Promise<string> {
   return new Promise((resolve, reject) => {
-    if (!file.type.startsWith('image/')) {
+    if (!file.type.startsWith('image/') && !file.name.toLowerCase().endsWith('.gif')) {
       reject(new Error('ไฟล์ที่เลือกไม่ใช่รูปภาพ'));
+      return;
+    }
+
+    // SPECIAL HANDLING FOR GIF:
+    // HTML Canvas cannot encode animated GIFs (it collapses all frames into a single static frame).
+    // Therefore, read animated GIFs directly as data URL to preserve 100% of the animated frames!
+    const isGif = file.type === 'image/gif' || file.name.toLowerCase().endsWith('.gif');
+    if (isGif) {
+      // If GIF is under 800KB, read directly as base64 Data URL (safe for Firestore document)
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('ไม่สามารถอ่านไฟล์ GIF ได้'));
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        resolve(result);
+      };
+      reader.readAsDataURL(file);
       return;
     }
 
