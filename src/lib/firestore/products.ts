@@ -198,6 +198,20 @@ export async function getProductById(id: string): Promise<Product | null> {
   }
 }
 
+function removeUndefinedDeep<T>(obj: T): T {
+  if (obj === null || obj === undefined) return obj;
+  if (Array.isArray(obj)) return obj.map((it) => removeUndefinedDeep(it)) as unknown as T;
+  if (typeof obj === 'object') {
+    if (obj instanceof Date || (obj as any)._methodName || (obj as any).toMillis) return obj;
+    const clean: Record<string, any> = {};
+    for (const [key, val] of Object.entries(obj)) {
+      if (val !== undefined) clean[key] = removeUndefinedDeep(val);
+    }
+    return clean as T;
+  }
+  return obj;
+}
+
 /**
  * Create a new product in Firestore
  */
@@ -206,8 +220,9 @@ export async function createProduct(formData: ProductFormData): Promise<string> 
     throw new Error('Firestore is not initialized.');
   }
 
+  const cleanData = removeUndefinedDeep(formData);
   const newDoc = {
-    ...formData,
+    ...cleanData,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
@@ -224,9 +239,10 @@ export async function updateProduct(id: string, formData: Partial<ProductFormDat
     throw new Error('Firestore is not initialized.');
   }
 
+  const cleanData = removeUndefinedDeep(formData);
   const docRef = doc(db, PRODUCTS_COLLECTION, id);
   await updateDoc(docRef, {
-    ...formData,
+    ...cleanData,
     updatedAt: serverTimestamp(),
   });
 }

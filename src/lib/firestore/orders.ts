@@ -65,6 +65,33 @@ export interface GetOrdersFilter {
   limitCount?: number;
 }
 
+function removeUndefinedDeep<T>(obj: T): T {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map((item) => removeUndefinedDeep(item)) as unknown as T;
+  }
+  if (typeof obj === 'object') {
+    // Preserve Date and Firestore FieldValues/Timestamps
+    if (
+      obj instanceof Date ||
+      (obj as any)._methodName ||
+      (obj as any).toMillis
+    ) {
+      return obj;
+    }
+    const clean: Record<string, any> = {};
+    for (const [key, val] of Object.entries(obj)) {
+      if (val !== undefined) {
+        clean[key] = removeUndefinedDeep(val);
+      }
+    }
+    return clean as T;
+  }
+  return obj;
+}
+
 /**
  * Create a new order in Firestore
  */
@@ -75,10 +102,8 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
 
   const orderNumber = generateOrderNumber();
 
-  // Strip undefined fields so Firestore doesn't reject addDoc
-  const sanitizedInput = Object.fromEntries(
-    Object.entries(input).filter(([_, v]) => v !== undefined)
-  );
+  // Recursively strip any undefined fields (including customer.notes, paymentProofUrl, etc.)
+  const sanitizedInput = removeUndefinedDeep(input);
 
   const newDoc = {
     ...sanitizedInput,

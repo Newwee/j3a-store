@@ -136,14 +136,14 @@ export default function CheckoutPage() {
       }
 
       // 2. Prepare Order Payload
-      const orderData = {
+      const orderData: any = {
         userId: user ? user.uid : 'guest',
         customer: {
           name: name.trim(),
           email: email.trim(),
           phone: phone.trim(),
           address: address.trim(),
-          notes: notes.trim() || undefined,
+          ...(notes.trim() ? { notes: notes.trim() } : {}),
         },
         items: items.map((item) => ({
           productId: item.product.id,
@@ -158,7 +158,7 @@ export default function CheckoutPage() {
         discount: 0,
         total,
         paymentMethod,
-        paymentProofUrl: slipUrl,
+        ...(slipUrl ? { paymentProofUrl: slipUrl } : {}),
       };
 
       // 3. Save order to Firestore
