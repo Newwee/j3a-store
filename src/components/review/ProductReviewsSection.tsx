@@ -120,7 +120,14 @@ export function ProductReviewsSection({
   const totalReviews = reviews.length;
   const averageRating =
     totalReviews > 0
-      ? Number((reviews.reduce((acc, r) => acc + r.rating, 0) / totalReviews).toFixed(1))
+      ? Number(
+          (
+            reviews.reduce(
+              (acc, r) => acc + (r.rating > 5 ? r.rating / 2 : r.rating),
+              0
+            ) / totalReviews
+          ).toFixed(1)
+        )
       : 5.0;
 
   return (
@@ -248,17 +255,25 @@ export function ProductReviewsSection({
                     </div>
 
                     {/* Stars */}
-                    <div className="flex items-center gap-0.5">
-                      {[1, 2, 3, 4, 5].map((s) => (
-                        <Star
-                          key={s}
-                          className={`w-3.5 h-3.5 ${
-                            s <= rev.rating
-                              ? 'fill-amber-400 text-amber-400'
-                              : 'text-slate-700'
-                          }`}
-                        />
-                      ))}
+                    <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-0.5">
+                        {[1, 2, 3, 4, 5].map((s) => {
+                          const starVal = rev.rating > 5 ? Math.round(rev.rating / 2) : rev.rating;
+                          return (
+                            <Star
+                              key={s}
+                              className={`w-3.5 h-3.5 ${
+                                s <= starVal
+                                  ? 'fill-amber-400 text-amber-400'
+                                  : 'text-slate-700'
+                              }`}
+                            />
+                          );
+                        })}
+                      </div>
+                      <span className="text-[11px] font-bold text-amber-400 ml-1">
+                        {rev.rating > 5 ? (rev.rating / 2).toFixed(1) : rev.rating} / 5
+                      </span>
                     </div>
                   </div>
 

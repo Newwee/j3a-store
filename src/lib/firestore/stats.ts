@@ -108,7 +108,9 @@ export async function getStoreDashboardStats(isAdmin = false): Promise<StoreStat
       let sum = 0;
       let high = 0;
       revSnap.forEach((d) => {
-        const r = Number(d.data().rating) || 5;
+        const raw = Number(d.data().rating) || 10;
+        // The store review score is out of 10, divide by 2 before averaging
+        const r = raw > 5 ? raw / 2 : raw;
         sum += r;
         if (r >= 4) high++;
       });

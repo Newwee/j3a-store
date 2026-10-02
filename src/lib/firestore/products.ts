@@ -53,7 +53,10 @@ function mapDocToProduct(docSnap: { id: string; data: () => Record<string, unkno
     featured: Boolean(data.featured),
     tags: Array.isArray(data.tags) ? data.tags : [],
     specs: (data.specs as Record<string, string>) || {},
-    rating: data.rating !== undefined ? Number(data.rating) : 5.0,
+    rating: (() => {
+      const raw = data.rating !== undefined ? Number(data.rating) : 5.0;
+      return raw > 5 ? Number((raw / 2).toFixed(1)) : raw;
+    })(),
     reviewCount: data.reviewCount !== undefined ? Number(data.reviewCount) : 0,
     createdAt,
     updatedAt,

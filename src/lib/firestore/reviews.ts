@@ -222,8 +222,11 @@ export async function submitProductReview(data: {
   try {
     const allReviews = await getProductReviews(data.productId);
     const totalCount = allReviews.length;
-    const sum = allReviews.reduce((acc, curr) => acc + curr.rating, 0);
-    const avg = totalCount > 0 ? Number((sum / totalCount).toFixed(1)) : star;
+    const sum = allReviews.reduce((acc, curr) => {
+      const r = curr.rating > 5 ? curr.rating / 2 : curr.rating;
+      return acc + r;
+    }, 0);
+    const avg = totalCount > 0 ? Number((sum / totalCount).toFixed(1)) : (star > 5 ? Number((star / 2).toFixed(1)) : star);
 
     const prodDocRef = doc(db, PRODUCTS_COLLECTION, data.productId);
     await updateDoc(prodDocRef, {
@@ -416,7 +419,9 @@ export async function getStoreReviewStats(): Promise<{
     let highRatings = 0; // 4 or 5 stars
 
     snap.forEach((d) => {
-      const r = Number(d.data().rating) || 5;
+      const raw = Number(d.data().rating) || 10;
+      // Convert 10-point rating to 5-star scale
+      const r = raw > 5 ? raw / 2 : raw;
       sum += r;
       if (r >= 4) highRatings++;
     });
