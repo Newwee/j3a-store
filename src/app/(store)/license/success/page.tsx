@@ -10,6 +10,12 @@ function LicenseSuccessContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get('orderId') || undefined;
   const initialKey = searchParams.get('key') || undefined;
+  const product =
+    searchParams.get('product') ||
+    searchParams.get('type') ||
+    searchParams.get('slug') ||
+    searchParams.get('name') ||
+    undefined;
 
   return (
     <div className="py-10 sm:py-16 px-4 sm:px-6 lg:px-8">
@@ -26,6 +32,7 @@ function LicenseSuccessContent() {
           orderId={orderId}
           initialKey={initialKey}
           autoClaim={!initialKey}
+          productName={product}
         />
       </div>
     </div>

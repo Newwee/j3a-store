@@ -15,6 +15,7 @@ import {
   Building2,
   Wallet,
   AlertCircle,
+  ExternalLink,
 } from 'lucide-react';
 import { Order } from '@/types/order';
 import { getOrderById, updatePaymentProof } from '@/lib/firestore/orders';
@@ -24,7 +25,7 @@ import { OrderStatusBadge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/context/ToastContext';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { LicenseKeyDelivery } from '@/components/license/LicenseKeyDelivery';
+import { LicenseKeyDelivery, getDownloadUrlForProduct } from '@/components/license/LicenseKeyDelivery';
 
 export default function OrderDetailPage({
   params,
@@ -109,8 +110,14 @@ export default function OrderDetailPage({
       return (
         name.includes('discord') ||
         name.includes('license') ||
+        name.includes('manager') ||
+        name.includes('profile') ||
+        name.includes('bot') ||
+        name.includes('bundle') ||
         slug.includes('discord') ||
-        slug.includes('license')
+        slug.includes('license') ||
+        slug.includes('manager') ||
+        slug.includes('profile')
       );
     }) || order?.transactionRef
   );
@@ -127,7 +134,7 @@ export default function OrderDetailPage({
           <span>ย้อนกลับไปยังประวัติการทำรายการ</span>
         </Link>
 
-        {/* Automated Key Delivery Component for J3A Discord Profile / License */}
+        {/* Automated Key Delivery Component for J3A Discord Profile / Discord Manager */}
         {isLicenseOrder && (order.status === 'completed' || order.status === 'paid') && (
           <div className="pt-2">
             <LicenseKeyDelivery
@@ -135,7 +142,7 @@ export default function OrderDetailPage({
               orderId={order.id}
               customerEmail={order.customer?.email}
               autoClaim={!order.transactionRef}
-              downloadUrl="/downloads/J3ADiscordProfile.zip"
+              items={order.items}
               discordUrl="https://discord.gg/j3astore"
             />
           </div>
@@ -145,10 +152,10 @@ export default function OrderDetailPage({
           <div className="rounded-2xl p-5 bg-[#7c5cff]/10 border border-[#7c5cff]/30 text-slate-200 text-xs sm:text-sm space-y-2">
             <div className="flex items-center gap-2 font-bold text-[#7c5cff]">
               <Package className="w-5 h-5" />
-              <span>คำสั่งซื้อนี้มีซอฟต์แวร์ J3A Discord Profile</span>
+              <span>คำสั่งซื้อนี้มีซอฟต์แวร์ Discord / License Key</span>
             </div>
             <p className="text-slate-300">
-              เมื่อการชำระเงินได้รับการยืนยัน ระบบจะส่งมอบ License Key อัตโนมัติและแสดงปุ่มดาวน์โหลดโปรแกรมบนหน้านี้ทันที
+              เมื่อการชำระเงินได้รับการยืนยัน ระบบจะส่งมอบ License Key อัตโนมัติและแสดงปุ่มดาวน์โหลดไฟล์ติดตั้ง (.zip) ผ่าน Google Drive บนหน้านี้ทันที
             </p>
           </div>
         )}
@@ -198,10 +205,25 @@ export default function OrderDetailPage({
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
                     <span className="text-sm font-bold text-cyan-400">
                       {formatCurrency(item.price * item.quantity)}
                     </span>
+                    {(order.status === 'completed' || order.status === 'paid') && (() => {
+                      const downloadLink = getDownloadUrlForProduct(`${item.name} ${item.slug}`);
+                      if (!downloadLink) return null;
+                      return (
+                        <a
+                          href={downloadLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 hover:text-white text-xs font-bold transition-all shadow-[0_0_12px_rgba(34,197,94,0.15)] select-none no-underline cursor-pointer"
+                        >
+                          <span>⬇️ ดาวน์โหลด (.zip)</span>
+                          <ExternalLink className="w-3 h-3 opacity-70" />
+                        </a>
+                      );
+                    })()}
                     {order.status === 'completed' && (
                       <Link href={`/products/${item.slug}?openReview=true`}>
                         <Button

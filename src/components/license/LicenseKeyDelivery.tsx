@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Key,
   Copy,
@@ -12,20 +12,84 @@ import {
   AlertCircle,
   RefreshCw,
   Sparkles,
-  Shield,
-  Layers,
   Terminal,
 } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 import { Button } from '@/components/ui/Button';
 
-interface LicenseKeyDeliveryProps {
+export interface SoftwareDownloadItem {
+  id: string;
+  name: string;
+  shortName: string;
+  downloadUrl: string;
+  zipFileName: string;
+  exeFileName: string;
+  guideStep3: string;
+}
+
+export const SOFTWARE_DOWNLOADS: Record<'DISCORD_MANAGER' | 'DISCORD_PROFILE', SoftwareDownloadItem> = {
+  DISCORD_MANAGER: {
+    id: 'discord-manager',
+    name: 'J3A Discord Manager',
+    shortName: 'J3A Discord Manager',
+    downloadUrl: 'https://drive.google.com/file/d/1QTKdEcYbMJFHoG_LslEwJPWKIVtO8uH9/view?usp=sharing',
+    zipFileName: 'J3ADiscordManager.zip',
+    exeFileName: 'J3ADiscordManager.exe',
+    guideStep3: 'เชื่อมต่อ Bot Token หรือตั้งค่า Discord Server Architecture แล้วเริ่มใช้งานได้ทันที!',
+  },
+  DISCORD_PROFILE: {
+    id: 'discord-profile',
+    name: 'J3A Discord Profile',
+    shortName: 'J3A Discord Profile',
+    downloadUrl: 'https://drive.google.com/file/d/18Mt5mytIu-jB7Jt7efyr_nTxWGkDTuV0/view?usp=drive_link',
+    zipFileName: 'J3ADiscordProfile.zip',
+    exeFileName: 'J3ADiscordProfile.exe',
+    guideStep3: 'ใส่ Application ID จาก Discord Developer Portal แล้วกดเริ่มใช้งานได้ทันที!',
+  },
+};
+
+/**
+ * Helper function to match a product name/slug to its Google Drive download link
+ */
+export function getDownloadUrlForProduct(nameOrSlugOrId: string = ''): string | null {
+  const s = nameOrSlugOrId.toLowerCase();
+  if (
+    s.includes('discord manager') ||
+    s.includes('discordmanager') ||
+    s.includes('bot manager') ||
+    s.includes('discordbot') ||
+    s.includes('j3a-discord-manager')
+  ) {
+    return SOFTWARE_DOWNLOADS.DISCORD_MANAGER.downloadUrl;
+  }
+  if (
+    s.includes('discord profile') ||
+    s.includes('discordprofile') ||
+    s.includes('rich presence') ||
+    s.includes('rpc') ||
+    s.includes('j3a-discord-profile')
+  ) {
+    return SOFTWARE_DOWNLOADS.DISCORD_PROFILE.downloadUrl;
+  }
+  return null;
+}
+
+export interface LicenseOrderItem {
+  productId?: string;
+  name?: string;
+  slug?: string;
+  category?: string;
+}
+
+export interface LicenseKeyDeliveryProps {
   initialKey?: string;
   orderId?: string;
   customerEmail?: string;
   autoClaim?: boolean;
   downloadUrl?: string;
   discordUrl?: string;
+  items?: LicenseOrderItem[];
+  productName?: string;
 }
 
 export function LicenseKeyDelivery({
@@ -33,14 +97,107 @@ export function LicenseKeyDelivery({
   orderId,
   customerEmail,
   autoClaim = true,
-  downloadUrl = '/downloads/J3ADiscordProfile.zip',
+  downloadUrl,
   discordUrl = 'https://discord.gg/j3astore',
+  items,
+  productName,
 }: LicenseKeyDeliveryProps) {
   const { toast } = useToast();
   const [licenseKey, setLicenseKey] = useState<string>(initialKey || '');
   const [isLoading, setIsLoading] = useState<boolean>(!initialKey && autoClaim);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [hasCopied, setHasCopied] = useState<boolean>(false);
+
+  // Detect which software(s) were purchased based on items / product name / downloadUrl
+  const purchasedSoftware = useMemo<SoftwareDownloadItem[]>(() => {
+    // If a custom downloadUrl was provided and is not the old dummy zip
+    if (downloadUrl && !downloadUrl.includes('/downloads/J3ADiscordProfile.zip')) {
+      if (downloadUrl === SOFTWARE_DOWNLOADS.DISCORD_MANAGER.downloadUrl) {
+        return [SOFTWARE_DOWNLOADS.DISCORD_MANAGER];
+      }
+      if (downloadUrl === SOFTWARE_DOWNLOADS.DISCORD_PROFILE.downloadUrl) {
+        return [SOFTWARE_DOWNLOADS.DISCORD_PROFILE];
+      }
+      return [
+        {
+          id: 'custom-download',
+          name: productName || 'ซอฟต์แวร์ J3A',
+          shortName: productName || 'ซอฟต์แวร์ J3A',
+          downloadUrl,
+          zipFileName: 'program.zip',
+          exeFileName: 'program.exe',
+          guideStep3: 'เปิดใช้งานโปรแกรมและเริ่มใช้งานได้ทันที!',
+        },
+      ];
+    }
+
+    const matches: SoftwareDownloadItem[] = [];
+
+    const checkMatches = (text: string) => {
+      const s = text.toLowerCase();
+      const isManager =
+        s.includes('discord manager') ||
+        s.includes('discordmanager') ||
+        s.includes('bot manager') ||
+        s.includes('discordbot') ||
+        s.includes('j3a-discord-manager');
+
+      const isProfile =
+        s.includes('discord profile') ||
+        s.includes('discordprofile') ||
+        s.includes('rich presence') ||
+        s.includes('rpc') ||
+        s.includes('j3a-discord-profile');
+
+      const isBundle =
+        s.includes('bundle') ||
+        s.includes('ultimate') ||
+        s.includes('2-in-1') ||
+        s.includes('แพ็กเกจ');
+
+      if (isBundle) {
+        if (!matches.some((m) => m.id === SOFTWARE_DOWNLOADS.DISCORD_MANAGER.id)) {
+          matches.push(SOFTWARE_DOWNLOADS.DISCORD_MANAGER);
+        }
+        if (!matches.some((m) => m.id === SOFTWARE_DOWNLOADS.DISCORD_PROFILE.id)) {
+          matches.push(SOFTWARE_DOWNLOADS.DISCORD_PROFILE);
+        }
+      } else {
+        if (isManager && !matches.some((m) => m.id === SOFTWARE_DOWNLOADS.DISCORD_MANAGER.id)) {
+          matches.push(SOFTWARE_DOWNLOADS.DISCORD_MANAGER);
+        }
+        if (isProfile && !matches.some((m) => m.id === SOFTWARE_DOWNLOADS.DISCORD_PROFILE.id)) {
+          matches.push(SOFTWARE_DOWNLOADS.DISCORD_PROFILE);
+        }
+      }
+    };
+
+    if (items && items.length > 0) {
+      for (const it of items) {
+        checkMatches(`${it.name || ''} ${it.slug || ''} ${it.productId || ''} ${it.category || ''}`);
+      }
+    }
+
+    if (productName) {
+      checkMatches(productName);
+    }
+
+    // Default fallback if no specific match was identified
+    if (matches.length === 0) {
+      matches.push(SOFTWARE_DOWNLOADS.DISCORD_PROFILE);
+    }
+
+    return matches;
+  }, [items, productName, downloadUrl]);
+
+  const isMultiple = purchasedSoftware.length > 1;
+  const isManagerOnly = purchasedSoftware.length === 1 && purchasedSoftware[0].id === 'discord-manager';
+
+  const celebrationTitle = isMultiple
+    ? '🎉 ขอบคุณสำหรับการสั่งซื้อซอฟต์แวร์ Discord (J3A STORE)!'
+    : isManagerOnly
+    ? '🎉 ขอบคุณสำหรับการสั่งซื้อ J3A Discord Manager!'
+    : '🎉 ขอบคุณสำหรับการสั่งซื้อ J3A Discord Profile!';
 
   const claimKeyFromApi = async () => {
     setIsLoading(true);
@@ -92,7 +249,7 @@ export function LicenseKeyDelivery({
           <span>Automated Key Delivery System</span>
         </div>
         <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white flex items-center justify-center gap-2">
-          <span>🎉 ขอบคุณสำหรับการสั่งซื้อ J3A Discord Profile!</span>
+          <span>{celebrationTitle}</span>
         </h2>
         <p className="text-xs sm:text-sm text-slate-400 max-w-md mx-auto">
           ระบบได้ดำเนินการจัดส่งสิทธิ์การใช้งาน (License Key) ให้คุณโดยอัตโนมัติเรียบร้อยแล้ว
@@ -171,25 +328,40 @@ export function LicenseKeyDelivery({
         )}
       </div>
 
-      {/* 3. Primary Download Program Button */}
-      <div className="pt-2">
-        <a
-          href={downloadUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block w-full"
-        >
-          <button
-            type="button"
-            className="w-full py-4 px-6 rounded-2xl font-black text-sm sm:text-base text-slate-950 bg-gradient-to-r from-[#22c55e] via-emerald-400 to-[#22c55e] hover:from-[#16a34a] hover:to-[#16a34a] transition-all duration-300 shadow-[0_0_30px_rgba(34,197,94,0.4)] hover:shadow-[0_0_40px_rgba(34,197,94,0.6)] hover:scale-[1.01] flex items-center justify-center gap-3 cursor-pointer select-none"
+      {/* 3. Primary Download Program Button(s) directly linking to Google Drive */}
+      <div className="space-y-3 pt-2">
+        {purchasedSoftware.map((software) => (
+          <a
+            key={software.id}
+            href={software.downloadUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group relative block w-full py-4 px-6 rounded-2xl font-black text-sm sm:text-base text-slate-950 bg-gradient-to-r from-[#22c55e] via-emerald-400 to-[#22c55e] hover:from-[#16a34a] hover:to-[#16a34a] transition-all duration-300 shadow-[0_0_30px_rgba(34,197,94,0.4)] hover:shadow-[0_0_40px_rgba(34,197,94,0.6)] hover:scale-[1.01] text-center cursor-pointer select-none no-underline border border-emerald-300/40"
           >
-            <Download className="w-5 h-5 stroke-[2.5]" />
-            <span>📦 ดาวน์โหลดโปรแกรม (J3ADiscordProfile.zip)</span>
-          </button>
-        </a>
+            <div className="flex items-center justify-center gap-2.5">
+              <span className="text-lg">⬇️</span>
+              <span>
+                {isMultiple
+                  ? `ดาวน์โหลดไฟล์ติดตั้ง ${software.name} (.zip) ผ่าน Google Drive`
+                  : `ดาวน์โหลดไฟล์ติดตั้ง (.zip) ผ่าน Google Drive`}
+              </span>
+              <ExternalLink className="w-4 h-4 ml-1 opacity-70 group-hover:opacity-100 transition-opacity" />
+            </div>
+            {!isMultiple && (
+              <span className="block text-[11px] font-semibold text-emerald-950/80 mt-0.5">
+                สำหรับโปรแกรม: {software.name}
+              </span>
+            )}
+          </a>
+        ))}
+
+        {/* Small guidance note under the button - Exact user specification */}
+        <p className="text-[11px] sm:text-xs text-slate-400 text-center flex items-center justify-center gap-1.5 pt-0.5 px-2">
+          <span>💡 หมายเหตุ: ไฟล์ zip มีขนาดประมาณ 20-35 MB หากดาวน์โหลดเสร็จแล้วให้แตกไฟล์ (Extract Here) ก่อนเปิดโปรแกรม</span>
+        </p>
       </div>
 
-      {/* 4. Quick Start Guide (100% exact text matching specification) */}
+      {/* 4. Quick Start Guide */}
       <div className="rounded-2xl bg-slate-950/70 border border-slate-800 p-5 space-y-3">
         <h4 className="text-xs sm:text-sm font-black text-amber-300 flex items-center gap-2">
           <span>💡 วิธีใช้งาน:</span>
@@ -199,19 +371,38 @@ export function LicenseKeyDelivery({
             <span className="w-5 h-5 rounded-full bg-[#7c5cff]/20 text-[#7c5cff] font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
               1
             </span>
-            <span>ดาวน์โหลดและแตกไฟล์ <strong>J3ADiscordProfile.zip</strong></span>
+            <span>
+              ดาวน์โหลดและแตกไฟล์{' '}
+              <strong>
+                {isMultiple
+                  ? 'ไฟล์ .zip ของโปรแกรมที่ต้องการ'
+                  : purchasedSoftware[0].zipFileName}
+              </strong>
+            </span>
           </li>
           <li className="flex items-start gap-2.5">
             <span className="w-5 h-5 rounded-full bg-[#7c5cff]/20 text-[#7c5cff] font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
               2
             </span>
-            <span>เปิดโปรแกรม <strong>J3ADiscordProfile.exe</strong> นำ Key ด้านบนไปกรอกในหน้าต่างเปิดใช้งานครั้งแรก</span>
+            <span>
+              เปิดโปรแกรม{' '}
+              <strong>
+                {isMultiple
+                  ? 'ไฟล์ .exe ของโปรแกรม'
+                  : purchasedSoftware[0].exeFileName}
+              </strong>{' '}
+              นำ Key ด้านบนไปกรอกในหน้าต่างเปิดใช้งานครั้งแรก
+            </span>
           </li>
           <li className="flex items-start gap-2.5">
             <span className="w-5 h-5 rounded-full bg-[#7c5cff]/20 text-[#7c5cff] font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
               3
             </span>
-            <span>ใส่ Application ID จาก Discord Developer Portal แล้วกดเริ่มใช้งานได้ทันที!</span>
+            <span>
+              {isMultiple
+                ? 'ทำตามขั้นตอนการตั้งค่าในโปรแกรม และเริ่มใช้งานฟีเจอร์ระดับพรีเมียมได้ทันที!'
+                : purchasedSoftware[0].guideStep3}
+            </span>
           </li>
         </ol>
       </div>
