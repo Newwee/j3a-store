@@ -23,6 +23,7 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { Button } from '@/components/ui/Button';
+import PeekRating from '@/components/ui/PeekRating';
 
 interface ProductReviewsSectionProps {
   productId: string;
@@ -50,8 +51,7 @@ export function ProductReviewsSection({
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedRating, setSelectedRating] = useState(5);
-  const [hoverRating, setHoverRating] = useState(0);
+  const [selectedRating, setSelectedRating] = useState(10);
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -142,40 +142,17 @@ export function ProductReviewsSection({
             </p>
           </div>
 
-          {/* Action / Eligibility Button */}
+          {/* Action / Eligibility Button - Always openable as requested */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-            {eligibility.canReview ? (
-              <Button
-                variant="primary"
-                size="md"
-                onClick={() => setIsModalOpen(true)}
-                leftIcon={<Star className="w-4 h-4 fill-amber-300 text-amber-300" />}
-                className="shadow-[0_0_25px_rgba(245,158,11,0.45)] bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black animate-pulse"
-              >
-                ⭐ ให้คะแนนสินค้านี้ (Rate Product)
-              </Button>
-            ) : !user ? (
-              <Link href={`/login?redirect=/products/${productSlug || productId}`}>
-                <Button variant="secondary" size="sm" leftIcon={<Lock className="w-3.5 h-3.5 text-amber-400" />}>
-                  เข้าสู่ระบบเพื่อตรวจสอบสิทธิ์รีวิว
-                </Button>
-              </Link>
-            ) : eligibility.reason === 'already_reviewed' ? (
-              <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold">
-                <CheckCircle2 className="w-4 h-4" />
-                <span>คุณได้ให้คะแนนสินค้านี้แล้ว</span>
-              </div>
-            ) : eligibility.reason === 'order_pending_admin' ? (
-              <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-semibold">
-                <Clock className="w-4 h-4 animate-spin text-amber-400" />
-                <span>รอแอดมินอนุมัติคำสั่งซื้อจึงจะปลดล็อกปุ่มให้คะแนน</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900/90 border border-slate-700/80 text-slate-300 text-xs font-medium">
-                <Lock className="w-3.5 h-3.5 text-amber-400" />
-                <span>ปุ่มให้คะแนนจะปลดล็อกเมื่อซื้อสินค้าและแอดมินอนุมัติแล้ว</span>
-              </div>
-            )}
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => setIsModalOpen(true)}
+              leftIcon={<Star className="w-4 h-4 fill-amber-300 text-amber-300" />}
+              className="shadow-[0_0_25px_rgba(245,158,11,0.45)] bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black cursor-target"
+            >
+              ⭐ ให้คะแนนและรีวิวสินค้า
+            </Button>
           </div>
         </div>
 
@@ -301,7 +278,7 @@ export function ProductReviewsSection({
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-7 max-w-lg w-full shadow-2xl relative space-y-5">
             <button
               onClick={() => setIsModalOpen(false)}
-              className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-target"
             >
               <X className="w-5 h-5" />
             </button>
@@ -309,91 +286,138 @@ export function ProductReviewsSection({
             {/* Modal Title */}
             <div>
               <span className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider block">
-                ยืนยันการซื้อขายเรียบร้อยแล้ว
+                {eligibility.canReview ? 'ยืนยันการซื้อขายเรียบร้อยแล้ว' : 'ตรวจสอบสิทธิ์การรีวิว'}
               </span>
               <h3 className="text-lg font-black text-white tracking-tight mt-0.5">
                 ให้คะแนนและรีวิว: {productName}
               </h3>
             </div>
 
-            <form onSubmit={handleSubmitReview} className="space-y-4">
-              {/* Star Rating Selector */}
-              <div className="space-y-2 text-center p-4 rounded-2xl bg-slate-950/60 border border-slate-800">
-                <span className="text-xs font-semibold text-slate-300 block">
-                  เลือกระดับความพึงพอใจ:
-                </span>
-                <div className="flex items-center justify-center gap-2 py-1">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      type="button"
-                      key={star}
-                      onMouseEnter={() => setHoverRating(star)}
-                      onMouseLeave={() => setHoverRating(0)}
-                      onClick={() => setSelectedRating(star)}
-                      className="p-1 text-slate-600 hover:scale-125 transition-transform"
-                    >
-                      <Star
-                        className={`w-7 h-7 sm:w-8 sm:h-8 transition-colors ${
-                          star <= (hoverRating || selectedRating)
-                            ? 'fill-amber-400 text-amber-400'
-                            : 'text-slate-700'
-                        }`}
-                      />
-                    </button>
-                  ))}
+            {/* Check Review Gating */}
+            {!eligibility.canReview ? (
+              <div className="space-y-4 py-2">
+                <div className="p-5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-center space-y-3">
+                  <div className="w-12 h-12 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto shadow-[0_0_20px_rgba(244,63,94,0.3)]">
+                    <Lock className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="text-base font-bold text-rose-300">
+                      ไม่สามารถรีวิวได้เนื่องจากยังไม่ซื้อสินค้า
+                    </h4>
+                    <p className="text-xs text-slate-300 max-w-sm mx-auto mt-1 leading-relaxed">
+                      {eligibility.message ||
+                        'ระบบเปิดให้เฉพาะผู้ที่สั่งซื้อสินค้านี้จริงและได้รับการอนุมัติคำสั่งซื้อเรียบร้อยแล้วเท่านั้น จึงจะสามารถให้คะแนนและเขียนรีวิวได้'}
+                    </p>
+                  </div>
+                  {!user ? (
+                    <Link href={`/login?redirect=/products/${productSlug || productId}`}>
+                      <Button variant="primary" size="sm" className="mt-2 cursor-target">
+                        เข้าสู่ระบบบัญชีของคุณ
+                      </Button>
+                    </Link>
+                  ) : (
+                    <Link href={`/products/${productSlug || productId}`}>
+                      <Button variant="secondary" size="sm" className="mt-2 cursor-target">
+                        สั่งซื้อสินค้านี้เพื่อปลดล็อกสิทธิ์
+                      </Button>
+                    </Link>
+                  )}
                 </div>
-                <span className="text-xs font-bold text-amber-400 block">
-                  {hoverRating || selectedRating} / 5 ดาว (
-                  {(hoverRating || selectedRating) === 5
-                    ? 'ยอดเยี่ยม ประทับใจมาก'
-                    : (hoverRating || selectedRating) === 4
-                    ? 'ดีมาก พึงพอใจ'
-                    : (hoverRating || selectedRating) === 3
-                    ? 'ปานกลาง พอใช้'
-                    : (hoverRating || selectedRating) === 2
-                    ? 'ควรปรับปรุง'
-                    : 'ไม่พึงพอใจ'}
-                  )
-                </span>
-              </div>
 
-              {/* Comment Textarea */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-300 block">
-                  ข้อความรีวิวสินค้า *
-                </label>
-                <textarea
-                  rows={4}
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  placeholder="แบ่งปันประสบการณ์การใช้งาน เช่น ความรวดเร็วในการจัดส่ง คุณภาพของสินค้า บริการจากทางร้าน..."
-                  required
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-white placeholder-slate-500 text-xs sm:text-sm focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all resize-none"
-                />
-              </div>
+                {/* Disabled PeekRating Preview */}
+                <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80 text-center space-y-2 opacity-50 pointer-events-none">
+                  <span className="text-xs font-semibold text-slate-400 block">
+                    ตัวอย่างระบบให้คะแนน (1 - 10 ดาว):
+                  </span>
+                  <PeekRating
+                    count={10}
+                    activeColor="#779bff"
+                    tipTextColor="#7C3AED"
+                    size={32}
+                    riseDuration={310}
+                    magnify={1.17}
+                    showLabels={false}
+                    disabled={true}
+                    value={10}
+                  />
+                </div>
 
-              {/* Action Buttons */}
-              <div className="flex items-center justify-end gap-3 pt-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="md"
-                  onClick={() => setIsModalOpen(false)}
-                  disabled={submitting}
-                >
-                  ยกเลิก
-                </Button>
-                <Button
-                  type="submit"
-                  variant="primary"
-                  size="md"
-                  isLoading={submitting}
-                  className="font-bold shadow-[0_0_20px_rgba(6,182,212,0.35)]"
-                >
-                  บันทึกรีวิว (Submit Review)
-                </Button>
+                <div className="flex justify-end pt-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="md"
+                    onClick={() => setIsModalOpen(false)}
+                    className="cursor-target"
+                  >
+                    ปิดหน้าต่าง
+                  </Button>
+                </div>
               </div>
-            </form>
+            ) : (
+              <form onSubmit={handleSubmitReview} className="space-y-4">
+                {/* PeekRating Selector with 10 stars */}
+                <div className="space-y-2 text-center p-4 rounded-2xl bg-slate-950/60 border border-slate-800">
+                  <span className="text-xs font-semibold text-slate-300 block mb-2">
+                    เลือกระดับความพึงพอใจ (1 - 10 คะแนน):
+                  </span>
+                  <div className="flex justify-center py-2 overflow-x-auto">
+                    <PeekRating
+                      count={10}
+                      activeColor="#779bff"
+                      tipTextColor="#7C3AED"
+                      size={36}
+                      riseDuration={310}
+                      magnify={1.17}
+                      showLabels={false}
+                      value={selectedRating}
+                      onChange={(val) => setSelectedRating(val)}
+                    />
+                  </div>
+                  <span className="text-xs font-bold text-indigo-400 block mt-1">
+                    คะแนนที่เลือก: {selectedRating} / 10 คะแนน
+                  </span>
+                </div>
+
+                {/* Comment Textarea */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-300 block">
+                    ข้อความรีวิวสินค้า *
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    placeholder="แบ่งปันประสบการณ์การใช้งาน เช่น ความรวดเร็วในการจัดส่ง คุณภาพของสินค้า บริการจากทางร้าน..."
+                    required
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-white placeholder-slate-500 text-xs sm:text-sm focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all resize-none"
+                  />
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center justify-end gap-3 pt-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="md"
+                    onClick={() => setIsModalOpen(false)}
+                    disabled={submitting}
+                    className="cursor-target"
+                  >
+                    ยกเลิก
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="md"
+                    isLoading={submitting}
+                    className="font-bold shadow-[0_0_20px_rgba(6,182,212,0.35)] cursor-target"
+                  >
+                    บันทึกรีวิว (Submit Review)
+                  </Button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

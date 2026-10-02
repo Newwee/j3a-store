@@ -4,6 +4,7 @@ import './globals.css';
 import { AuthProvider } from '@/context/AuthContext';
 import { CartProvider } from '@/context/CartContext';
 import { ToastProvider } from '@/context/ToastContext';
+import TargetCursor from '@/components/ui/TargetCursor';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -81,6 +82,15 @@ export default function RootLayout({
   return (
     <html lang="th" className={`${inter.variable} ${prompt.variable} dark`}>
       <body className="bg-[#080c14] text-slate-100 font-sans antialiased min-h-screen selection:bg-cyan-500 selection:text-slate-950 flex flex-col">
+        <TargetCursor
+          spinDuration={5}
+          hideDefaultCursor
+          parallaxOn
+          hoverDuration={0.25}
+          cursorColor="#ffffff"
+          cursorColorOnTarget="#B497CF"
+          targetSelector=".cursor-target, button, a, [role='button']"
+        />
         <ToastProvider>
           <AuthProvider>
             <CartProvider>

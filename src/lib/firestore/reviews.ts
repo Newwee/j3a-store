@@ -198,8 +198,8 @@ export async function submitProductReview(data: {
 }): Promise<Review> {
   if (!db) throw new Error('Firestore is not initialized.');
 
-  // Validate rating boundary
-  const star = Math.max(1, Math.min(5, Math.round(data.rating)));
+  // Validate rating boundary (1 to 10)
+  const star = Math.max(1, Math.min(10, Math.round(data.rating)));
 
   const reviewDoc = {
     productId: data.productId,
@@ -240,6 +240,147 @@ export async function submitProductReview(data: {
     productId: data.productId,
     productSlug: data.productSlug,
     productName: data.productName,
+    orderId: data.orderId,
+    userId: data.userId,
+    userName: data.userName,
+    userPhoto: data.userPhoto,
+    rating: star,
+    comment: data.comment.trim(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Check if user is eligible to write an overall store review
+ * Rule: Must be logged in AND have at least 1 paid/completed order
+ */
+export async function checkStoreReviewEligibility(userId?: string | null): Promise<ReviewEligibility> {
+  if (!userId) {
+    return {
+      canReview: false,
+      reason: 'not_logged_in',
+      message: 'ไม่สามารถรีวิวได้เนื่องจากยังไม่ซื้อสินค้า',
+    };
+  }
+
+  if (!db) {
+    return {
+      canReview: false,
+      reason: 'no_purchase',
+      message: 'ระบบฐานข้อมูลยังไม่พร้อมใช้งาน',
+    };
+  }
+
+  try {
+    const ordersCol = collection(db, ORDERS_COLLECTION);
+    const q = query(ordersCol, where('userId', '==', userId));
+    const snap = await getDocs(q);
+
+    const completedOrders: any[] = [];
+    snap.forEach((d) => {
+      const ord = d.data();
+      if (ord.status === 'completed' || ord.status === 'paid') {
+        completedOrders.push({ id: d.id, ...ord });
+      }
+    });
+
+    if (completedOrders.length === 0) {
+      return {
+        canReview: false,
+        reason: 'no_purchase',
+        message: 'ไม่สามารถรีวิวได้เนื่องจากยังไม่ซื้อสินค้า',
+      };
+    }
+
+    const reviewsCol = collection(db, REVIEWS_COLLECTION);
+    const revQ = query(
+      reviewsCol,
+      where('productId', '==', 'store_overall'),
+      where('userId', '==', userId)
+    );
+    const revSnap = await getDocs(revQ);
+    if (!revSnap.empty) {
+      const existing = mapDocToReview(revSnap.docs[0]);
+      return {
+        canReview: false,
+        reason: 'already_reviewed',
+        message: 'คุณได้ส่งรีวิวร้านค้าเรียบร้อยแล้ว ขอบคุณสำหรับคะแนนและความเห็น!',
+        orderId: completedOrders[0].id,
+        existingReview: existing,
+      };
+    }
+
+    return {
+      canReview: true,
+      reason: 'eligible',
+      message: 'คุณมีสิทธิ์รีวิวร้านค้าเนื่องจากเป็นลูกค้าที่มียอดสั่งซื้อสำเร็จในระบบแล้ว',
+      orderId: completedOrders[0].id,
+    };
+  } catch (err) {
+    console.error('Error checking store review eligibility:', err);
+    return {
+      canReview: false,
+      reason: 'no_purchase',
+      message: 'ไม่สามารถรีวิวได้เนื่องจากยังไม่ซื้อสินค้า',
+    };
+  }
+}
+
+/**
+ * Get all overall store reviews
+ */
+export async function getStoreReviews(): Promise<Review[]> {
+  if (!db) return [];
+  try {
+    const colRef = collection(db, REVIEWS_COLLECTION);
+    const q = query(colRef, where('productId', '==', 'store_overall'));
+    const snap = await getDocs(q);
+    const reviews = snap.docs.map(mapDocToReview);
+    reviews.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return reviews;
+  } catch (error) {
+    console.error('Error fetching store reviews:', error);
+    return [];
+  }
+}
+
+/**
+ * Submit overall store review
+ */
+export async function submitStoreReview(data: {
+  userId: string;
+  userName: string;
+  userPhoto?: string;
+  orderId: string;
+  rating: number;
+  comment: string;
+}): Promise<Review> {
+  if (!db) throw new Error('Firestore is not initialized.');
+
+  const star = Math.max(1, Math.min(10, Math.round(data.rating)));
+  const reviewDoc = {
+    productId: 'store_overall',
+    productSlug: 'store',
+    productName: 'J3A STORE (ร้านค้าโดยรวม)',
+    orderId: data.orderId,
+    userId: data.userId,
+    userName: data.userName || 'ลูกค้าผู้ใช้งานจริง',
+    userPhoto: data.userPhoto || null,
+    rating: star,
+    comment: data.comment.trim(),
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
+
+  const colRef = collection(db, REVIEWS_COLLECTION);
+  const docRef = await addDoc(colRef, reviewDoc);
+
+  return {
+    id: docRef.id,
+    productId: 'store_overall',
+    productSlug: 'store',
+    productName: 'J3A STORE (ร้านค้าโดยรวม)',
     orderId: data.orderId,
     userId: data.userId,
     userName: data.userName,

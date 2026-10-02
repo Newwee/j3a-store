@@ -11,6 +11,7 @@ import { FeaturedProductsSection } from '@/components/home/FeaturedProductsSecti
 import { CategoryPills } from '@/components/home/CategoryPills';
 import { PromoBannerSection } from '@/components/home/PromoBannerSection';
 import { WhyUsSection } from '@/components/home/WhyUsSection';
+import { StoreReviewsSection } from '@/components/review/StoreReviewsSection';
 import { ProductCard } from '@/components/product/ProductCard';
 import { ProductCardSkeleton } from '@/components/ui/Skeleton';
 import { Button } from '@/components/ui/Button';
@@ -151,7 +152,10 @@ export default function HomePage() {
       {/* 6. Promotional Banner Section */}
       <PromoBannerSection />
 
-      {/* 7. Why J3A STORE Section */}
+      {/* 7. Store Reviews Section with Gating and PeekRating */}
+      <StoreReviewsSection />
+
+      {/* 8. Why J3A STORE Section */}
       <WhyUsSection />
     </div>
   );

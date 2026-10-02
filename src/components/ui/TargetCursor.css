@@ -1,0 +1,52 @@
+.target-cursor-wrapper {
+  position: fixed;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 99999;
+  user-select: none;
+  transform: translate(-50%, -50%);
+}
+
+.target-cursor-dot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 4px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.target-cursor-corner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  border-width: 3px;
+  border-style: solid;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+.target-cursor-corner.corner-tl {
+  border-right: none;
+  border-bottom: none;
+}
+
+.target-cursor-corner.corner-tr {
+  border-left: none;
+  border-bottom: none;
+}
+
+.target-cursor-corner.corner-br {
+  border-left: none;
+  border-top: none;
+}
+
+.target-cursor-corner.corner-bl {
+  border-right: none;
+  border-top: none;
+}

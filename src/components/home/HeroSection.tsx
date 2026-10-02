@@ -6,6 +6,8 @@ import Image from 'next/image';
 import { ArrowRight, ShieldCheck, Zap, Sparkles, Flame, Star } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { ShapeWaves } from '@/components/ui/ShapeWaves';
+import ParticleText from '@/components/ui/ParticleText';
+import ElectricLogo from '@/components/ui/ElectricLogo';
 
 export function HeroSection() {
   return (
@@ -30,14 +32,25 @@ export function HeroSection() {
               <span>เวอร์ชันใหม่เปิดให้บริการแล้ว! ระบบอัตโนมัติ 24 ชม.</span>
             </div>
 
-            {/* Main Headline */}
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.1]">
-              NEXT-GEN{' '}
-              <span className="text-shimmer">
-                E-COMMERCE
-              </span>{' '}
-              & DIGITAL STORE
-            </h1>
+            {/* Main Headline with ParticleText */}
+            <div className="w-full h-24 sm:h-28 lg:h-32 relative flex items-center justify-center lg:justify-start">
+              <ParticleText
+                text="J3A STUDIO"
+                fontSize="clamp(2.4rem, 5.5vw, 4.2rem)"
+                color="#06b6d4"
+                highlightColor="#a855f7"
+                particleSize={2.4}
+                density={3}
+                glow={true}
+              />
+            </div>
+
+            {/* Sub-headline badge */}
+            <div className="flex items-center justify-center lg:justify-start gap-2 -mt-2">
+              <span className="text-xs sm:text-sm font-bold tracking-widest uppercase text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-sky-300 to-indigo-400">
+                Next-Gen E-Commerce & Digital Store
+              </span>
+            </div>
 
             {/* Subtext */}
             <p className="text-sm sm:text-base text-slate-300 max-w-xl mx-auto lg:mx-0 leading-relaxed">
@@ -51,13 +64,13 @@ export function HeroSection() {
                   variant="primary"
                   size="lg"
                   rightIcon={<ArrowRight className="w-5 h-5" />}
-                  className="px-8 shadow-[0_0_30px_rgba(6,182,212,0.4)]"
+                  className="px-8 shadow-[0_0_30px_rgba(6,182,212,0.4)] cursor-target"
                 >
                   เลือกซื้อสินค้า (Shop Now)
                 </Button>
               </Link>
               <Link href="/profile?tab=topup">
-                <Button variant="secondary" size="lg" className="px-6">
+                <Button variant="secondary" size="lg" className="px-6 cursor-target">
                   เติมเครดิตบัญชี
                 </Button>
               </Link>
@@ -86,44 +99,31 @@ export function HeroSection() {
             </div>
           </div>
 
-          {/* Right Column: Hero Visual with Official Logo and 3D Cards */}
+          {/* Right Column: ElectricLogo with Logo2.png */}
           <div className="lg:col-span-5 relative flex items-center justify-center">
-            {/* Holographic Ring */}
-            <div className="relative w-72 sm:w-80 lg:w-96 aspect-square rounded-3xl bg-gradient-to-tr from-cyan-500/20 via-blue-600/10 to-transparent p-1 border border-cyan-500/40 shadow-[0_0_50px_rgba(6,182,212,0.25)] flex items-center justify-center group">
-              <div className="absolute inset-0 bg-slate-950/80 rounded-3xl backdrop-blur-xl" />
-
-              {/* Central Logo */}
-              <div className="relative w-64 h-64 sm:w-72 sm:h-72 p-4 transition-transform duration-500 group-hover:scale-105">
-                <Image
-                  src="/logo.png"
-                  alt="J3A STORE Emblem"
-                  fill
-                  className="object-contain filter drop-shadow-[0_0_25px_rgba(6,182,212,0.6)]"
-                  priority
-                />
-              </div>
-
-              {/* Floating Badge 1 */}
-              <div className="absolute -bottom-4 -left-4 bg-slate-900/90 border border-slate-700/80 rounded-2xl p-3 shadow-xl backdrop-blur-md flex items-center gap-3 animate-bounce [animation-duration:4s]">
-                <div className="w-9 h-9 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-400">
-                  <Zap className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-[10px] text-slate-400 font-medium">ความเร็วจัดส่ง</p>
-                  <p className="text-xs font-bold text-white">ทันที Real-time</p>
-                </div>
-              </div>
-
-              {/* Floating Badge 2 */}
-              <div className="absolute -top-4 -right-4 bg-slate-900/90 border border-cyan-500/40 rounded-2xl p-3 shadow-xl backdrop-blur-md flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-400">
-                  <ShieldCheck className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-[10px] text-slate-400 font-medium">ความปลอดภัย</p>
-                  <p className="text-xs font-bold text-emerald-400">ยืนยันแท้ 100%</p>
-                </div>
-              </div>
+            <div
+              style={{ width: '100%', height: '480px', position: 'relative' }}
+              className="rounded-3xl overflow-hidden border border-cyan-500/30 bg-slate-950/70 shadow-[0_0_50px_rgba(255,82,96,0.25)] flex items-center justify-center"
+            >
+              <ElectricLogo
+                src="/Logo2.png"
+                color="#ffcdd2"
+                glowColor="#ff5260"
+                scale={0.7}
+                strands={4}
+                bend={0.6}
+                crackle={1.5}
+                arcs={0.4}
+                speed={2.5}
+                interactive
+                intensity={1}
+                glow={1}
+                thickness={1.5}
+                flicker={0.6}
+                fill={0}
+                cursorIntensity={0.75}
+                cursorRadius={100}
+              />
             </div>
           </div>
         </div>
