@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
+import { useTheme } from '@/context/ThemeContext';
 import { updateUserProfile } from '@/lib/firestore/users';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -60,7 +61,7 @@ export function SettingsTabContent() {
   const [marketingNotif, setMarketingNotif] = useState(false);
 
   // Preferences state
-  const [theme, setTheme] = useState<'dark' | 'light' | 'system'>('dark');
+  const { theme, setTheme } = useTheme();
   const [language, setLanguage] = useState<'th' | 'en'>('th');
   const [timezone, setTimezone] = useState('Asia/Bangkok (GMT+7)');
   const [dateFormat, setDateFormat] = useState('DD/MM/YYYY HH:mm');
@@ -484,20 +485,27 @@ export function SettingsTabContent() {
                   ธีมการแสดงผล (Appearance)
                 </label>
                 <div className="grid grid-cols-3 gap-3">
-                  {(['dark', 'light', 'system'] as const).map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setTheme(t)}
-                      className={`p-3 rounded-xl border text-xs font-bold capitalize transition-all cursor-pointer ${
-                        theme === t
-                          ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.3)]'
-                          : 'bg-slate-950/60 text-slate-400 border-slate-800 hover:text-white'
-                      }`}
-                    >
-                      {t === 'dark' ? '🌙 Dark Neon' : t === 'light' ? '☀️ Light' : '💻 System'}
-                    </button>
-                  ))}
+                    {(['dark', 'light', 'system'] as const).map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => {
+                          setTheme(t);
+                          success(
+                            `เปลี่ยนธีมเป็น ${
+                              t === 'light' ? 'Light Mode' : t === 'dark' ? 'Dark Neon' : 'System Theme'
+                            } เรียบร้อยแล้ว`
+                          );
+                        }}
+                        className={`p-3 rounded-xl border text-xs font-bold capitalize transition-all cursor-pointer cursor-target ${
+                          theme === t
+                            ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.3)]'
+                            : 'bg-slate-950/60 text-slate-400 border-slate-800 hover:text-white'
+                        }`}
+                      >
+                        {t === 'dark' ? '🌙 Dark Neon' : t === 'light' ? '☀️ Light' : '💻 System'}
+                      </button>
+                    ))}
                 </div>
               </div>
 

@@ -105,10 +105,12 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
   // Recursively strip any undefined fields (including customer.notes, paymentProofUrl, etc.)
   const sanitizedInput = removeUndefinedDeep(input);
 
+  const initialStatus: OrderStatus = input.status || 'pending';
+
   const newDoc = {
     ...sanitizedInput,
     orderNumber,
-    status: 'pending' as OrderStatus,
+    status: initialStatus,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
@@ -119,7 +121,7 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     id: docRef.id,
     orderNumber,
     ...input,
-    status: 'pending',
+    status: initialStatus,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };

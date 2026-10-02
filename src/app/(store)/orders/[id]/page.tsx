@@ -231,8 +231,21 @@ export default function OrderDetailPage({
             </div>
           </div>
 
-          {/* Payment Proof Upload if Pending */}
-          {order.status === 'pending' && (
+          {/* Wallet Paid Success Banner */}
+          {order.paymentMethod === 'wallet' && (
+            <div className="pt-4 border-t border-slate-800 bg-emerald-950/20 border border-emerald-500/30 rounded-2xl p-5 space-y-2">
+              <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
+                <CheckCircle2 className="w-5 h-5" />
+                <span>ชำระเงินสำเร็จแล้วผ่านยอดเงินคงเหลือในเว็บไซต์ (Wallet)</span>
+              </div>
+              <p className="text-xs text-slate-300">
+                ระบบได้ตัดยอดเงินในบัญชีของคุณเรียบร้อยแล้ว รายการสั่งซื้อนี้ได้รับการยืนยันและจัดส่งอัตโนมัติทันที ไม่จำเป็นต้องอัปโหลดสลิป
+              </p>
+            </div>
+          )}
+
+          {/* Payment Proof Upload if Pending and NOT Wallet */}
+          {order.status === 'pending' && order.paymentMethod !== 'wallet' && (
             <div className="pt-4 border-t border-slate-800 bg-cyan-950/20 border border-cyan-500/30 rounded-2xl p-5 space-y-3">
               <div className="flex items-center gap-2 text-cyan-400 font-bold text-sm">
                 <QrCode className="w-5 h-5" />

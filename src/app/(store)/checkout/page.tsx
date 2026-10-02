@@ -22,6 +22,7 @@ import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { createOrder } from '@/lib/firestore/orders';
+import { deductUserCredits } from '@/lib/firestore/users';
 import { PaymentMethod } from '@/types/order';
 import { PaymentService } from '@/lib/services/payment';
 import { formatCurrency } from '@/lib/utils/formatters';
@@ -34,7 +35,7 @@ import { StoreSettings } from '@/types/settings';
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, subtotal, shipping, total, clearCart } = useCart();
-  const { user, profile } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
   const { success, error, toast } = useToast();
 
   const [storeSettings, setStoreSettings] = useState<StoreSettings>(DEFAULT_STORE_SETTINGS);
@@ -57,7 +58,7 @@ export default function CheckoutPage() {
   const [phone, setPhone] = useState(profile?.phone || '');
   const [address, setAddress] = useState('จัดส่งดิจิทัลทันทีผ่านระบบ / Email');
   const [notes, setNotes] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('promptpay');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('wallet');
 
   // Payment Slip Upload state
   const [slipFile, setSlipFile] = useState<File | null>(null);
@@ -118,9 +119,29 @@ export default function CheckoutPage() {
     setIsProcessing(true);
 
     try {
-      // 1. Upload payment slip if provided
+      // 1. Process Wallet Payment Deduction
+      if (paymentMethod === 'wallet') {
+        if (!user) {
+          error('กรุณาเข้าสู่ระบบก่อนทำการชำระเงินด้วยยอดเงินในเว็บไซต์');
+          setIsProcessing(false);
+          return;
+        }
+        if (userCredits < total) {
+          error(`ยอดเงินคงเหลือในเว็บไซต์ไม่เพียงพอ (คงเหลือ ฿${userCredits}) กรุณาเติมเงินก่อนทำรายการ`);
+          setIsProcessing(false);
+          return;
+        }
+
+        // Deduct user credits in Firestore
+        await deductUserCredits(user.uid, total);
+        if (refreshProfile) {
+          await refreshProfile();
+        }
+      }
+
+      // 2. Upload payment slip if provided (only for bank transfer / QR)
       let slipUrl: string | undefined = undefined;
-      if (slipFile) {
+      if (paymentMethod !== 'wallet' && slipFile) {
         try {
           const uploadRes = await uploadProductImage(slipFile, 'slips');
           slipUrl = uploadRes.downloadUrl;
@@ -135,7 +156,7 @@ export default function CheckoutPage() {
         }
       }
 
-      // 2. Prepare Order Payload
+      // 3. Prepare Order Payload
       const orderData: any = {
         userId: user ? user.uid : 'guest',
         customer: {
@@ -158,13 +179,14 @@ export default function CheckoutPage() {
         discount: 0,
         total,
         paymentMethod,
+        status: paymentMethod === 'wallet' ? 'completed' : 'pending',
         ...(slipUrl ? { paymentProofUrl: slipUrl } : {}),
       };
 
-      // 3. Save order to Firestore
+      // 4. Save order to Firestore
       const created = await createOrder(orderData);
 
-      // 4. Trigger celebration
+      // 5. Trigger celebration
       try {
         confetti({
           particleCount: 100,
@@ -173,10 +195,14 @@ export default function CheckoutPage() {
         });
       } catch {}
 
-      // 5. Clear cart
+      // 6. Clear cart
       clearCart();
 
-      success(`สร้างคำสั่งซื้อ #${created.orderNumber} สำเร็จแล้ว!`);
+      success(
+        paymentMethod === 'wallet'
+          ? `ชำระเงินสำเร็จผ่านยอดเงินในเว็บ! สร้างคำสั่งซื้อ #${created.orderNumber} สำเร็จแล้ว`
+          : `สร้างคำสั่งซื้อ #${created.orderNumber} สำเร็จแล้ว!`
+      );
       router.push(`/orders/${created.id}`);
     } catch (err: any) {
       console.error('Error placing order:', err);
@@ -284,91 +310,63 @@ export default function CheckoutPage() {
                 )}
 
                 <div className="space-y-3">
-                  {/* Option 1: PromptPay QR */}
-                  <label
-                    className={`flex items-start gap-4 p-4 rounded-xl border cursor-pointer transition-all ${
-                      paymentMethod === 'promptpay'
-                        ? 'bg-cyan-500/10 border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.2)]'
-                        : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
-                    }`}
-                  >
+                  {/* Option 1: Scan QR (Coming soon) */}
+                  <div className="flex items-start gap-4 p-4 rounded-xl border bg-slate-950/40 border-slate-800/60 opacity-60 cursor-not-allowed">
                     <input
                       type="radio"
                       name="paymentMethod"
-                      value="promptpay"
-                      checked={paymentMethod === 'promptpay'}
-                      onChange={() => setPaymentMethod('promptpay')}
-                      className="mt-1 accent-cyan-400"
+                      disabled
+                      className="mt-1 accent-cyan-400 cursor-not-allowed"
                     />
                     <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <QrCode className="w-4 h-4 text-cyan-400" />
-                        <span className="text-sm font-bold text-white">
-                          พร้อมเพย์ (PromptPay QR) — สแกนจ่ายอัตโนมัติ
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-400 mt-1">
-                        รองรับทุกแอปธนาคารไทย (KBank, SCB, KTB, BBL ฯลฯ) ไม่มีค่าธรรมเนียม
-                      </p>
-
-                      {/* Expanded promptpay details */}
-                      {paymentMethod === 'promptpay' && (
-                        <div className="mt-4 p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-slate-400">เบอร์พร้อมเพย์:</span>
-                            <span className="font-mono font-bold text-cyan-400 text-sm">
-                              {promptpayNumber}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-slate-400">ชื่อบัญชี:</span>
-                            <span className="font-bold text-white">{storeSettings.storeName || 'J3A STORE Co., Ltd.'}</span>
-                          </div>
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-slate-400">ยอดชำระ:</span>
-                            <span className="font-bold text-emerald-400 text-base">
-                              {formatCurrency(total)}
-                            </span>
-                          </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <QrCode className="w-4 h-4 text-slate-400" />
+                          <span className="text-sm font-bold text-slate-300">
+                            1. สแกนจ่ายตรงนั้น (PromptPay QR)
+                          </span>
                         </div>
-                      )}
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                          Coming Soon (เร็วๆ นี้)
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">
+                        ระบบสแกนชำระเงินอัตโนมัติผ่าน QR พร้อมเพย์ (กำลังเปิดให้บริการ)
+                      </p>
                     </div>
-                  </label>
+                  </div>
 
-                  {/* Option 2: Bank Transfer */}
-                  <label
-                    className={`flex items-start gap-4 p-4 rounded-xl border cursor-pointer transition-all ${
-                      paymentMethod === 'bank_transfer'
-                        ? 'bg-cyan-500/10 border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.2)]'
-                        : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
-                    }`}
-                  >
+                  {/* Option 2: Bank Transfer (Coming soon) */}
+                  <div className="flex items-start gap-4 p-4 rounded-xl border bg-slate-950/40 border-slate-800/60 opacity-60 cursor-not-allowed">
                     <input
                       type="radio"
                       name="paymentMethod"
-                      value="bank_transfer"
-                      checked={paymentMethod === 'bank_transfer'}
-                      onChange={() => setPaymentMethod('bank_transfer')}
-                      className="mt-1 accent-cyan-400"
+                      disabled
+                      className="mt-1 accent-cyan-400 cursor-not-allowed"
                     />
                     <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <Building2 className="w-4 h-4 text-cyan-400" />
-                        <span className="text-sm font-bold text-white">
-                          โอนผ่านเลขบัญชีธนาคาร (Bank Transfer)
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <Building2 className="w-4 h-4 text-slate-400" />
+                          <span className="text-sm font-bold text-slate-300">
+                            2. โอนเงินผ่านเลขบัญชี (Bank Transfer)
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                          Coming Soon (เร็วๆ นี้)
                         </span>
                       </div>
-                      <p className="text-xs text-slate-400 mt-1">
-                        กสิกรไทย (KBANK) 123-4-56789-0 ชื่อบัญชี บจก. เจทรีเอ สโตร์
+                      <p className="text-xs text-slate-500 mt-1">
+                        โอนผ่านบัญชีธนาคารและแนบสลิปเพื่อตรวจสอบ (กำลังเปิดให้บริการ)
                       </p>
                     </div>
-                  </label>
+                  </div>
 
-                  {/* Option 3: Store Wallet Balance */}
+                  {/* Option 3: Store Wallet Balance (Active) */}
                   <label
                     className={`flex items-start gap-4 p-4 rounded-xl border cursor-pointer transition-all ${
                       paymentMethod === 'wallet'
-                        ? 'bg-cyan-500/10 border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.2)]'
+                        ? 'bg-cyan-500/10 border-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.25)]'
                         : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
                     }`}
                   >
@@ -378,23 +376,48 @@ export default function CheckoutPage() {
                       value="wallet"
                       checked={paymentMethod === 'wallet'}
                       onChange={() => setPaymentMethod('wallet')}
-                      className="mt-1 accent-cyan-400"
+                      className="mt-1 accent-cyan-400 cursor-pointer"
                     />
                     <div className="flex-1">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <Wallet className="w-4 h-4 text-cyan-400" />
                           <span className="text-sm font-bold text-white">
-                            ยอดเครดิตในบัญชี (Store Credits)
+                            3. ตัดจากเงินที่เติมเข้าไปในเว็บ (Store Wallet)
                           </span>
                         </div>
-                        <span className="text-xs font-bold text-cyan-400">
+                        <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full">
                           คงเหลือ {formatCurrency(userCredits)}
                         </span>
                       </div>
-                      <p className="text-xs text-slate-400 mt-1">
-                        หักเงินจากยอดเครดิตคงเหลือของคุณทันที
+                      <p className="text-xs text-slate-300 mt-1">
+                        หักเงินจากยอดเครดิตคงเหลือในบัญชีของคุณทันที รวดเร็ว ปลอดภัย 100%
                       </p>
+
+                      {!user ? (
+                        <div className="mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-center justify-between">
+                          <span>กรุณาเข้าสู่ระบบเพื่อใช้ยอดเงินในบัญชี</span>
+                          <Link href="/login?redirect=/checkout">
+                            <Button variant="secondary" size="sm" className="text-xs">
+                              เข้าสู่ระบบ
+                            </Button>
+                          </Link>
+                        </div>
+                      ) : !canPayWithWallet ? (
+                        <div className="mt-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center justify-between">
+                          <span>ยอดเงินในบัญชีไม่พอ (ขาดอีก {formatCurrency(total - userCredits)})</span>
+                          <Link href="/profile?tab=topup">
+                            <Button variant="neon" size="sm" className="text-xs">
+                              เติมเงินเข้าเว็บ
+                            </Button>
+                          </Link>
+                        </div>
+                      ) : (
+                        <div className="mt-2 text-[11px] text-emerald-400 flex items-center gap-1 font-medium">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>ยอดเงินคงเหลือเพียงพอสำหรับคำสั่งซื้อนี้</span>
+                        </div>
+                      )}
                     </div>
                   </label>
                 </div>

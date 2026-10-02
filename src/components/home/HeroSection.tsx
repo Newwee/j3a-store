@@ -33,14 +33,15 @@ export function HeroSection() {
             </div>
 
             {/* Main Headline with ParticleText */}
-            <div className="w-full h-24 sm:h-28 lg:h-32 relative flex items-center justify-center lg:justify-start">
+            <div className="w-full h-36 sm:h-44 lg:h-52 relative flex items-center justify-center lg:justify-start -my-2">
               <ParticleText
-                text="J3A STUDIO"
-                fontSize="clamp(2.4rem, 5.5vw, 4.2rem)"
-                color="#06b6d4"
-                highlightColor="#a855f7"
-                particleSize={2.4}
-                density={3}
+                text="J3A STORE"
+                fontSize="clamp(3.6rem, 8vw, 6.2rem)"
+                color="#00e5ff"
+                highlightColor="#c084fc"
+                particleSize={2.8}
+                density={2.5}
+                scatter={160}
                 glow={true}
               />
             </div>

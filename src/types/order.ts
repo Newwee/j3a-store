@@ -46,5 +46,6 @@ export interface CreateOrderInput {
   discount: number;
   total: number;
   paymentMethod: PaymentMethod;
+  status?: OrderStatus;
   paymentProofUrl?: string;
 }

@@ -9,6 +9,7 @@ import {
   limit,
   serverTimestamp,
   Timestamp,
+  increment,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { UserProfile, UserRole, UserTier } from '@/types/user';
@@ -216,3 +217,16 @@ export async function updateUserCredits(uid: string, amount: number): Promise<vo
     updatedAt: serverTimestamp(),
   });
 }
+
+/**
+ * Deduct user credits atomically for store purchases
+ */
+export async function deductUserCredits(uid: string, amountToDeduct: number): Promise<void> {
+  if (!db) throw new Error('Firestore is not initialized.');
+  const docRef = doc(db, USERS_COLLECTION, uid);
+  await updateDoc(docRef, {
+    credits: increment(-amountToDeduct),
+    updatedAt: serverTimestamp(),
+  });
+}
+

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter, Prompt } from 'next/font/google';
 import './globals.css';
+import { ThemeProvider } from '@/context/ThemeContext';
 import { AuthProvider } from '@/context/AuthContext';
 import { CartProvider } from '@/context/CartContext';
 import { ToastProvider } from '@/context/ToastContext';
@@ -80,24 +81,45 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="th" className={`${inter.variable} ${prompt.variable} dark`}>
-      <body className="bg-[#080c14] text-slate-100 font-sans antialiased min-h-screen selection:bg-cyan-500 selection:text-slate-950 flex flex-col">
-        <TargetCursor
-          spinDuration={5}
-          hideDefaultCursor
-          parallaxOn
-          hoverDuration={0.25}
-          cursorColor="#ffffff"
-          cursorColorOnTarget="#B497CF"
-          targetSelector=".cursor-target, button, a, [role='button']"
+    <html lang="th" className={`${inter.variable} ${prompt.variable} dark`} suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                var t = localStorage.getItem('j3a_theme') || 'dark';
+                var isLight = t === 'light' || (t === 'system' && !window.matchMedia('(prefers-color-scheme: dark)').matches);
+                if (isLight) {
+                  document.documentElement.classList.add('light');
+                  document.documentElement.classList.remove('dark');
+                } else {
+                  document.documentElement.classList.add('dark');
+                  document.documentElement.classList.remove('light');
+                }
+              } catch(e) {}
+            `,
+          }}
         />
-        <ToastProvider>
-          <AuthProvider>
-            <CartProvider>
-              {children}
-            </CartProvider>
-          </AuthProvider>
-        </ToastProvider>
+      </head>
+      <body className="font-sans antialiased min-h-screen selection:bg-cyan-500 selection:text-slate-950 flex flex-col transition-colors duration-200">
+        <ThemeProvider>
+          <TargetCursor
+            spinDuration={5}
+            hideDefaultCursor
+            parallaxOn
+            hoverDuration={0.25}
+            cursorColor="#ffffff"
+            cursorColorOnTarget="#B497CF"
+            targetSelector=".cursor-target, button, a, [role='button']"
+          />
+          <ToastProvider>
+            <AuthProvider>
+              <CartProvider>
+                {children}
+              </CartProvider>
+            </AuthProvider>
+          </ToastProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
