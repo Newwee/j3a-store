@@ -98,7 +98,7 @@ export function LicenseKeyDelivery({
   customerEmail,
   autoClaim = true,
   downloadUrl,
-  discordUrl = 'https://discord.gg/j3astore',
+  discordUrl = 'https://discord.gg/UtWykPvTYF',
   items,
   productName,
 }: LicenseKeyDeliveryProps) {

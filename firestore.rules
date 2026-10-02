@@ -92,6 +92,21 @@ rules_version = '2';
 //   - createdAt: timestamp | string (optional, immutable)
 //   - updatedAt: timestamp | string (optional)
 //
+// Collection: deletion_requests
+// Document ID: {userId} (or {requestId})
+// Fields:
+//   - userId: string (required, matches auth.uid)
+//   - email: string | null (optional)
+//   - displayName: string | null (optional)
+//   - credits: number (required, non-negative number)
+//   - status: string (required, 'pending' | 'approved' | 'rejected' | 'cancelled')
+//   - userReason: string | null (optional, max 1000 chars)
+//   - adminNote: string | null (optional, max 1000 chars)
+//   - createdAt: timestamp | string (optional)
+//   - updatedAt: timestamp | string (optional)
+//   - approvedAt: timestamp | string (optional)
+//   - rejectedAt: timestamp | string (optional)
+//
 // ============================================================================
 
 service cloud.firestore {
@@ -404,5 +419,23 @@ service cloud.firestore {
       // Create, Update, Delete: Admin can create and manage bundle packages
       allow create, update, delete: if isAdmin();
     }
+
+    // 9. Account Deletion Requests Collection
+    match /deletion_requests/{requestId} {
+      // Read: Users can view their own request, Admin can view all
+      allow read: if (isSignedIn() && (requestId == request.auth.uid || ('userId' in resource.data && resource.data.userId == request.auth.uid))) || isAdmin();
+
+      // Create: Authenticated users can request deletion of their own account
+      allow create: if isSignedIn() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.status == 'pending';
+
+      // Update: Admin can approve/reject, or owner can cancel
+      allow update: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+
+      // Delete: Admin only
+      allow delete: if isAdmin();
+    }
   }
 }
+

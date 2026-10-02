@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Gamepad2, Gift, CreditCard, Sparkles, Server, Shield, Layers } from 'lucide-react';
+import { Layers, Sparkles, Server, Boxes, Key } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 
 interface CategoryPillsProps {
@@ -12,12 +12,10 @@ interface CategoryPillsProps {
 
 const CATEGORIES = [
   { id: 'all', name: 'ทั้งหมด (All)', icon: Layers },
-  { id: 'เกมยอดนิยม', name: 'เกมยอดนิยม', icon: Gamepad2 },
-  { id: 'บัตรเติมเงิน', name: 'บัตรเติมเงิน', icon: Gift },
-  { id: 'บริการดิจิทัล', name: 'บริการดิจิทัล', icon: Server },
-  { id: 'ไอดีเกม & สกิน', name: 'ไอดีเกม & สกิน', icon: Sparkles },
-  { id: 'ซอฟต์แวร์ & คีย์', name: 'ซอฟต์แวร์ & คีย์', icon: Shield },
-  { id: 'อื่นๆ', name: 'อื่นๆ', icon: CreditCard },
+  { id: 'ซอฟต์แวร์ Discord', name: 'ซอฟต์แวร์ Discord', icon: Sparkles },
+  { id: 'ระบบเซิร์ฟเวอร์ & บอท', name: 'ระบบเซิร์ฟเวอร์ & บอท', icon: Server },
+  { id: 'แพ็กเกจบันเดิล (Bundles)', name: 'แพ็กเกจบันเดิล (Bundles)', icon: Boxes },
+  { id: 'สิทธิ์การใช้งาน (Licenses)', name: 'สิทธิ์การใช้งาน (Licenses)', icon: Key },
 ];
 
 export function CategoryPills({

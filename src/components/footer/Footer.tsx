@@ -117,15 +117,15 @@ export function Footer() {
             </p>
             <div className="flex flex-col gap-2 pt-1 text-xs">
               <a
-                href="https://line.me"
+                href="https://line.me/R/ti/p/@153nhgvs"
                 target="_blank"
                 rel="noreferrer"
                 className="flex items-center gap-2 text-emerald-400 hover:underline"
               >
-                <MessageCircle className="w-4 h-4" /> LINE: @j3astore
+                <MessageCircle className="w-4 h-4" /> LINE: @153nhgvs
               </a>
               <a
-                href="https://discord.com"
+                href="https://discord.gg/UtWykPvTYF"
                 target="_blank"
                 rel="noreferrer"
                 className="flex items-center gap-2 text-indigo-400 hover:underline"

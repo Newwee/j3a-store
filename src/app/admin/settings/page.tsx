@@ -142,13 +142,13 @@ export default function AdminSettingsPage() {
                   label="LINE Official ID"
                   value={lineContact}
                   onChange={(e) => setLineContact(e.target.value)}
-                  placeholder="@j3astore"
+                  placeholder="@153nhgvs"
                 />
                 <Input
                   label="ลิงก์ Discord Server"
                   value={discordContact}
                   onChange={(e) => setDiscordContact(e.target.value)}
-                  placeholder="https://discord.gg/j3astore"
+                  placeholder="https://discord.gg/UtWykPvTYF"
                 />
               </div>
             </div>

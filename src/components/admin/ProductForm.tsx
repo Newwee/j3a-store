@@ -31,12 +31,11 @@ interface ProductFormProps {
 }
 
 const CATEGORIES = [
-  'เกมยอดนิยม',
-  'บัตรเติมเงิน',
+  'ซอฟต์แวร์ Discord',
+  'ระบบเซิร์ฟเวอร์ & บอท',
+  'แพ็กเกจบันเดิล (Bundles)',
+  'สิทธิ์การใช้งาน (Licenses)',
   'บริการดิจิทัล',
-  'ไอดีเกม & สกิน',
-  'ซอฟต์แวร์ & คีย์',
-  'อุปกรณ์เสริม',
   'ทั่วไป',
 ];
 
@@ -53,7 +52,7 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
   const [comparePrice, setComparePrice] = useState<number | string>(
     initialData?.comparePrice ?? ''
   );
-  const [category, setCategory] = useState(initialData?.category || 'เกมยอดนิยม');
+  const [category, setCategory] = useState(initialData?.category || 'ซอฟต์แวร์ Discord');
   const [stock, setStock] = useState<number | string>(initialData?.stock ?? 10);
   const [status, setStatus] = useState<ProductStatus>(initialData?.status || 'active');
   const [featured, setFeatured] = useState<boolean>(initialData?.featured || false);

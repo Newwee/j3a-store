@@ -143,7 +143,7 @@ export default function OrderDetailPage({
               customerEmail={order.customer?.email}
               autoClaim={!order.transactionRef}
               items={order.items}
-              discordUrl="https://discord.gg/j3astore"
+              discordUrl="https://discord.gg/UtWykPvTYF"
             />
           </div>
         )}

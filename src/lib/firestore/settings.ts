@@ -8,9 +8,9 @@ const STORE_DOC_ID = 'store';
 export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   storeName: 'J3A STORE',
   promptpay: '0812345678',
-  lineContact: '@j3astore',
-  discordContact: 'https://discord.gg/j3astore',
-  announcement: 'ยินดีต้อนรับสู่ J3A STORE ระบบเติมเกมและบริการดิจิทัลอัตโนมัติ 24 ชม.',
+  lineContact: '@153nhgvs',
+  discordContact: 'https://discord.gg/UtWykPvTYF',
+  announcement: 'ยินดีต้อนรับสู่ J3A STORE ซอฟต์แวร์ Discord และบริการดิจิทัลอัตโนมัติ 24 ชม.',
   shippingFee: 0,
   freeShippingThreshold: 0,
 };

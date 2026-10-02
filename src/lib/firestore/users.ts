@@ -4,6 +4,7 @@ import {
   getDoc,
   setDoc,
   updateDoc,
+  deleteDoc,
   getDocs,
   query,
   limit,
@@ -228,5 +229,14 @@ export async function deductUserCredits(uid: string, amountToDeduct: number): Pr
     credits: increment(-amountToDeduct),
     updatedAt: serverTimestamp(),
   });
+}
+
+/**
+ * Permanently delete user document from Firestore (Admin action)
+ */
+export async function deleteUserDoc(uid: string): Promise<void> {
+  if (!db) throw new Error('Firestore is not initialized.');
+  const docRef = doc(db, USERS_COLLECTION, uid);
+  await deleteDoc(docRef);
 }
 

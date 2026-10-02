@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import {
   User,
@@ -26,13 +26,25 @@ import {
   EyeOff,
   Camera,
   Upload,
+  AlertTriangle,
+  ExternalLink,
+  Headphones,
+  MessageCircle,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { useTheme } from '@/context/ThemeContext';
 import { updateUserProfile } from '@/lib/firestore/users';
+import {
+  requestAccountDeletion,
+  getUserDeletionRequest,
+  cancelAccountDeletion,
+} from '@/lib/firestore/deletionRequests';
+import { DeletionRequest } from '@/types/user';
+import { formatDate } from '@/lib/utils/formatters';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Modal } from '@/components/ui/Modal';
 
 export function SettingsTabContent() {
   const { user, profile, refreshProfile } = useAuth();
@@ -68,8 +80,72 @@ export function SettingsTabContent() {
   const [timezone, setTimezone] = useState('Asia/Bangkok (GMT+7)');
   const [dateFormat, setDateFormat] = useState('DD/MM/YYYY HH:mm');
 
-  // Delete modal state
+  // Delete account state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletionRequest, setDeletionRequest] = useState<DeletionRequest | null>(null);
+  const [isLoadingDeletionReq, setIsLoadingDeletionReq] = useState(false);
+  const [deleteReason, setDeleteReason] = useState('');
+  const [isSubmittingDelete, setIsSubmittingDelete] = useState(false);
+  const [isCancellingDelete, setIsCancellingDelete] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadDeletionRequest() {
+      if (!user?.uid) return;
+      setIsLoadingDeletionReq(true);
+      try {
+        const req = await getUserDeletionRequest(user.uid);
+        if (isMounted) {
+          setDeletionRequest(req);
+        }
+      } catch (e) {
+        console.warn('Could not load deletion request:', e);
+      } finally {
+        if (isMounted) {
+          setIsLoadingDeletionReq(false);
+        }
+      }
+    }
+    loadDeletionRequest();
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.uid]);
+
+  const handleSubmitDeletionRequest = async () => {
+    if (!user) return;
+    setIsSubmittingDelete(true);
+    try {
+      const res = await requestAccountDeletion({
+        userId: user.uid,
+        email: user.email,
+        displayName: profile?.displayName || user.displayName,
+        credits: profile?.credits || 0,
+        userReason: deleteReason,
+      });
+      setDeletionRequest(res);
+      setShowDeleteModal(false);
+      toast('คำขอลบบัญชีถูกส่งไปยังระบบเรียบร้อยแล้ว โปรดติดต่อแอดมินใน Discord หรือ LINE เพื่ออนุมัติ', 'info');
+    } catch (err: any) {
+      error(`ไม่สามารถส่งคำขอลบบัญชีได้: ${err.message || 'กรุณาลองใหม่อีกครั้ง'}`);
+    } finally {
+      setIsSubmittingDelete(false);
+    }
+  };
+
+  const handleCancelDeleteRequest = async () => {
+    if (!user) return;
+    setIsCancellingDelete(true);
+    try {
+      await cancelAccountDeletion(user.uid);
+      setDeletionRequest((prev) => (prev ? { ...prev, status: 'cancelled' } : null));
+      success('ยกเลิกคำขอลบบัญชีเรียบร้อยแล้ว');
+    } catch (err: any) {
+      error(`ไม่สามารถยกเลิกคำขอได้: ${err.message || 'เกิดข้อผิดพลาด'}`);
+    } finally {
+      setIsCancellingDelete(false);
+    }
+  };
 
   const handleSaveAccount = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -663,58 +739,196 @@ export function SettingsTabContent() {
                 </Button>
               </div>
 
-              {/* Delete Account */}
-              <div className="p-4 rounded-2xl bg-rose-500/5 border border-rose-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <h4 className="text-sm font-bold text-rose-300 flex items-center gap-2">
-                    <Trash2 className="w-4 h-4 text-rose-400" />
-                    <span>Delete Account (ลบบัญชีถาวร)</span>
-                  </h4>
-                  <p className="text-xs text-slate-400 mt-1">
-                    เมื่อลบบัญชีแล้ว ข้อมูลและเครดิตคงเหลือจะไม่สามารถกู้คืนได้อีก
-                  </p>
+              {/* Delete Account Section */}
+              {deletionRequest?.status === 'pending' ? (
+                <div className="p-5 sm:p-6 rounded-2xl bg-amber-950/20 border-2 border-amber-500/40 space-y-4 shadow-xl">
+                  <div className="flex items-start sm:items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center shrink-0">
+                        <Clock className="w-5 h-5 text-amber-400" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                          <span>คำขอลบบัญชีอยู่ระหว่างรอแอดมินอนุมัติ</span>
+                          <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                            Pending
+                          </span>
+                        </h4>
+                        <p className="text-xs text-amber-200/80">
+                          ส่งคำขอเมื่อ: {formatDate(deletionRequest.createdAt)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleCancelDeleteRequest}
+                      isLoading={isCancellingDelete}
+                      className="text-xs text-slate-400 hover:text-rose-400"
+                    >
+                      ยกเลิกคำขอลบ
+                    </Button>
+                  </div>
+
+                  {/* Notice Box matching user prompt */}
+                  <div className="p-4 rounded-xl bg-slate-950/90 border border-amber-500/30 space-y-2">
+                    <div className="flex items-start gap-2.5 text-amber-300 text-xs sm:text-sm font-bold">
+                      <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
+                      <span>โปรดติดต่อ admin ที่เซิฟเวอร์ดิสครอส เพื่อ ลบบัชชี หากไม่ติดต่อ ก็จะลบไม่ได้</span>
+                    </div>
+                    <p className="text-xs text-slate-300 pl-6 leading-relaxed">
+                      เปิด ticket ใน discord หรือทักไลน์ได้เลย เพื่อให้แอดมินดำเนินการตรวจสอบยอดเครดิตและอนุมัติการลบข้อมูลของคุณ
+                    </p>
+                  </div>
+
+                  {/* Direct Contact Buttons */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <a
+                      href="https://discord.gg/UtWykPvTYF"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[#5865F2] hover:bg-[#4752c4] text-white text-xs font-bold transition-all shadow-[0_0_20px_rgba(88,101,242,0.3)] cursor-pointer"
+                    >
+                      <Headphones className="w-4 h-4" />
+                      <span>เปิด Ticket ใน Discord (discord.gg/UtWykPvTYF)</span>
+                      <ExternalLink className="w-3.5 h-3.5 opacity-70" />
+                    </a>
+
+                    <a
+                      href="https://line.me/R/ti/p/@153nhgvs"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[#06C755] hover:bg-[#05b04b] text-white text-xs font-bold transition-all shadow-[0_0_20px_rgba(6,199,85,0.3)] cursor-pointer"
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                      <span>ทัก LINE: @153nhgvs</span>
+                      <ExternalLink className="w-3.5 h-3.5 opacity-70" />
+                    </a>
+                  </div>
                 </div>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={() => setShowDeleteModal(true)}
-                  leftIcon={<Trash2 className="w-3.5 h-3.5" />}
-                >
-                  ขอลบบัญชี
-                </Button>
-              </div>
+              ) : (
+                <div className="p-4 rounded-2xl bg-rose-500/5 border border-rose-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h4 className="text-sm font-bold text-rose-300 flex items-center gap-2">
+                      <Trash2 className="w-4 h-4 text-rose-400" />
+                      <span>Delete Account (ลบบัญชีถาวร)</span>
+                    </h4>
+                    <p className="text-xs text-slate-400 mt-1">
+                      เมื่อลบบัญชีแล้ว ข้อมูลและเครดิตคงเหลือ (฿{profile?.credits || 0}) จะถูกลบถาวรโดยแอดมินและไม่สามารถกู้คืนได้
+                    </p>
+                  </div>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() => setShowDeleteModal(true)}
+                    leftIcon={<Trash2 className="w-3.5 h-3.5" />}
+                  >
+                    ขอลบบัญชี
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* Delete Confirmation Modal */}
-            {showDeleteModal && (
-              <div className="p-4 rounded-2xl bg-rose-950/30 border border-rose-500/40 space-y-3 animate-in fade-in">
-                <div className="flex items-start gap-2.5 text-rose-300 text-xs">
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span>
-                    คุณแน่ใจหรือไม่ว่าต้องการลบบัญชี? เพื่อความปลอดภัย กรุณาติดต่อแอดมินทาง LINE หรือ Discord เพื่อยืนยันการเคลียร์เครดิตคงเหลือ
-                  </span>
+            <Modal
+              isOpen={showDeleteModal}
+              onClose={() => setShowDeleteModal(false)}
+              title="⚠️ ขอลบบัญชีผู้ใช้งานถาวร (Delete Account)"
+            >
+              <div className="space-y-4">
+                {/* Warning and Guidance Notice */}
+                <div className="p-4 rounded-2xl bg-amber-950/30 border-2 border-amber-500/40 space-y-2 text-amber-200">
+                  <div className="flex items-start gap-2 text-amber-300 font-bold text-xs sm:text-sm">
+                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
+                    <span>โปรดติดต่อ admin ที่เซิฟเวอร์ดิสครอส เพื่อ ลบบัชชี หากไม่ติดต่อ ก็จะลบไม่ได้</span>
+                  </div>
+                  <p className="text-xs text-amber-200/90 pl-6 leading-relaxed">
+                    เมื่อกดส่งคำขอแล้ว <strong>เปิด ticket ใน discord หรือทักไลน์ได้เลย</strong> เจ้าหน้าที่จะดำเนินการตรวจสอบข้อมูลและอนุมัติการลบออกจากระบบ
+                  </p>
                 </div>
-                <div className="flex gap-2 justify-end">
+
+                {/* Direct Contact Links */}
+                <div className="grid grid-cols-1 gap-2 p-3 rounded-xl bg-slate-950/80 border border-slate-800 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-2 text-slate-300">
+                      <Headphones className="w-4 h-4 text-[#5865F2]" />
+                      <span>Discord Server:</span>
+                    </span>
+                    <a
+                      href="https://discord.gg/UtWykPvTYF"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-cyan-400 hover:underline inline-flex items-center gap-1 font-mono text-[11px]"
+                    >
+                      <span>discord.gg/UtWykPvTYF</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-2 text-slate-300">
+                      <MessageCircle className="w-4 h-4 text-[#06C755]" />
+                      <span>LINE Official:</span>
+                    </span>
+                    <a
+                      href="https://line.me/R/ti/p/@153nhgvs"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-cyan-400 hover:underline inline-flex items-center gap-1 font-mono text-[11px]"
+                    >
+                      <span>@153nhgvs</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                </div>
+
+                {/* Credits Information */}
+                <div className="p-3 rounded-xl bg-rose-950/20 border border-rose-500/30 text-xs text-rose-300">
+                  💡 เครดิตคงเหลือในบัญชีของคุณ: <strong className="text-white font-mono">฿{profile?.credits || 0} บาท</strong>
+                  <p className="text-[11px] text-rose-300/80 mt-0.5">
+                    (ข้อมูลคำสั่งซื้อ เครดิตคงเหลือ และประวัติการทำรายการจะถูกลบถาวรเมื่อแอดมินอนุมัติ)
+                  </p>
+                </div>
+
+                {/* Reason Textarea */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-300">
+                    เหตุผลในการขอลบบัญชี (ไม่บังคับ)
+                  </label>
+                  <textarea
+                    value={deleteReason}
+                    onChange={(e) => setDeleteReason(e.target.value)}
+                    placeholder="ระบุเหตุผล เช่น ไม่ต้องการใช้งานแล้ว หรือต้องการสร้างบัญชีใหม่..."
+                    rows={3}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 placeholder:text-slate-500 focus:border-amber-400 outline-none resize-none"
+                  />
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 justify-end pt-2 border-t border-slate-800">
                   <Button
-                    variant="ghost"
-                    size="sm"
+                    type="button"
+                    variant="secondary"
+                    size="md"
                     onClick={() => setShowDeleteModal(false)}
+                    disabled={isSubmittingDelete}
                   >
                     ยกเลิก
                   </Button>
                   <Button
+                    type="button"
                     variant="danger"
-                    size="sm"
-                    onClick={() => {
-                      toast('คำขอลบบัญชีถูกส่งไปยังผู้ดูแลระบบเรียบร้อยแล้ว', 'info');
-                      setShowDeleteModal(false);
-                    }}
+                    size="md"
+                    onClick={handleSubmitDeletionRequest}
+                    isLoading={isSubmittingDelete}
+                    className="bg-rose-600 hover:bg-rose-500 text-white font-bold shadow-[0_0_20px_rgba(225,29,72,0.4)]"
                   >
-                    ยืนยันคำขอ
+                    ยืนยันส่งคำขอลบบัญชี
                   </Button>
                 </div>
               </div>
-            )}
+            </Modal>
           </div>
         )}
       </div>
