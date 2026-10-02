@@ -115,7 +115,7 @@ service cloud.firestore {
     // Supports store owner emails, custom claims ('role' or 'admin'), and fallback Firestore user role
     function isAdmin() {
       return isSignedIn() && (
-        ('email' in request.auth.token && request.auth.token.email in ['pongpataradanai@gmail.com', 'admin@j3astore.com']) ||
+        ('email' in request.auth.token && request.auth.token.email in ['pongpataradanai@gmail.com', 'admin@j3astore.com', 'mynameisyee0@gmail.com', 'ratchadejchaisomvit@gmail.com']) ||
         ('role' in request.auth.token && request.auth.token.role == 'admin') ||
         ('admin' in request.auth.token && request.auth.token.admin == true) ||
         (

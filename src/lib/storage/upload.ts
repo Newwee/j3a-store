@@ -50,13 +50,20 @@ export async function uploadProductImage(
     let isSettled = false;
 
     if (timeoutMs > 0) {
-      timer = setTimeout(() => {
+      timer = setTimeout(async () => {
         if (!isSettled) {
           isSettled = true;
           try {
             uploadTask.cancel();
           } catch {}
-          reject(new Error('Firebase Storage connection timed out (CORS or network policy).'));
+          console.warn('Firebase Storage timed out (CORS or network policy). Falling back to high-efficiency compressed base64 data URL.');
+          try {
+            const { compressImageToDataUrl } = await import('@/lib/utils/image');
+            const dataUrl = await compressImageToDataUrl(file, 800, 800, 0.75);
+            resolve({ downloadUrl: dataUrl, storagePath: 'base64_fallback' });
+          } catch (compErr) {
+            reject(new Error('Firebase Storage connection timed out (CORS or network policy).'));
+          }
         }
       }, timeoutMs);
     }
@@ -71,12 +78,18 @@ export async function uploadProductImage(
           onProgress(progress);
         }
       },
-      (error) => {
+      async (error) => {
         if (timer) clearTimeout(timer);
         if (!isSettled) {
           isSettled = true;
-          console.warn('Firebase Storage upload error (e.g. CORS preflight failed):', error);
-          reject(new Error(`เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ: ${error.message}`));
+          console.warn('Firebase Storage upload error (e.g. CORS preflight / bucket not ready). Falling back to high-efficiency compressed base64 data URL:', error);
+          try {
+            const { compressImageToDataUrl } = await import('@/lib/utils/image');
+            const dataUrl = await compressImageToDataUrl(file, 800, 800, 0.75);
+            resolve({ downloadUrl: dataUrl, storagePath: 'base64_fallback' });
+          } catch (compErr) {
+            reject(new Error(`เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ: ${error.message}`));
+          }
         }
       },
       async () => {

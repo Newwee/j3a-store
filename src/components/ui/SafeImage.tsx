@@ -16,11 +16,11 @@ export function SafeImage({
   className = '',
   ...props
 }: SafeImageProps) {
-  // Discard invalid blob: urls immediately because they are temporary and fail across reloads/devices
+  // Allow valid src including blob: (for local file previews) and data: (for base64 compressed images)
   const isValidSrc = (s?: string | null) => {
     if (!s) return false;
     const trimmed = s.trim();
-    if (!trimmed || trimmed.startsWith('blob:')) return false;
+    if (!trimmed) return false;
     return true;
   };
 
