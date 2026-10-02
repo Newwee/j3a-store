@@ -37,6 +37,7 @@ rules_version = '2';
 //   - specs: map (optional, max 50 keys)
 //   - rating: number | null (optional, 0 to 10)
 //   - reviewCount: number | null (optional, non-negative number)
+//   - showcaseUrl: string | null (optional, valid URL / string, max 1000 chars)
 //   - createdAt: timestamp | string (optional, immutable)
 //   - updatedAt: timestamp | string (optional)
 //
@@ -153,7 +154,7 @@ service cloud.firestore {
 
     // Product Validator
     function isValidProduct(data) {
-      return hasOnlyAllowedFields(['id', 'name', 'slug', 'description', 'price', 'comparePrice', 'image', 'images', 'category', 'stock', 'status', 'featured', 'tags', 'specs', 'rating', 'reviewCount', 'createdAt', 'updatedAt']) &&
+      return hasOnlyAllowedFields(['id', 'name', 'slug', 'description', 'price', 'comparePrice', 'image', 'images', 'category', 'stock', 'status', 'featured', 'tags', 'specs', 'rating', 'reviewCount', 'showcaseUrl', 'createdAt', 'updatedAt']) &&
         hasRequiredFields(['name', 'slug', 'price', 'image', 'category', 'stock', 'status', 'featured']) &&
         data.name is string && data.name.size() >= 1 && data.name.size() <= 200 &&
         data.slug is string && data.slug.size() >= 1 && data.slug.size() <= 200 &&
@@ -170,6 +171,7 @@ service cloud.firestore {
         (!('specs' in data) || (data.specs is map && data.specs.size() <= 50)) &&
         (!('rating' in data) || data.rating == null || (data.rating is number && data.rating >= 0 && data.rating <= 10)) &&
         (!('reviewCount' in data) || data.reviewCount == null || (data.reviewCount is number && data.reviewCount >= 0)) &&
+        (!('showcaseUrl' in data) || data.showcaseUrl == null || (data.showcaseUrl is string && data.showcaseUrl.size() <= 1000)) &&
         (!('id' in data) || data.id == null || (data.id is string && data.id.size() <= 100)) &&
         (!('createdAt' in data) || isValidDate(data.createdAt)) &&
         (!('updatedAt' in data) || isValidDate(data.updatedAt));

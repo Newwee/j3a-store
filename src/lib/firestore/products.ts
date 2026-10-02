@@ -58,6 +58,7 @@ function mapDocToProduct(docSnap: { id: string; data: () => Record<string, unkno
       return raw > 5 ? Number((raw / 2).toFixed(1)) : raw;
     })(),
     reviewCount: data.reviewCount !== undefined ? Number(data.reviewCount) : 0,
+    showcaseUrl: (data.showcaseUrl as string) || undefined,
     createdAt,
     updatedAt,
   };

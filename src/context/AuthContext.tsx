@@ -67,7 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProfile(p);
     } catch (err) {
       console.error('Error syncing user profile from Firestore:', err);
-      const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'mynameisyee0@gmail.com')
+      const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'pongpataradanai@gmail.com,admin@j3astore.com,mynameisyee0@gmail.com')
         .toLowerCase()
         .split(',')
         .map((e) => e.trim())
@@ -165,7 +165,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await sendPasswordResetEmail(auth, email);
   };
 
-  const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'mynameisyee0@gmail.com')
+  const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'pongpataradanai@gmail.com,admin@j3astore.com,mynameisyee0@gmail.com')
     .toLowerCase()
     .split(',')
     .map((e) => e.trim())

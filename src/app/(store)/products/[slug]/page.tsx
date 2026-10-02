@@ -16,6 +16,7 @@ import {
   Clock,
   Sparkles,
   Star,
+  ExternalLink,
 } from 'lucide-react';
 import { Product } from '@/types/product';
 import { getProductBySlug } from '@/lib/firestore/products';
@@ -224,6 +225,30 @@ export default function ProductDetailPage({
                 </span>
               )}
             </div>
+
+            {/* Product Showcase Link Button */}
+            {product.showcaseUrl && (
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-cyan-950/40 via-blue-950/30 to-purple-950/40 border border-cyan-500/30 flex items-center justify-between gap-3 shadow-lg">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center shrink-0">
+                    <ExternalLink className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-white">วิดีโอตัวอย่างสินค้า (Showcase)</p>
+                    <p className="text-[11px] text-cyan-300/80">คลิกเพื่อรับชมคลิปสาธิตหรือฟังก์ชันการใช้งาน</p>
+                  </div>
+                </div>
+                <a
+                  href={product.showcaseUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3.5 py-1.5 rounded-xl bg-cyan-500 text-slate-950 font-bold text-xs hover:bg-cyan-400 transition-colors shadow-[0_0_15px_rgba(6,182,212,0.4)] flex items-center gap-1.5 shrink-0 cursor-target"
+                >
+                  <span>ดู Showcase</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
+            )}
 
             {/* Quantity Selector & Action Buttons */}
             <div className="pt-4 border-t border-slate-800 space-y-4">

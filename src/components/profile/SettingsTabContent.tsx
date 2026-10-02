@@ -24,6 +24,8 @@ import {
   Check,
   Eye,
   EyeOff,
+  Camera,
+  Upload,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
@@ -184,6 +186,68 @@ export function SettingsTabContent() {
             </div>
 
             <div className="space-y-4">
+              {/* Profile Avatar Upload Section (Ready for Cloud Storage) */}
+              <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 flex flex-col sm:flex-row items-center sm:items-start gap-4">
+                <div className="relative w-20 h-20 rounded-2xl overflow-hidden border-2 border-slate-700 bg-slate-900 shrink-0 shadow-md">
+                  {user?.photoURL ? (
+                    <Image
+                      src={user.photoURL}
+                      alt={displayName || 'Avatar'}
+                      fill
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-slate-500 font-bold text-2xl">
+                      {displayName ? displayName.charAt(0).toUpperCase() : 'U'}
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-slate-950/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                    <Camera className="w-6 h-6 text-white" />
+                  </div>
+                </div>
+
+                <div className="flex-1 text-center sm:text-left space-y-2">
+                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                    <h4 className="text-sm font-bold text-white">รูปโปรไฟล์ (Profile Avatar)</h4>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/30">
+                      เร็ว ๆ นี้ (Coming Soon)
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    รองรับไฟล์รูปภาพ PNG, JPG, GIF ขนาดไม่เกิน 2MB (ระบบเตรียมเปิดใช้งานเร็ว ๆ นี้ เมื่อเชื่อมต่อ Storage Server เรียบร้อย)
+                  </p>
+
+                  <div className="pt-1 flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                    {/* Hidden file input ready for activation */}
+                    <input
+                      type="file"
+                      id="avatar-upload-input"
+                      accept="image/*"
+                      disabled
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      leftIcon={<Upload className="w-3.5 h-3.5" />}
+                      onClick={() => {
+                        toast(
+                          'ฟังก์ชันอัปโหลดรูปโปรไฟล์เตรียมเปิดให้บริการเร็ว ๆ นี้ (ขณะนี้กำลังจัดเตรียม Cloud Storage Server)',
+                          'info'
+                        );
+                      }}
+                      className="text-xs cursor-pointer opacity-80 hover:opacity-100"
+                    >
+                      เปลี่ยนรูปโปรไฟล์
+                    </Button>
+                    <span className="text-[11px] text-slate-500 italic">
+                      * บัญชี Google จะใช้รูปโปรไฟล์จาก Google อัตโนมัติ
+                    </span>
+                  </div>
+                </div>
+              </div>
+
               <Input
                 label="ชื่อที่ต้องการแสดง (Display Name) *"
                 value={displayName}

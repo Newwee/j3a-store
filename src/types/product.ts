@@ -17,6 +17,7 @@ export interface Product {
   specs?: Record<string, string>;
   rating?: number;
   reviewCount?: number;
+  showcaseUrl?: string;
   createdAt: string;
   updatedAt: string;
 }

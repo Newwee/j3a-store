@@ -58,6 +58,7 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
   const [status, setStatus] = useState<ProductStatus>(initialData?.status || 'active');
   const [featured, setFeatured] = useState<boolean>(initialData?.featured || false);
   const [tagsInput, setTagsInput] = useState(initialData?.tags?.join(', ') || '');
+  const [showcaseUrl, setShowcaseUrl] = useState(initialData?.showcaseUrl || '');
 
   // Image states
   const [imagePreview, setImagePreview] = useState<string>(initialData?.image || '');
@@ -200,6 +201,7 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
         image: finalImageUrl,
         images: initialData?.images || [],
         tags,
+        ...(showcaseUrl.trim() ? { showcaseUrl: showcaseUrl.trim() } : {}),
       };
 
       // 3. Save to Firestore
@@ -358,6 +360,22 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
                 required
               />
             </div>
+          </div>
+
+          {/* Showcase Video / Demo Link */}
+          <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-md space-y-4">
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <LinkIcon className="w-5 h-5 text-cyan-400" />
+              <span>ลิงก์ Showcase / วิดีโอตัวอย่างสินค้า (Showcase Link)</span>
+            </h3>
+            <Input
+              label="URL คลิป Showcase หรือเว็บตัวอย่างสินค้า"
+              type="url"
+              value={showcaseUrl}
+              onChange={(e) => setShowcaseUrl(e.target.value)}
+              placeholder="https://www.youtube.com/watch?v=... หรือลิงก์สาธิตสินค้า"
+              helperText="เมื่อใส่ลิงก์นี้ จะมีปุ่ม 'รับชม Showcase ตัวอย่าง' แสดงในหน้ารายละเอียดสินค้าให้ลูกค้าคลิกดูได้ทันที"
+            />
           </div>
         </div>
 

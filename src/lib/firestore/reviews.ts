@@ -10,6 +10,7 @@ import {
   limit,
   serverTimestamp,
   updateDoc,
+  deleteDoc,
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
@@ -440,3 +441,56 @@ export async function getStoreReviewStats(): Promise<{
     return { averageRating: 5.0, totalReviews: 0, satisfactionRate: '100%' };
   }
 }
+
+/**
+ * Fetch all customer reviews for Admin moderation
+ */
+export async function getAllReviews(limitCount = 100): Promise<Review[]> {
+  if (!db) return [];
+
+  try {
+    const colRef = collection(db, REVIEWS_COLLECTION);
+    const snap = await getDocs(colRef);
+    const reviews = snap.docs.map(mapDocToReview);
+
+    // Sort newest first
+    reviews.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return reviews.slice(0, limitCount);
+  } catch (error) {
+    console.error('Error getting all reviews:', error);
+    return [];
+  }
+}
+
+/**
+ * Delete a review (Admin moderation) and optionally recalculate product rating
+ */
+export async function deleteReview(reviewId: string, productId?: string): Promise<void> {
+  if (!db || !reviewId) return;
+
+  const docRef = doc(db, REVIEWS_COLLECTION, reviewId);
+  await deleteDoc(docRef);
+
+  // If associated with a product, recalculate its average rating
+  if (productId && productId !== 'store_overall') {
+    try {
+      const remainingReviews = await getProductReviews(productId);
+      const totalCount = remainingReviews.length;
+      const sum = remainingReviews.reduce((acc, curr) => {
+        const r = curr.rating > 5 ? curr.rating / 2 : curr.rating;
+        return acc + r;
+      }, 0);
+      const avg = totalCount > 0 ? Number((sum / totalCount).toFixed(1)) : 5.0;
+
+      const prodDocRef = doc(db, PRODUCTS_COLLECTION, productId);
+      await updateDoc(prodDocRef, {
+        rating: avg,
+        reviewCount: totalCount,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (e) {
+      console.warn('Could not recalculate product rating after review deletion:', e);
+    }
+  }
+}
+

@@ -16,6 +16,7 @@ import {
   Shield,
   Layers,
   Wallet,
+  Star,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils/cn';
@@ -60,6 +61,11 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
       href: '/admin/customers',
       label: 'สมาชิกลูกค้า (Customers)',
       icon: Users,
+    },
+    {
+      href: '/admin/reviews',
+      label: 'จัดการรีวิว (Reviews)',
+      icon: Star,
     },
     {
       href: '/admin/settings',
