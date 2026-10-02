@@ -35,7 +35,7 @@ rules_version = '2';
 //   - featured: bool (required)
 //   - tags: list of strings (optional, max 30 items)
 //   - specs: map (optional, max 50 keys)
-//   - rating: number | null (optional, 0 to 5)
+//   - rating: number | null (optional, 0 to 10)
 //   - reviewCount: number | null (optional, non-negative number)
 //   - createdAt: timestamp | string (optional, immutable)
 //   - updatedAt: timestamp | string (optional)
@@ -168,7 +168,7 @@ service cloud.firestore {
         data.featured is bool &&
         (!('tags' in data) || (data.tags is list && data.tags.size() <= 30)) &&
         (!('specs' in data) || (data.specs is map && data.specs.size() <= 50)) &&
-        (!('rating' in data) || data.rating == null || (data.rating is number && data.rating >= 0 && data.rating <= 5)) &&
+        (!('rating' in data) || data.rating == null || (data.rating is number && data.rating >= 0 && data.rating <= 10)) &&
         (!('reviewCount' in data) || data.reviewCount == null || (data.reviewCount is number && data.reviewCount >= 0)) &&
         (!('id' in data) || data.id == null || (data.id is string && data.id.size() <= 100)) &&
         (!('createdAt' in data) || isValidDate(data.createdAt)) &&
@@ -254,10 +254,19 @@ service cloud.firestore {
       // Create: Admin only
       allow create: if isAdmin() && isValidProduct(request.resource.data);
 
-      // Update: Admin only
-      allow update: if isAdmin()
-        && isValidProduct(request.resource.data)
-        && areImmutableFieldsUnchanged(['createdAt']);
+      // Update: Admin can update all; Signed-in user can update rating/reviewCount when submitting a review
+      allow update: if (
+        (isAdmin() && isValidProduct(request.resource.data)) ||
+        (
+          isSignedIn() &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating', 'reviewCount', 'updatedAt']) &&
+          request.resource.data.rating is number &&
+          request.resource.data.rating >= 0 &&
+          request.resource.data.rating <= 10 &&
+          request.resource.data.reviewCount is number &&
+          request.resource.data.reviewCount >= 0
+        )
+      ) && areImmutableFieldsUnchanged(['createdAt']);
 
       // Delete: Admin only
       allow delete: if isAdmin();
@@ -305,11 +314,11 @@ service cloud.firestore {
       // Read: Public read
       allow read: if true;
 
-      // Create: Signed in users can submit a review if their UID matches
+      // Create: Signed in users can submit a review if their UID matches (1-10 stars)
       allow create: if isSignedIn() &&
         request.resource.data.userId == request.auth.uid &&
         request.resource.data.rating >= 1 &&
-        request.resource.data.rating <= 5;
+        request.resource.data.rating <= 10;
 
       // Update / Delete: Admin or review author
       allow update, delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
