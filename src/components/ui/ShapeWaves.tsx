@@ -70,7 +70,31 @@ export function ShapeWaves({
     window.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseleave', handleMouseLeave);
 
-    let startTime = performance.now();
+    let isVisible = true;
+    const observer = new IntersectionObserver(([entry]) => {
+      isVisible = entry.isIntersecting;
+      if (isVisible) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = requestAnimationFrame(render);
+      }
+    });
+
+    if (canvas.parentElement) {
+      observer.observe(canvas.parentElement);
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        isVisible = false;
+      } else {
+        isVisible = true;
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = requestAnimationFrame(render);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    const startTime = performance.now();
 
     const drawTriangle = (c: CanvasRenderingContext2D, x: number, y: number, size: number) => {
       const h = size * Math.sqrt(3);
@@ -82,6 +106,8 @@ export function ShapeWaves({
     };
 
     const render = (time: number) => {
+      if (!isVisible) return;
+
       // Smooth mouse follow
       mouseX += (targetMouseX - mouseX) * 0.1;
       mouseY += (targetMouseY - mouseY) * 0.1;
@@ -167,6 +193,8 @@ export function ShapeWaves({
     animationFrameId = requestAnimationFrame(render);
 
     return () => {
+      observer.disconnect();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('mousemove', handleMouseMove);

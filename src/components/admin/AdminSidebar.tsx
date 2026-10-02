@@ -17,6 +17,7 @@ import {
   Layers,
   Wallet,
   Star,
+  Ticket,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils/cn';
@@ -43,6 +44,11 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
       icon: Package,
     },
     {
+      href: '/admin/bundles',
+      label: 'แพ็กเกจบันเดิล (Bundles)',
+      icon: Layers,
+    },
+    {
       href: '/admin/products/new',
       label: 'เพิ่มสินค้าใหม่ (Create)',
       icon: PlusCircle,
@@ -51,6 +57,11 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
       href: '/admin/orders',
       label: 'รายการคำสั่งซื้อ (Orders)',
       icon: ShoppingBag,
+    },
+    {
+      href: '/admin/codes',
+      label: 'โค้ดของขวัญ (Redeem Codes)',
+      icon: Ticket,
     },
     {
       href: '/admin/topups',

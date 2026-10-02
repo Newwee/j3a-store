@@ -27,32 +27,28 @@ export default function HomePage() {
 
     async function loadData() {
       try {
-        // 1. Fetch featured products
-        const featured = await getProducts({
-          status: 'active',
-          featured: true,
-          limitCount: 8,
-        });
+        // Fetch featured products and new arrivals concurrently
+        const [featured, newest] = await Promise.all([
+          getProducts({
+            status: 'active',
+            featured: true,
+            limitCount: 8,
+          }),
+          getProducts({
+            status: 'active',
+            sortBy: 'newest',
+            limitCount: 8,
+          }),
+        ]);
 
-        // If no products marked featured, fallback to newest products
         if (isMounted) {
           if (featured.length > 0) {
             setFeaturedProducts(featured);
           } else {
             const allActive = await getProducts({ status: 'active', limitCount: 8 });
-            setFeaturedProducts(allActive);
+            if (isMounted) setFeaturedProducts(allActive);
           }
           setLoadingFeatured(false);
-        }
-
-        // 2. Fetch new arrivals
-        const newest = await getProducts({
-          status: 'active',
-          sortBy: 'newest',
-          limitCount: 8,
-        });
-
-        if (isMounted) {
           setNewArrivals(newest);
           setLoadingNew(false);
         }

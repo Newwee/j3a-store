@@ -5,6 +5,7 @@ import {
   getDocs,
   setDoc,
   updateDoc,
+  deleteDoc,
   query,
   where,
   serverTimestamp,
@@ -51,6 +52,10 @@ export async function redeemCodeForUser(codeStr: string, userId: string): Promis
   }
 
   try {
+    if (cleanCode === 'J3AOPENING') {
+      await seedOpeningCodeIfNotExists();
+    }
+
     const codeDocRef = doc(db, REDEEM_CODES_COLLECTION, cleanCode);
     const userDocRef = doc(db, 'users', userId);
 
@@ -140,3 +145,110 @@ export async function getAllRedeemCodes(): Promise<RedeemCode[]> {
     return [];
   }
 }
+
+export interface CreateRedeemCodeInput {
+  code: string;
+  amount: number;
+  maxUses?: number;
+  isActive?: boolean;
+}
+
+/**
+ * Create a new redeem code (Admin)
+ */
+export async function createRedeemCode(input: CreateRedeemCodeInput): Promise<RedeemCode> {
+  if (!db) throw new Error('Firestore is not initialized.');
+
+  const cleanCode = input.code.trim().toUpperCase();
+  if (!cleanCode) throw new Error('กรุณากรอกรหัสโค้ด');
+  if (input.amount <= 0) throw new Error('จำนวนเครดิตต้องมากกว่า 0');
+
+  const docRef = doc(db, REDEEM_CODES_COLLECTION, cleanCode);
+  const snap = await getDoc(docRef);
+  if (snap.exists()) {
+    throw new Error(`โค้ด "${cleanCode}" มีอยู่ในระบบแล้ว`);
+  }
+
+  const newDoc = {
+    code: cleanCode,
+    amount: Math.round(input.amount),
+    maxUses: Number(input.maxUses) || 0,
+    usedCount: 0,
+    usedByUsers: [],
+    isActive: input.isActive ?? true,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
+
+  await setDoc(docRef, newDoc);
+
+  return {
+    id: cleanCode,
+    code: cleanCode,
+    amount: Math.round(input.amount),
+    maxUses: Number(input.maxUses) || 0,
+    usedCount: 0,
+    usedByUsers: [],
+    isActive: input.isActive ?? true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Update an existing redeem code (Admin)
+ */
+export async function updateRedeemCode(
+  codeId: string,
+  data: Partial<CreateRedeemCodeInput>
+): Promise<void> {
+  if (!db) throw new Error('Firestore is not initialized.');
+  const docRef = doc(db, REDEEM_CODES_COLLECTION, codeId.toUpperCase());
+  
+  const payload: Record<string, any> = {
+    updatedAt: serverTimestamp(),
+  };
+
+  if (data.amount !== undefined) payload.amount = Math.round(data.amount);
+  if (data.maxUses !== undefined) payload.maxUses = Number(data.maxUses);
+  if (data.isActive !== undefined) payload.isActive = Boolean(data.isActive);
+
+  await updateDoc(docRef, payload);
+}
+
+/**
+ * Delete a redeem code (Admin)
+ */
+export async function deleteRedeemCode(codeId: string): Promise<void> {
+  if (!db) throw new Error('Firestore is not initialized.');
+  const docRef = doc(db, REDEEM_CODES_COLLECTION, codeId.toUpperCase());
+  await deleteDoc(docRef);
+}
+
+/**
+ * Auto-seed opening code 'J3AOPENING' for 20 credits if it does not exist
+ */
+export async function seedOpeningCodeIfNotExists(): Promise<void> {
+  if (!db) return;
+  try {
+    const code = 'J3AOPENING';
+    const docRef = doc(db, REDEEM_CODES_COLLECTION, code);
+    const snap = await getDoc(docRef);
+    if (!snap.exists()) {
+      await setDoc(docRef, {
+        code,
+        amount: 20,
+        maxUses: 0, // 0 = unlimited total uses (1 per user)
+        usedCount: 0,
+        usedByUsers: [],
+        isActive: true,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      console.log('Seeded default code J3AOPENING (20 credits)');
+    }
+  } catch (err) {
+    console.error('Error seeding opening code:', err);
+  }
+}
+

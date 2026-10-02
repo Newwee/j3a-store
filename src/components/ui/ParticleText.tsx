@@ -181,7 +181,14 @@ export function ParticleText({
       ctx.fill();
     };
 
+    let isVisible = true;
+
     const render = (now: number): void => {
+      if (!isVisible) {
+        animationFrame = null;
+        return;
+      }
+
       ctx.clearRect(0, 0, width, height);
 
       if (glow && !reducedMotion) {
@@ -415,11 +422,41 @@ export function ParticleText({
 
     const resizeObserver = new ResizeObserver(queueSample);
     resizeObserver.observe(container);
+
+    const intersectionObserver = new IntersectionObserver(([entry]) => {
+      isVisible = entry.isIntersecting;
+      if (isVisible) {
+        ensureRenderLoop();
+      } else {
+        if (animationFrame !== null) {
+          window.cancelAnimationFrame(animationFrame);
+          animationFrame = null;
+        }
+      }
+    });
+    intersectionObserver.observe(container);
+
+    const handleDocVisibility = () => {
+      if (document.hidden) {
+        isVisible = false;
+        if (animationFrame !== null) {
+          window.cancelAnimationFrame(animationFrame);
+          animationFrame = null;
+        }
+      } else {
+        isVisible = true;
+        ensureRenderLoop();
+      }
+    };
+    document.addEventListener('visibilitychange', handleDocVisibility);
+
     void sampleText();
 
     return () => {
       buildId += 1;
       resizeObserver.disconnect();
+      intersectionObserver.disconnect();
+      document.removeEventListener('visibilitychange', handleDocVisibility);
       reduceMotionQuery?.removeEventListener('change', handleReduceMotionChange);
       canvas.removeEventListener('pointerenter', handlePointerEnter);
       canvas.removeEventListener('pointermove', handlePointerMove);

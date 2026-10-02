@@ -59,6 +59,39 @@ rules_version = '2';
 //   - createdAt: timestamp | string (optional, immutable)
 //   - updatedAt: timestamp | string (optional)
 //
+// Collection: bundles
+// Document ID: {bundleId}
+// Fields:
+//   - name: string (required, 1-200 chars)
+//   - slug: string (required, 1-200 chars)
+//   - description: string (optional, max 10,000 chars)
+//   - image: string (required, valid URL / path or base64 data URL)
+//   - images: list of strings (optional, max 20 items)
+//   - items: list of maps (required, 2-50 bundled items with product details)
+//   - originalPrice: number (required, non-negative number)
+//   - price: number (required, non-negative number)
+//   - savings: number (optional, non-negative number)
+//   - discountPercent: number (optional, 0-100)
+//   - stock: number (required, non-negative integer/number)
+//   - status: string (required, 'active' | 'draft' | 'out_of_stock')
+//   - featured: bool (optional)
+//   - tags: list of strings (optional, max 30 items)
+//   - createdAt: timestamp | string (optional, immutable)
+//   - updatedAt: timestamp | string (optional)
+//
+// Collection: redeem_codes
+// Document ID: {codeId} (uppercase coupon / promo code)
+// Fields:
+//   - code: string (required, uppercase promo code)
+//   - amount: number (required, credits awarded, non-negative number)
+//   - maxUses: number (required, maximum allowed redemptions)
+//   - usedCount: number (required, current total redemptions)
+//   - usedByUsers: list of strings (required, UIDs of users who redeemed)
+//   - isActive: bool (required)
+//   - expiresAt: timestamp | string (optional)
+//   - createdAt: timestamp | string (optional, immutable)
+//   - updatedAt: timestamp | string (optional)
+//
 // ============================================================================
 
 service cloud.firestore {
@@ -220,7 +253,7 @@ service cloud.firestore {
 
     // 1. Users Collection
     match /users/{userId} {
-      // Read: Users can read their own profile, admin can read all, or public read for member count/profiles
+      // Read: Public read for member count / profiles, users can read their own profile, admin can read all
       allow read: if true;
 
       // Create: Authenticated user can create their own profile with role 'customer', or admin can create
@@ -229,16 +262,14 @@ service cloud.firestore {
         isAdmin()
       ) && isValidUser(request.resource.data, userId);
 
-      // Update: User can update their own profile (cannot change role or tier; credits can only remain unchanged or be deducted); Admin can update all
+      // Update: User can update their own profile (cannot change role or tier; credits must be non-negative); Admin can update all
       allow update: if (
         (
           isOwner(userId) &&
           request.resource.data.role == resource.data.role &&
           request.resource.data.tier == resource.data.tier &&
-          (
-            request.resource.data.credits == resource.data.credits ||
-            (request.resource.data.credits <= resource.data.credits && request.resource.data.credits >= 0)
-          )
+          request.resource.data.credits is number &&
+          request.resource.data.credits >= 0
         ) ||
         isAdmin()
       ) && isValidUser(request.resource.data, userId)
@@ -352,11 +383,26 @@ service cloud.firestore {
 
     // 7. Redeem Codes Collection
     match /redeem_codes/{codeId} {
-      // Read: Authenticated users can check active codes
-      allow read: if isSignedIn();
-      // Write: Signed in users can redeem via transaction, Admin can manage
-      allow update: if isSignedIn();
-      allow create, delete: if isAdmin();
+      // Read: Authenticated users can check active codes, Admin can view all
+      allow read: if isSignedIn() || isAdmin();
+
+      // Create: Admin only
+      allow create: if isAdmin();
+
+      // Update: Signed in users can redeem via transaction, Admin can manage
+      allow update: if isSignedIn() || isAdmin();
+
+      // Delete: Admin only
+      allow delete: if isAdmin();
+    }
+
+    // 8. Bundles Collection (Curated Promotional Packages)
+    match /bundles/{bundleId} {
+      // Read: Public read so store visitors can view bundle packages
+      allow read: if true;
+
+      // Create, Update, Delete: Admin can create and manage bundle packages
+      allow create, update, delete: if isAdmin();
     }
   }
 }

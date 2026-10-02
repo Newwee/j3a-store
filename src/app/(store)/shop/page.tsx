@@ -2,10 +2,13 @@
 
 import React, { useEffect, useState, useMemo, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Store, Layers, Sparkles, Filter, Loader2 } from 'lucide-react';
+import { Store, Layers, Sparkles, Filter, Loader2, Flame } from 'lucide-react';
 import { Product } from '@/types/product';
+import { BundlePackage } from '@/types/bundle';
 import { getProducts, getDistinctCategories } from '@/lib/firestore/products';
+import { getBundles } from '@/lib/firestore/bundles';
 import { ProductCard } from '@/components/product/ProductCard';
+import { BundleCard } from '@/components/bundle/BundleCard';
 import { ProductFilter } from '@/components/product/ProductFilter';
 import { ProductCardSkeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -20,6 +23,7 @@ function ShopContent() {
   const initialSort = searchParams.get('sortBy') || 'newest';
 
   const [products, setProducts] = useState<Product[]>([]);
+  const [bundles, setBundles] = useState<BundlePackage[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -29,12 +33,20 @@ function ShopContent() {
   const [sortBy, setSortBy] = useState(initialSort);
   const [inStockOnly, setInStockOnly] = useState(false);
 
-  // Load distinct categories on mount
+  // Load distinct categories and active bundles on mount
   useEffect(() => {
-    async function loadCategories() {
+    async function loadInitialData() {
       try {
-        const cats = await getDistinctCategories();
-        if (cats.length > 0) {
+        const [cats, bList] = await Promise.all([
+          getDistinctCategories(),
+          getBundles({ status: 'active' }),
+        ]);
+
+        if (bList.length > 0) {
+          setBundles(bList);
+          const baseCats = cats.length > 0 ? cats : ['เกมยอดนิยม', 'บัตรเติมเงิน', 'บริการดิจิทัล'];
+          setCategories(['แพ็กเกจสุดคุ้ม (Bundle)', ...baseCats.filter((c) => c !== 'แพ็กเกจสุดคุ้ม (Bundle)')]);
+        } else if (cats.length > 0) {
           setCategories(cats);
         } else {
           setCategories([
@@ -46,10 +58,10 @@ function ShopContent() {
           ]);
         }
       } catch (err) {
-        console.error('Error fetching categories:', err);
+        console.error('Error fetching categories and bundles:', err);
       }
     }
-    loadCategories();
+    loadInitialData();
   }, []);
 
   // Fetch products with active filters
@@ -129,36 +141,70 @@ function ShopContent() {
           onReset={handleReset}
         />
 
-        {/* Results Counter */}
-        <div className="flex items-center justify-between text-xs text-slate-400 mb-6">
-          <span>
-            พบทั้งหมด <strong className="text-white">{displayedProducts.length}</strong> รายการ
-          </span>
-          {category !== 'all' && (
-            <span className="text-cyan-400 font-medium">หมวดหมู่: {category}</span>
-          )}
-        </div>
+        {/* Bundle Deals Section */}
+        {bundles.length > 0 && (category === 'all' || category === 'แพ็กเกจสุดคุ้ม (Bundle)') && !search && (
+          <div className="mb-10 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-rose-500/20 text-rose-400">
+                  <Flame className="w-5 h-5 fill-current" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black text-white flex items-center gap-2">
+                    <span>แพ็กเกจสุดคุ้ม (Bundle Deals)</span>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-rose-600 text-white">
+                      โปรพิเศษ
+                    </span>
+                  </h2>
+                  <p className="text-xs text-slate-400">
+                    รวมสินค้ายอดนิยมในราคาพิเศษ ประหยัดกว่าซื้อแยกชิ้น
+                  </p>
+                </div>
+              </div>
+            </div>
 
-        {/* Products Grid */}
-        {isLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <ProductCardSkeleton key={i} />
-            ))}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {bundles.map((bundle) => (
+                <BundleCard key={bundle.id} bundle={bundle} />
+              ))}
+            </div>
           </div>
-        ) : displayedProducts.length === 0 ? (
-          <EmptyState
-            title="ไม่พบสินค้าตามเงื่อนไขที่เลือก"
-            description="ลองเปลี่ยนคำค้นหา หรือรีเซ็ตตัวกรองเพื่อดูสินค้าทั้งหมดที่มีในระบบ"
-            actionText="รีเซ็ตตัวกรองทั้งหมด"
-            onAction={handleReset}
-          />
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {displayedProducts.map((p) => (
-              <ProductCard key={p.id} product={p} />
-            ))}
-          </div>
+        )}
+
+        {/* Results Counter */}
+        {category !== 'แพ็กเกจสุดคุ้ม (Bundle)' && (
+          <>
+            <div className="flex items-center justify-between text-xs text-slate-400 mb-6">
+              <span>
+                พบทั้งหมด <strong className="text-white">{displayedProducts.length}</strong> รายการ
+              </span>
+              {category !== 'all' && (
+                <span className="text-cyan-400 font-medium">หมวดหมู่: {category}</span>
+              )}
+            </div>
+
+            {/* Products Grid */}
+            {isLoading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <ProductCardSkeleton key={i} />
+                ))}
+              </div>
+            ) : displayedProducts.length === 0 ? (
+              <EmptyState
+                title="ไม่พบสินค้าตามเงื่อนไขที่เลือก"
+                description="ลองเปลี่ยนคำค้นหา หรือรีเซ็ตตัวกรองเพื่อดูสินค้าทั้งหมดที่มีในระบบ"
+                actionText="รีเซ็ตตัวกรองทั้งหมด"
+                onAction={handleReset}
+              />
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                {displayedProducts.map((p) => (
+                  <ProductCard key={p.id} product={p} />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

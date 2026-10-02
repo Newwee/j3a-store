@@ -5,9 +5,35 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight, ShieldCheck, Zap, Sparkles, Flame, Star } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import dynamic from 'next/dynamic';
 import { ShapeWaves } from '@/components/ui/ShapeWaves';
-import ParticleText from '@/components/ui/ParticleText';
-import ElectricLogo from '@/components/ui/ElectricLogo';
+
+const ParticleText = dynamic(() => import('@/components/ui/ParticleText'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full flex items-center justify-center lg:justify-start">
+      <span className="text-5xl sm:text-6xl lg:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-sky-300 to-indigo-400 tracking-wider">
+        J3A STORE
+      </span>
+    </div>
+  ),
+});
+
+const ElectricLogo = dynamic(() => import('@/components/ui/ElectricLogo'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full flex items-center justify-center">
+      <Image
+        src="/Logo2.png"
+        alt="J3A STORE Logo"
+        width={320}
+        height={320}
+        className="w-56 sm:w-64 object-contain opacity-80"
+        priority
+      />
+    </div>
+  ),
+});
 
 export function HeroSection() {
   return (
