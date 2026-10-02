@@ -172,6 +172,15 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
         finalImageUrl = '/logo.png';
       }
 
+      // Check Firestore 1MB string size limit
+      if (finalImageUrl.length > 950000) {
+        error(
+          `ขนาดข้อมูลรูปภาพใหญ่เกินขีดจำกัด 1 MB ของฐานข้อมูล (${(finalImageUrl.length / 1024 / 1024).toFixed(2)} MB) กรุณาใช้ไฟล์ไม่เกิน 700 KB หรือใส่ Image URL โดยตรง (เช่น /products/duck.gif)`
+        );
+        setIsSaving(false);
+        return;
+      }
+
       // 2. Prepare payload
       const tags = tagsInput
         .split(',')
@@ -440,10 +449,22 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
             )}
 
             {/* Direct Image URL input option */}
-            <div className="pt-2 border-t border-slate-800 space-y-1.5">
-              <label className="block text-[11px] font-medium text-slate-400">
-                หรือใส่ Image URL โดยตรง:
-              </label>
+            <div className="pt-2 border-t border-slate-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-[11px] font-medium text-slate-400">
+                  หรือใส่ Image URL โดยตรง:
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImagePreview('/products/duck.gif');
+                    setSelectedFile(null);
+                  }}
+                  className="text-[11px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer bg-cyan-500/10 hover:bg-cyan-500/20 px-2 py-0.5 rounded-md border border-cyan-500/30 transition-all font-medium"
+                >
+                  🦆 ใช้เป็ดเต้น (/products/duck.gif)
+                </button>
+              </div>
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -452,7 +473,7 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
                     setImagePreview(e.target.value);
                     setSelectedFile(null);
                   }}
-                  placeholder={imagePreview.startsWith('data:') ? '(รูปภาพที่อัปโหลดถูกบีบอัดพร้อมใช้งานแล้ว)' : 'https://...'}
+                  placeholder={imagePreview.startsWith('data:') ? '(รูปภาพที่อัปโหลดถูกบีบอัดพร้อมใช้งานแล้ว)' : 'https://... หรือ /products/duck.gif'}
                   className="w-full bg-slate-950/80 text-xs text-slate-200 rounded-lg px-2.5 py-2 border border-slate-800 focus:border-cyan-500 outline-none"
                 />
               </div>
