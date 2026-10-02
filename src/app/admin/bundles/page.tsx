@@ -23,8 +23,9 @@ import {
   getBundles,
   updateBundle,
   deleteBundle,
+  createBundle,
 } from '@/lib/firestore/bundles';
-import { BundlePackage } from '@/types/bundle';
+import { BundlePackage, BundleFormData } from '@/types/bundle';
 import { Button } from '@/components/ui/Button';
 import { SafeImage } from '@/components/ui/SafeImage';
 import { DeleteConfirmModal } from '@/components/admin/DeleteConfirmModal';
@@ -80,6 +81,46 @@ export default function AdminBundlesPage() {
       error(`ไม่สามารถลบแพ็กเกจ: ${err.message}`);
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const [isSeeding, setIsSeeding] = useState(false);
+
+  const handleSeedBundle = async () => {
+    setIsSeeding(true);
+    try {
+      await createBundle({
+        name: 'J3A Discord Ultimate Bundle (2-in-1)',
+        slug: 'j3a-discord-ultimate-bundle',
+        description: 'แพ็กเกจรวมสุดคุ้ม 2 ซอฟต์แวร์ระดับท็อปสำหรับ Discord: J3A Discord Profile (Rich Presence Status) + J3ADiscordManager (Server Architecture & Roles Studio) ซื้อคู่กันในราคาพิเศษเพียง 75 บาท (จากปกติ 80 บาท ลดทันที 5 บาท)',
+        image: '/products/j3a-discord-bundle.jpg',
+        images: ['/products/j3a-discord-bundle.jpg'],
+        items: [
+          {
+            productId: 'j3a-discord-profile',
+            name: 'J3A Discord Profile',
+            price: 30,
+            image: '/products/j3a-discord-profile.jpg',
+          },
+          {
+            productId: 'j3a-discord-manager',
+            name: 'J3ADiscordManager',
+            price: 50,
+            image: '/products/j3a-discord-manager.jpg',
+          },
+        ],
+        price: 75,
+        stock: 999,
+        status: 'active',
+        featured: true,
+        tags: ['bundle', 'discord', 'software', 'discount'],
+      });
+      success('สร้างแพ็กเกจ J3A Discord Ultimate Bundle สำเร็จแล้ว!');
+      await loadBundles();
+    } catch (err: any) {
+      error(`เกิดข้อผิดพลาดในการสร้างบันเดิล: ${err.message}`);
+    } finally {
+      setIsSeeding(false);
     }
   };
 
@@ -156,11 +197,25 @@ export default function AdminBundlesPage() {
           <p className="text-xs text-slate-500 mb-4 max-w-md mx-auto">
             คุณสามารถเลือกสินค้าอย่างน้อย 2 รายการในร้าน มาจัดโปรโมชันลดราคาพิเศษเป็นชุดได้
           </p>
-          <Link href="/admin/bundles/new">
-            <Button variant="primary" size="md">
-              สร้าง Bundle แรกเลย
-            </Button>
-          </Link>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <Link href="/admin/bundles/new">
+              <Button variant="primary" size="md">
+                สร้าง Bundle แรกเลย
+              </Button>
+            </Link>
+            {bundles.length === 0 && (
+              <Button
+                variant="secondary"
+                size="md"
+                onClick={handleSeedBundle}
+                isLoading={isSeeding}
+                leftIcon={<Sparkles className="w-4 h-4 text-cyan-400" />}
+                className="text-xs font-bold border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/10 cursor-pointer"
+              >
+                🚀 นำเข้า J3A Discord Ultimate Bundle (75฿)
+              </Button>
+            )}
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

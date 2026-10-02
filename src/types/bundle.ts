@@ -29,4 +29,11 @@ export interface BundlePackage {
   updatedAt: string;
 }
 
-export type BundleFormData = Omit<BundlePackage, 'id' | 'createdAt' | 'updatedAt'>;
+export type BundleFormData = Omit<
+  BundlePackage,
+  'id' | 'createdAt' | 'updatedAt' | 'originalPrice' | 'savings' | 'discountPercent'
+> & {
+  originalPrice?: number;
+  savings?: number;
+  discountPercent?: number;
+};
