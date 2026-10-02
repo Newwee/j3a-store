@@ -39,6 +39,11 @@ export default function CheckoutPage() {
   const { success, error, toast } = useToast();
 
   const [storeSettings, setStoreSettings] = useState<StoreSettings>(DEFAULT_STORE_SETTINGS);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     async function loadSettings() {
@@ -60,6 +65,21 @@ export default function CheckoutPage() {
   const [notes, setNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('wallet');
 
+  // Sync profile when auth state updates
+  useEffect(() => {
+    if (profile) {
+      if (!name && (profile.displayName || user?.displayName)) {
+        setName(profile.displayName || user?.displayName || '');
+      }
+      if (!email && (profile.email || user?.email)) {
+        setEmail(profile.email || user?.email || '');
+      }
+      if (!phone && profile.phone) {
+        setPhone(profile.phone || '');
+      }
+    }
+  }, [profile, user]);
+
   // Payment Slip Upload state
   const [slipFile, setSlipFile] = useState<File | null>(null);
   const [slipPreview, setSlipPreview] = useState<string>('');
@@ -68,6 +88,15 @@ export default function CheckoutPage() {
 
   const userCredits = profile?.credits || 0;
   const canPayWithWallet = userCredits >= total;
+
+  if (!mounted) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-24 text-center space-y-4">
+        <div className="w-10 h-10 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin mx-auto" />
+        <p className="text-xs text-slate-400">กำลังเตรียมข้อมูลคำสั่งซื้อ...</p>
+      </div>
+    );
+  }
 
   if (items.length === 0) {
     return (

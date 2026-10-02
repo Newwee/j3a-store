@@ -78,9 +78,10 @@ service cloud.firestore {
     }
 
     // Check if the requester has admin privileges
-    // Supports custom claims ('role' or 'admin') and fallback Firestore user role
+    // Supports store owner emails, custom claims ('role' or 'admin'), and fallback Firestore user role
     function isAdmin() {
       return isSignedIn() && (
+        ('email' in request.auth.token && request.auth.token.email in ['pongpataradanai@gmail.com', 'admin@j3astore.com']) ||
         ('role' in request.auth.token && request.auth.token.role == 'admin') ||
         ('admin' in request.auth.token && request.auth.token.admin == true) ||
         (
@@ -226,13 +227,16 @@ service cloud.firestore {
         isAdmin()
       ) && isValidUser(request.resource.data, userId);
 
-      // Update: User can update their own profile without changing role, credits, or tier; Admin can update all
+      // Update: User can update their own profile (cannot change role or tier; credits can only remain unchanged or be deducted); Admin can update all
       allow update: if (
         (
           isOwner(userId) &&
           request.resource.data.role == resource.data.role &&
-          request.resource.data.credits == resource.data.credits &&
-          request.resource.data.tier == resource.data.tier
+          request.resource.data.tier == resource.data.tier &&
+          (
+            request.resource.data.credits == resource.data.credits ||
+            (request.resource.data.credits <= resource.data.credits && request.resource.data.credits >= 0)
+          )
         ) ||
         isAdmin()
       ) && isValidUser(request.resource.data, userId)
@@ -264,8 +268,11 @@ service cloud.firestore {
       // Read: Allowed for the order owner or admin
       allow read: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
 
-      // Create: Any user (authenticated or guest) can create an order where status == 'pending'
-      allow create: if request.resource.data.status == 'pending' &&
+      // Create: Any user (authenticated or guest) can create an order (pending, or completed if paying with wallet)
+      allow create: if (
+          request.resource.data.status == 'pending' ||
+          (request.resource.data.status == 'completed' && request.resource.data.paymentMethod == 'wallet')
+        ) &&
         (
           (!isSignedIn() && request.resource.data.userId == 'guest') ||
           (isSignedIn() && (request.resource.data.userId == request.auth.uid || request.resource.data.userId == 'guest'))

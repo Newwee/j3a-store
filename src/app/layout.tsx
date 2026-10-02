@@ -101,7 +101,10 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="font-sans antialiased min-h-screen selection:bg-cyan-500 selection:text-slate-950 flex flex-col transition-colors duration-200">
+      <body
+        className="font-sans antialiased min-h-screen selection:bg-cyan-500 selection:text-slate-950 flex flex-col transition-colors duration-200"
+        suppressHydrationWarning
+      >
         <ThemeProvider>
           <TargetCursor
             spinDuration={5}
