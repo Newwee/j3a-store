@@ -24,6 +24,7 @@ import { OrderStatusBadge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/context/ToastContext';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { LicenseKeyDelivery } from '@/components/license/LicenseKeyDelivery';
 
 export default function OrderDetailPage({
   params,
@@ -101,6 +102,19 @@ export default function OrderDetailPage({
     );
   }
 
+  const isLicenseOrder = Boolean(
+    order?.items.some((item) => {
+      const name = (item.name || '').toLowerCase();
+      const slug = (item.slug || '').toLowerCase();
+      return (
+        name.includes('discord') ||
+        name.includes('license') ||
+        slug.includes('discord') ||
+        slug.includes('license')
+      );
+    }) || order?.transactionRef
+  );
+
   return (
     <div className="py-8 sm:py-12">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
@@ -112,6 +126,32 @@ export default function OrderDetailPage({
           <ArrowLeft className="w-4 h-4" />
           <span>ย้อนกลับไปยังประวัติการทำรายการ</span>
         </Link>
+
+        {/* Automated Key Delivery Component for J3A Discord Profile / License */}
+        {isLicenseOrder && (order.status === 'completed' || order.status === 'paid') && (
+          <div className="pt-2">
+            <LicenseKeyDelivery
+              initialKey={order.transactionRef}
+              orderId={order.id}
+              customerEmail={order.customer?.email}
+              autoClaim={!order.transactionRef}
+              downloadUrl="/downloads/J3ADiscordProfile.zip"
+              discordUrl="https://discord.gg/j3astore"
+            />
+          </div>
+        )}
+
+        {isLicenseOrder && order.status === 'pending' && (
+          <div className="rounded-2xl p-5 bg-[#7c5cff]/10 border border-[#7c5cff]/30 text-slate-200 text-xs sm:text-sm space-y-2">
+            <div className="flex items-center gap-2 font-bold text-[#7c5cff]">
+              <Package className="w-5 h-5" />
+              <span>คำสั่งซื้อนี้มีซอฟต์แวร์ J3A Discord Profile</span>
+            </div>
+            <p className="text-slate-300">
+              เมื่อการชำระเงินได้รับการยืนยัน ระบบจะส่งมอบ License Key อัตโนมัติและแสดงปุ่มดาวน์โหลดโปรแกรมบนหน้านี้ทันที
+            </p>
+          </div>
+        )}
 
         {/* Order Header Card */}
         <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8 backdrop-blur-md space-y-6 shadow-xl">

@@ -14,12 +14,13 @@ import {
   Check,
   Filter,
 } from 'lucide-react';
-import { Product, ProductStatus } from '@/types/product';
+import { Product, ProductFormData, ProductStatus } from '@/types/product';
 import {
   getProducts,
   deleteProduct,
   toggleProductStatus,
   toggleProductFeatured,
+  createProduct,
 } from '@/lib/firestore/products';
 import { AdminHeader } from '@/components/admin/AdminHeader';
 import { DeleteConfirmModal } from '@/components/admin/DeleteConfirmModal';
@@ -53,6 +54,82 @@ export default function AdminProductsPage() {
       error('ไม่สามารถโหลดข้อมูลสินค้าได้');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const [isSeeding, setIsSeeding] = useState(false);
+
+  const handleSeedProducts = async () => {
+    setIsSeeding(true);
+    try {
+      const sampleItems: ProductFormData[] = [
+        {
+          name: 'J3A Discord Profile',
+          slug: 'j3a-discord-profile',
+          description: 'โปรแกรมตกแต่งและปรับแต่งสถานะ Discord Profile อัตโนมัติ (Rich Presence) ส่งมอบ License Key ทันทีหลังสั่งซื้อ ใช้งานง่าย ปลอดภัย 100% รองรับ Windows 10/11',
+          price: 199,
+          comparePrice: 299,
+          image: '/logo.png',
+          images: ['/logo.png'],
+          category: 'ซอฟต์แวร์',
+          stock: 999,
+          status: 'active',
+          featured: true,
+          tags: ['discord', 'profile', 'software', 'license', 'rpc'],
+        },
+        {
+          name: 'Steam Wallet Card 1,000 THB (TH Key)',
+          slug: 'steam-wallet-card-1000-thb',
+          description: 'บัตรเติมเงิน Steam Wallet มูลค่า 1,000 บาท สำหรับบัญชีสตรีมโซนไทย จัดส่งรหัสทันทีแบบอัตโนมัติ 24 ชม.',
+          price: 990,
+          comparePrice: 1050,
+          image: '/logo.png',
+          images: ['/logo.png'],
+          category: 'บัตรเติมเงิน',
+          stock: 50,
+          status: 'active',
+          featured: true,
+          tags: ['steam', 'wallet', 'pc', 'giftcard'],
+        },
+        {
+          name: 'Valorant Points 1,650 VP (Riot Direct Top-up)',
+          slug: 'valorant-points-1650-vp',
+          description: 'เติม Riot Points / VP เกม Valorant เข้าไอดีโดยตรง รวดเร็ว ปลอดภัย 100% ไม่ต้องให้รหัสผ่าน เพียงระบุ Riot ID',
+          price: 499,
+          comparePrice: 550,
+          image: '/logo.png',
+          images: ['/logo.png'],
+          category: 'เกมยอดนิยม',
+          stock: 120,
+          status: 'active',
+          featured: true,
+          tags: ['valorant', 'riot', 'points', 'fps'],
+        },
+        {
+          name: 'Discord Nitro 1 Month (Full Subscription)',
+          slug: 'discord-nitro-1-month',
+          description: 'แพ็กเกจ Discord Nitro เต็มรูปแบบ 1 เดือน ปลดล็อกอีโมจิแบบเคลื่อนไหว เพิ่มขนาดอัปโหลด 500MB และสตรีม HD 4K 60FPS',
+          price: 290,
+          comparePrice: 349,
+          image: '/logo.png',
+          images: ['/logo.png'],
+          category: 'บริการดิจิทัล',
+          stock: 35,
+          status: 'active',
+          featured: true,
+          tags: ['discord', 'nitro', 'subscription'],
+        },
+      ];
+
+      for (const item of sampleItems) {
+        await createProduct(item);
+      }
+      success('นำเข้าสินค้าเริ่มต้นและ J3A Discord Profile สำเร็จแล้ว!');
+      await loadAllProducts();
+    } catch (err: any) {
+      error(`เกิดข้อผิดพลาดในการนำเข้าสินค้า: ${err.message || 'กรุณาลองใหม่อีกครั้ง'}`);
+    } finally {
+      setIsSeeding(false);
     }
   };
 
@@ -189,12 +266,28 @@ export default function AdminProductsPage() {
           ))}
         </div>
       ) : filteredProducts.length === 0 ? (
-        <EmptyState
-          title="ไม่พบสินค้าในระบบ"
-          description="ยังไม่มีสินค้าตรงกับตัวกรองที่เลือก หรือยังไม่มีสินค้าถูกสร้างขึ้น"
-          actionText="เพิ่มสินค้าชิ้นแรกเลย"
-          actionHref="/admin/products/new"
-        />
+        <div className="space-y-4">
+          <EmptyState
+            title="ไม่พบสินค้าในระบบ"
+            description="ยังไม่มีสินค้าตรงกับตัวกรองที่เลือก หรือยังไม่มีสินค้าถูกสร้างขึ้น"
+            actionText="เพิ่มสินค้าชิ้นแรกเลย"
+            actionHref="/admin/products/new"
+          />
+          {products.length === 0 && (
+            <div className="text-center pt-2">
+              <Button
+                variant="secondary"
+                size="md"
+                onClick={handleSeedProducts}
+                isLoading={isSeeding}
+                leftIcon={<Sparkles className="w-4 h-4 text-cyan-400" />}
+                className="text-xs font-bold border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/10 cursor-pointer"
+              >
+                🚀 นำเข้าสินค้าเริ่มต้น & J3A Discord Profile ทันที (One-Click Setup)
+              </Button>
+            </div>
+          )}
+        </div>
       ) : (
         <div className="bg-slate-900/60 border border-slate-800 rounded-3xl overflow-hidden backdrop-blur-md shadow-xl">
           <div className="overflow-x-auto">

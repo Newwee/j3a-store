@@ -31,6 +31,7 @@ import { Input } from '@/components/ui/Input';
 import { uploadProductImage } from '@/lib/storage/upload';
 import { getStoreSettings, DEFAULT_STORE_SETTINGS } from '@/lib/firestore/settings';
 import { StoreSettings } from '@/types/settings';
+import { LicenseAgreementCard } from '@/components/license/LicenseAgreementCard';
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -86,6 +87,26 @@ export default function CheckoutPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
+  // Check if any cart item requires software license agreement
+  const hasLicenseItem = items.some((item) => {
+    const name = (item.product.name || '').toLowerCase();
+    const slug = (item.product.slug || '').toLowerCase();
+    const cat = (item.product.category || '').toLowerCase();
+    const tags = Array.isArray(item.product.tags) ? item.product.tags.map((t) => t.toLowerCase()) : [];
+    return (
+      name.includes('discord') ||
+      name.includes('license') ||
+      slug.includes('discord') ||
+      slug.includes('license') ||
+      cat.includes('ซอฟต์แวร์') ||
+      cat.includes('software') ||
+      tags.includes('license') ||
+      tags.includes('software') ||
+      tags.includes('discord-profile')
+    );
+  });
+  const [isLicenseAgreed, setIsLicenseAgreed] = useState(false);
+
   const userCredits = profile?.credits || 0;
   const canPayWithWallet = userCredits >= total;
 
@@ -126,6 +147,10 @@ export default function CheckoutPage() {
       errs.payment = 'ยอดเครดิตในบัญชีของคุณไม่เพียงพอ กรุณาเลือกวิธีอื่นหรือเติมเงิน';
     }
 
+    if (hasLicenseItem && !isLicenseAgreed) {
+      errs.license = 'กรุณายอมรับเงื่อนไข 1 คีย์ต่อ 1 เครื่อง และนโยบายความเป็นส่วนตัว ก่อนดำเนินการชำระเงิน';
+    }
+
     setFormErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -141,7 +166,7 @@ export default function CheckoutPage() {
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) {
-      error('กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน');
+      error('กรุณากรอกข้อมูลที่จำเป็นและยอมรับเงื่อนไขให้ครบถ้วน');
       return;
     }
 
@@ -185,7 +210,25 @@ export default function CheckoutPage() {
         }
       }
 
-      // 3. Prepare Order Payload
+      // 3. Auto-claim License Key if paying via wallet for software license
+      let claimedKey: string | undefined = undefined;
+      if (hasLicenseItem && paymentMethod === 'wallet') {
+        try {
+          const claimRes = await fetch('/api/license/claim', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ customerEmail: email.trim() }),
+          });
+          const claimData = await claimRes.json();
+          if (claimData.ok && claimData.key) {
+            claimedKey = claimData.key;
+          }
+        } catch (claimErr) {
+          console.warn('Could not pre-claim license key during checkout:', claimErr);
+        }
+      }
+
+      // 4. Prepare Order Payload
       const orderData: any = {
         userId: user ? user.uid : 'guest',
         customer: {
@@ -209,13 +252,14 @@ export default function CheckoutPage() {
         total,
         paymentMethod,
         status: paymentMethod === 'wallet' ? 'completed' : 'pending',
+        ...(claimedKey ? { transactionRef: claimedKey } : {}),
         ...(slipUrl ? { paymentProofUrl: slipUrl } : {}),
       };
 
-      // 4. Save order to Firestore
+      // 5. Save order to Firestore
       const created = await createOrder(orderData);
 
-      // 5. Trigger celebration
+      // 6. Trigger celebration
       try {
         confetti({
           particleCount: 100,
@@ -224,7 +268,7 @@ export default function CheckoutPage() {
         });
       } catch {}
 
-      // 6. Clear cart
+      // 7. Clear cart
       clearCart();
 
       success(
@@ -477,6 +521,22 @@ export default function CheckoutPage() {
                   </div>
                 )}
               </div>
+
+              {/* 3. License Agreement Card (Pre-Purchase Disclaimer & Agreement) */}
+              {hasLicenseItem && (
+                <div className="space-y-2">
+                  <LicenseAgreementCard
+                    isAgreed={isLicenseAgreed}
+                    onAgreementChange={setIsLicenseAgreed}
+                  />
+                  {formErrors.license && (
+                    <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>{formErrors.license}</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Right Column: Order Summary & Place Order Button */}
@@ -544,15 +604,27 @@ export default function CheckoutPage() {
                 </div>
 
                 {/* Place Order CTA */}
+                {hasLicenseItem && !isLicenseAgreed && (
+                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs text-center flex items-center justify-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-amber-400" />
+                    <span>โปรดกดยอมรับเงื่อนไข 1 คีย์ต่อ 1 เครื่อง ด้านซ้ายก่อนดำเนินการชำระเงิน</span>
+                  </div>
+                )}
+
                 <Button
                   type="submit"
                   variant="primary"
                   size="lg"
+                  disabled={isProcessing || (hasLicenseItem && !isLicenseAgreed)}
                   isLoading={isProcessing}
                   rightIcon={<ArrowRight className="w-5 h-5" />}
-                  className="w-full font-bold shadow-[0_0_25px_rgba(6,182,212,0.4)]"
+                  className={`w-full font-bold shadow-[0_0_25px_rgba(6,182,212,0.4)] ${
+                    hasLicenseItem && !isLicenseAgreed
+                      ? 'opacity-50 cursor-not-allowed bg-slate-800 text-slate-500 shadow-none border-slate-700'
+                      : ''
+                  }`}
                 >
-                  ยืนยันคำสั่งซื้อ ({formatCurrency(total)})
+                  ดำเนินการชำระเงิน ({formatCurrency(total)})
                 </Button>
 
                 <div className="flex items-center justify-center gap-2 text-[11px] text-slate-400 pt-1">

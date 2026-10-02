@@ -28,6 +28,20 @@ if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
 
 const sampleProducts = [
   {
+    name: 'J3A Discord Profile',
+    slug: 'j3a-discord-profile',
+    description: 'โปรแกรมตกแต่งและปรับแต่งสถานะ Discord Profile อัตโนมัติ (Rich Presence) ส่งมอบ License Key ทันทีหลังสั่งซื้อ ใช้งานง่าย ปลอดภัย 100% รองรับ Windows 10/11',
+    price: 199,
+    comparePrice: 299,
+    image: '/logo.png',
+    images: ['/logo.png'],
+    category: 'ซอฟต์แวร์',
+    stock: 999,
+    status: 'active',
+    featured: true,
+    tags: ['discord', 'profile', 'software', 'license', 'rpc'],
+  },
+  {
     name: 'Steam Wallet Card 1,000 THB (TH Key)',
     slug: 'steam-wallet-card-1000-thb',
     description: 'บัตรเติมเงิน Steam Wallet มูลค่า 1,000 บาท สำหรับบัญชีสตรีมโซนไทย จัดส่งรหัสทันทีแบบอัตโนมัติ 24 ชม.',
