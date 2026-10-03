@@ -79,7 +79,7 @@ const TargetCursor = ({
 
   spinDuration = 2,
 
-  hideDefaultCursor = true,
+  hideDefaultCursor = false,
 
   hoverDuration = 0.2,
 
@@ -182,6 +182,10 @@ const TargetCursor = ({
     if (hideDefaultCursor) {
 
       document.body.style.cursor = 'none';
+
+    } else {
+
+      document.body.style.cursor = 'auto';
 
     }
 

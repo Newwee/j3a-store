@@ -109,7 +109,7 @@ export default function RootLayout({
         <ThemeProvider>
           <TargetCursor
             spinDuration={5}
-            hideDefaultCursor
+            hideDefaultCursor={false}
             parallaxOn
             hoverDuration={0.25}
             cursorColor="#ffffff"
