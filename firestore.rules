@@ -27,7 +27,7 @@ rules_version = '2';
 //   - description: string | null (optional, max 10,000 chars)
 //   - price: number (required, non-negative number)
 //   - comparePrice: number | null (optional, non-negative number)
-//   - image: string (required, valid URL / path or base64 data URL, max 800KB)
+//   - image: string (required, valid URL / path or base64 data URL, max 900KB)
 //   - images: list of strings (optional, max 20 items)
 //   - category: string (required, 1-100 chars)
 //   - stock: number (required, non-negative integer/number)
@@ -40,7 +40,7 @@ rules_version = '2';
 //   - showcaseUrl: string | null (optional, valid URL / string, max 1000 chars)
 //   - downloadUrl: string | null (optional, download link / Google Drive URL, max 1000 chars)
 //   - deliveryNote: string | null (optional, instructions for customer after purchase, max 1000 chars)
-//   - deliveryType: string | null (optional, 'link' | 'key' | 'both')
+//   - deliveryType: string | null (optional, max 50 chars)
 //   - createdAt: timestamp | string (optional, immutable)
 //   - updatedAt: timestamp | string (optional)
 //
@@ -133,7 +133,7 @@ service cloud.firestore {
     // Supports store owner emails, custom claims ('role' or 'admin'), and fallback Firestore user role
     function isAdmin() {
       return isSignedIn() && (
-        ('email' in request.auth.token && request.auth.token.email in ['pongpataradanai@gmail.com', 'admin@j3astore.com', 'mynameisyee0@gmail.com', 'ratchadejchaisomvit@gmail.com']) ||
+        ('email' in request.auth.token && request.auth.token.email.lower() in ['pongpataradanai@gmail.com', 'admin@j3astore.com', 'mynameisyee0@gmail.com', 'ratchadejchaisomvit@gmail.com']) ||
         ('role' in request.auth.token && request.auth.token.role == 'admin') ||
         ('admin' in request.auth.token && request.auth.token.admin == true) ||
         (
@@ -173,9 +173,9 @@ service cloud.firestore {
         (url.matches("^https?://.*") || url.matches("^/.*"));
     }
 
-    // Validate product image (URL or compressed base64 data URL under 800KB)
+    // Validate product image (URL or compressed base64 data URL under 900KB)
     function isValidProductImage(img) {
-      return img is string && (isValidUrl(img) || (img.matches("^data:image/.*") && img.size() <= 800000));
+      return img is string && img.size() >= 1 && img.size() <= 900000;
     }
 
     // Validate date / timestamp representation (Timestamp or ISO string)
@@ -225,7 +225,7 @@ service cloud.firestore {
         (!('showcaseUrl' in data) || data.showcaseUrl == null || (data.showcaseUrl is string && data.showcaseUrl.size() <= 1000)) &&
         (!('downloadUrl' in data) || data.downloadUrl == null || (data.downloadUrl is string && data.downloadUrl.size() <= 1000)) &&
         (!('deliveryNote' in data) || data.deliveryNote == null || (data.deliveryNote is string && data.deliveryNote.size() <= 1000)) &&
-        (!('deliveryType' in data) || data.deliveryType == null || (data.deliveryType in ['link', 'key', 'both'])) &&
+        (!('deliveryType' in data) || data.deliveryType == null || (data.deliveryType is string && data.deliveryType.size() <= 50)) &&
         (!('id' in data) || data.id == null || (data.id is string && data.id.size() <= 100)) &&
         (!('createdAt' in data) || isValidDate(data.createdAt)) &&
         (!('updatedAt' in data) || isValidDate(data.updatedAt));

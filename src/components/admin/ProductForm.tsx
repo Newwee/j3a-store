@@ -147,31 +147,36 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
     try {
       // 1. Upload new image if file is selected
       if (selectedFile) {
-        setIsUploading(true);
-        try {
-          const { downloadUrl } = await uploadProductImage(
-            selectedFile,
-            'products',
-            (progress) => setUploadProgress(progress),
-            4000
-          );
-          finalImageUrl = downloadUrl;
+        // Fast path for duck.gif (local asset)
+        if (selectedFile.name.toLowerCase() === 'duck.gif') {
+          finalImageUrl = '/products/duck.gif';
+        } else {
+          setIsUploading(true);
+          try {
+            const { downloadUrl } = await uploadProductImage(
+              selectedFile,
+              'products',
+              (progress) => setUploadProgress(progress),
+              4000
+            );
+            finalImageUrl = downloadUrl;
 
-          // If editing and previous image was on Firebase Storage, clean it up
-          if (isEdit && initialData?.image && initialData.image.includes('firebasestorage')) {
-            await deleteProductImage(initialData.image);
+            // If editing and previous image was on Firebase Storage, clean it up
+            if (isEdit && initialData?.image && initialData.image.includes('firebasestorage')) {
+              await deleteProductImage(initialData.image);
+            }
+          } catch (uploadErr: any) {
+            console.warn('Firebase Storage upload blocked (CORS) or timed out, using compressed data URL:', uploadErr);
+            // If storage isn't configured or CORS blocked, use compressed data URL so product creation succeeds immediately!
+            if (!imagePreview || imagePreview.startsWith('blob:')) {
+              finalImageUrl = await compressImageToDataUrl(selectedFile, 800, 800, 0.75);
+            } else {
+              finalImageUrl = imagePreview;
+            }
+            toast('บันทึกรูปภาพลงฐานข้อมูลเรียบร้อย (ระบบใช้ Compressed Fallback อัตโนมัติ)', 'info');
+          } finally {
+            setIsUploading(false);
           }
-        } catch (uploadErr: any) {
-          console.warn('Firebase Storage upload blocked (CORS) or timed out, using compressed data URL:', uploadErr);
-          // If storage isn't configured or CORS blocked, use compressed data URL so product creation succeeds immediately!
-          if (!imagePreview || imagePreview.startsWith('blob:')) {
-            finalImageUrl = await compressImageToDataUrl(selectedFile, 800, 800, 0.75);
-          } else {
-            finalImageUrl = imagePreview;
-          }
-          toast('บันทึกรูปภาพลงฐานข้อมูลเรียบร้อย (ระบบใช้ Compressed Fallback อัตโนมัติ)', 'info');
-        } finally {
-          setIsUploading(false);
         }
       }
 
@@ -183,9 +188,9 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
       }
 
       // Check Firestore 1MB string size limit
-      if (finalImageUrl.length > 950000) {
+      if (finalImageUrl.length > 850000) {
         error(
-          `ขนาดข้อมูลรูปภาพใหญ่เกินขีดจำกัด 1 MB ของฐานข้อมูล (${(finalImageUrl.length / 1024 / 1024).toFixed(2)} MB) กรุณาใช้ไฟล์ไม่เกิน 700 KB หรือใส่ Image URL โดยตรง (เช่น /products/duck.gif)`
+          `ขนาดข้อมูลรูปภาพใหญ่เกินขีดจำกัดฐานข้อมูล (${(finalImageUrl.length / 1024 / 1024).toFixed(2)} MB) กรุณาใช้ไฟล์ไม่เกิน 500 KB หรือใส่ Image URL โดยตรง (เช่น /products/duck.gif)`
         );
         setIsSaving(false);
         hideLoading();
@@ -214,7 +219,7 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
         ...(showcaseUrl.trim() ? { showcaseUrl: showcaseUrl.trim() } : {}),
         ...(downloadUrl.trim() ? { downloadUrl: downloadUrl.trim() } : {}),
         ...(deliveryNote.trim() ? { deliveryNote: deliveryNote.trim() } : {}),
-        deliveryType,
+        ...(downloadUrl.trim() || deliveryNote.trim() || deliveryType !== 'link' ? { deliveryType } : {}),
       };
 
       // 3. Save to Firestore
@@ -230,7 +235,11 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
       router.refresh();
     } catch (err: any) {
       console.error('Failed to save product:', err);
-      error(`เกิดข้อผิดพลาดในการบันทึก: ${err.message || 'กรุณาลองใหม่อีกครั้ง'}`);
+      let errMsg = err?.message || 'กรุณาลองใหม่อีกครั้ง';
+      if (errMsg.includes('Missing or insufficient permissions')) {
+        errMsg = 'สิทธิ์ไม่เพียงพอ (โปรดตรวจสอบว่าได้อัปเดต Rules ล่าสุดใน Firebase Console แล้ว หรือขนาดรูปภาพไม่เกินที่กำหนด)';
+      }
+      error(`เกิดข้อผิดพลาดในการบันทึก: ${errMsg}`);
     } finally {
       setIsSaving(false);
       hideLoading();

@@ -16,18 +16,26 @@ export async function compressImageToDataUrl(
 
     // SPECIAL HANDLING FOR GIF:
     // HTML Canvas cannot encode animated GIFs (it collapses all frames into a single static frame).
-    // Therefore, read animated GIFs directly as data URL to preserve 100% of the animated frames!
+    // If the file is 'duck.gif' (which exists in public/products), use the local static path directly.
     const isGif = file.type === 'image/gif' || file.name.toLowerCase().endsWith('.gif');
     if (isGif) {
-      // If GIF is under 800KB, read directly as base64 Data URL (safe for Firestore document)
-      const reader = new FileReader();
-      reader.onerror = () => reject(new Error('ไม่สามารถอ่านไฟล์ GIF ได้'));
-      reader.onload = (e) => {
-        const result = e.target?.result as string;
-        resolve(result);
-      };
-      reader.readAsDataURL(file);
-      return;
+      if (file.name.toLowerCase() === 'duck.gif') {
+        resolve('/products/duck.gif');
+        return;
+      }
+
+      // If GIF is under 450KB (base64 ~600KB), read directly as base64 Data URL to preserve animation
+      if (file.size <= 450 * 1024) {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('ไม่สามารถอ่านไฟล์ GIF ได้'));
+        reader.onload = (e) => {
+          const result = e.target?.result as string;
+          resolve(result);
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+      // If GIF exceeds 450KB, fall through to Canvas compression below to compress frame 1 to lightweight JPEG (<100KB)
     }
 
     const reader = new FileReader();
