@@ -32,19 +32,19 @@ export const SOFTWARE_DOWNLOADS: Record<'DISCORD_MANAGER' | 'DISCORD_PROFILE', S
     id: 'discord-manager',
     name: 'J3A Discord Manager',
     shortName: 'J3A Discord Manager',
-    downloadUrl: 'https://drive.google.com/file/d/1QTKdEcYbMJFHoG_LslEwJPWKIVtO8uH9/view?usp=sharing',
+    downloadUrl: 'https://drive.google.com/file/d/1meSdpyuMvpWAUqiWcMybYZNRd-_T43zM/view?usp=sharing',
     zipFileName: 'J3ADiscordManager.zip',
     exeFileName: 'J3ADiscordManager.exe',
-    guideStep3: 'เชื่อมต่อ Bot Token หรือตั้งค่า Discord Server Architecture แล้วเริ่มใช้งานได้ทันที!',
+    guideStep3: '💡 หมายเหตุ: ไฟล์ zip มีขนาดประมาณ 20-35 MB หากดาวน์โหลดเสร็จแล้วให้แตกไฟล์ (Extract Here) ก่อนเปิดโปรแกรม',
   },
   DISCORD_PROFILE: {
     id: 'discord-profile',
     name: 'J3A Discord Profile',
     shortName: 'J3A Discord Profile',
-    downloadUrl: 'https://drive.google.com/file/d/18Mt5mytIu-jB7Jt7efyr_nTxWGkDTuV0/view?usp=drive_link',
+    downloadUrl: 'https://drive.google.com/file/d/1ozs5fS2Y_cUcKGkuugp-5yuta5VGs385/view?usp=sharing',
     zipFileName: 'J3ADiscordProfile.zip',
     exeFileName: 'J3ADiscordProfile.exe',
-    guideStep3: 'ใส่ Application ID จาก Discord Developer Portal แล้วกดเริ่มใช้งานได้ทันที!',
+    guideStep3: '💡 หมายเหตุ: ไฟล์ zip มีขนาดประมาณ 20-35 MB หากดาวน์โหลดเสร็จแล้วให้แตกไฟล์ (Extract Here) ก่อนเปิดโปรแกรม',
   },
 };
 
@@ -79,6 +79,9 @@ export interface LicenseOrderItem {
   name?: string;
   slug?: string;
   category?: string;
+  downloadUrl?: string;
+  deliveryNote?: string;
+  deliveryType?: 'link' | 'key' | 'both';
 }
 
 export interface LicenseKeyDeliveryProps {
@@ -110,7 +113,7 @@ export function LicenseKeyDelivery({
 
   // Detect which software(s) were purchased based on items / product name / downloadUrl
   const purchasedSoftware = useMemo<SoftwareDownloadItem[]>(() => {
-    // If a custom downloadUrl was provided and is not the old dummy zip
+    // If a custom downloadUrl was provided directly and is not the old dummy zip
     if (downloadUrl && !downloadUrl.includes('/downloads/J3ADiscordProfile.zip')) {
       if (downloadUrl === SOFTWARE_DOWNLOADS.DISCORD_MANAGER.downloadUrl) {
         return [SOFTWARE_DOWNLOADS.DISCORD_MANAGER];
@@ -126,60 +129,82 @@ export function LicenseKeyDelivery({
           downloadUrl,
           zipFileName: 'program.zip',
           exeFileName: 'program.exe',
-          guideStep3: 'เปิดใช้งานโปรแกรมและเริ่มใช้งานได้ทันที!',
+          guideStep3: '💡 หมายเหตุ: ไฟล์ zip มีขนาดประมาณ 20-35 MB หากดาวน์โหลดเสร็จแล้วให้แตกไฟล์ (Extract Here) ก่อนเปิดโปรแกรม',
         },
       ];
     }
 
     const matches: SoftwareDownloadItem[] = [];
 
-    const checkMatches = (text: string) => {
-      const s = text.toLowerCase();
-      const isManager =
-        s.includes('discord manager') ||
-        s.includes('discordmanager') ||
-        s.includes('bot manager') ||
-        s.includes('discordbot') ||
-        s.includes('j3a-discord-manager');
-
-      const isProfile =
-        s.includes('discord profile') ||
-        s.includes('discordprofile') ||
-        s.includes('rich presence') ||
-        s.includes('rpc') ||
-        s.includes('j3a-discord-profile');
-
-      const isBundle =
-        s.includes('bundle') ||
-        s.includes('ultimate') ||
-        s.includes('2-in-1') ||
-        s.includes('แพ็กเกจ');
-
-      if (isBundle) {
-        if (!matches.some((m) => m.id === SOFTWARE_DOWNLOADS.DISCORD_MANAGER.id)) {
-          matches.push(SOFTWARE_DOWNLOADS.DISCORD_MANAGER);
-        }
-        if (!matches.some((m) => m.id === SOFTWARE_DOWNLOADS.DISCORD_PROFILE.id)) {
-          matches.push(SOFTWARE_DOWNLOADS.DISCORD_PROFILE);
-        }
-      } else {
-        if (isManager && !matches.some((m) => m.id === SOFTWARE_DOWNLOADS.DISCORD_MANAGER.id)) {
-          matches.push(SOFTWARE_DOWNLOADS.DISCORD_MANAGER);
-        }
-        if (isProfile && !matches.some((m) => m.id === SOFTWARE_DOWNLOADS.DISCORD_PROFILE.id)) {
-          matches.push(SOFTWARE_DOWNLOADS.DISCORD_PROFILE);
-        }
-      }
-    };
-
+    // 1. Check if any items have explicit downloadUrl configured by Admin
     if (items && items.length > 0) {
       for (const it of items) {
-        checkMatches(`${it.name || ''} ${it.slug || ''} ${it.productId || ''} ${it.category || ''}`);
+        if (it.downloadUrl && !it.downloadUrl.includes('/downloads/J3ADiscordProfile.zip')) {
+          if (!matches.some((m) => m.downloadUrl === it.downloadUrl)) {
+            matches.push({
+              id: it.productId || it.slug || `item-${matches.length}`,
+              name: it.name || 'ซอฟต์แวร์ J3A',
+              shortName: it.name || 'ซอฟต์แวร์ J3A',
+              downloadUrl: it.downloadUrl,
+              zipFileName: `${(it.name || 'software').replace(/\s+/g, '')}.zip`,
+              exeFileName: `${(it.name || 'software').replace(/\s+/g, '')}.exe`,
+              guideStep3: it.deliveryNote || '💡 หมายเหตุ: ไฟล์ zip มีขนาดประมาณ 20-35 MB หากดาวน์โหลดเสร็จแล้วให้แตกไฟล์ (Extract Here) ก่อนเปิดโปรแกรม',
+            });
+          }
+        }
       }
     }
 
-    if (productName) {
-      checkMatches(productName);
+    // 2. Fallback to product name matching if no explicit links were found
+    if (matches.length === 0) {
+      const checkMatches = (text: string) => {
+        const s = text.toLowerCase();
+        const isManager =
+          s.includes('discord manager') ||
+          s.includes('discordmanager') ||
+          s.includes('bot manager') ||
+          s.includes('discordbot') ||
+          s.includes('j3a-discord-manager');
+
+        const isProfile =
+          s.includes('discord profile') ||
+          s.includes('discordprofile') ||
+          s.includes('rich presence') ||
+          s.includes('rpc') ||
+          s.includes('j3a-discord-profile');
+
+        const isBundle =
+          s.includes('bundle') ||
+          s.includes('ultimate') ||
+          s.includes('2-in-1') ||
+          s.includes('แพ็กเกจ');
+
+        if (isBundle) {
+          if (!matches.some((m) => m.id === SOFTWARE_DOWNLOADS.DISCORD_MANAGER.id)) {
+            matches.push(SOFTWARE_DOWNLOADS.DISCORD_MANAGER);
+          }
+          if (!matches.some((m) => m.id === SOFTWARE_DOWNLOADS.DISCORD_PROFILE.id)) {
+            matches.push(SOFTWARE_DOWNLOADS.DISCORD_PROFILE);
+          }
+        } else {
+          if (isManager && !matches.some((m) => m.id === SOFTWARE_DOWNLOADS.DISCORD_MANAGER.id)) {
+            matches.push(SOFTWARE_DOWNLOADS.DISCORD_MANAGER);
+          }
+          if (isProfile && !matches.some((m) => m.id === SOFTWARE_DOWNLOADS.DISCORD_PROFILE.id)) {
+            matches.push(SOFTWARE_DOWNLOADS.DISCORD_PROFILE);
+          }
+        }
+      };
+
+      if (items && items.length > 0) {
+        for (const it of items) {
+          checkMatches(`${it.name || ''} ${it.slug || ''} ${it.productId || ''} ${it.category || ''}`);
+        }
+      }
+
+      if (productName) {
+        checkMatches(productName);
+      }
     }
 
     // Default fallback if no specific match was identified

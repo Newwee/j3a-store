@@ -60,6 +60,9 @@ function mapDocToProduct(docSnap: { id: string; data: () => Record<string, unkno
     })(),
     reviewCount: data.reviewCount !== undefined ? Number(data.reviewCount) : 0,
     showcaseUrl: (data.showcaseUrl as string) || undefined,
+    downloadUrl: (data.downloadUrl as string) || undefined,
+    deliveryNote: (data.deliveryNote as string) || undefined,
+    deliveryType: (data.deliveryType as any) || undefined,
     createdAt,
     updatedAt,
   };

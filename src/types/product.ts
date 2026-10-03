@@ -18,6 +18,9 @@ export interface Product {
   rating?: number;
   reviewCount?: number;
   showcaseUrl?: string;
+  downloadUrl?: string;
+  deliveryNote?: string;
+  deliveryType?: 'link' | 'key' | 'both';
   createdAt: string;
   updatedAt: string;
 }

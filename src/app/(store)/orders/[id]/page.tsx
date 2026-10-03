@@ -214,7 +214,7 @@ export default function OrderDetailPage({
                       {formatCurrency(item.price * item.quantity)}
                     </span>
                     {(order.status === 'completed' || order.status === 'paid') && (() => {
-                      const downloadLink = getDownloadUrlForProduct(`${item.name} ${item.slug}`);
+                      const downloadLink = item.downloadUrl || getDownloadUrlForProduct(`${item.name} ${item.slug}`);
                       if (!downloadLink) return null;
                       return (
                         <a
@@ -223,7 +223,7 @@ export default function OrderDetailPage({
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 hover:text-white text-xs font-bold transition-all shadow-[0_0_12px_rgba(34,197,94,0.15)] select-none no-underline cursor-pointer"
                         >
-                          <span>⬇️ ดาวน์โหลด (.zip)</span>
+                          <span>⬇️ ดาวน์โหลด / เปิดลิงก์สินค้า</span>
                           <ExternalLink className="w-3 h-3 opacity-70" />
                         </a>
                       );

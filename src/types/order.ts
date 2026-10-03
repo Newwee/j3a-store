@@ -9,6 +9,9 @@ export interface OrderItem {
   price: number;
   quantity: number;
   image: string;
+  downloadUrl?: string;
+  deliveryNote?: string;
+  deliveryType?: 'link' | 'key' | 'both';
 }
 
 export interface CustomerInfo {

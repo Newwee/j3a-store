@@ -15,6 +15,8 @@ import {
   ArrowLeft,
   Loader2,
   RefreshCw,
+  Download,
+  Key,
 } from 'lucide-react';
 import { Product, ProductFormData, ProductStatus } from '@/types/product';
 import { uploadProductImage, deleteProductImage } from '@/lib/storage/upload';
@@ -60,6 +62,11 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
   const [featured, setFeatured] = useState<boolean>(initialData?.featured || false);
   const [tagsInput, setTagsInput] = useState(initialData?.tags?.join(', ') || '');
   const [showcaseUrl, setShowcaseUrl] = useState(initialData?.showcaseUrl || '');
+  const [downloadUrl, setDownloadUrl] = useState(initialData?.downloadUrl || '');
+  const [deliveryNote, setDeliveryNote] = useState(initialData?.deliveryNote || '');
+  const [deliveryType, setDeliveryType] = useState<'link' | 'key' | 'both'>(
+    initialData?.deliveryType || 'link'
+  );
 
   // Image states
   const [imagePreview, setImagePreview] = useState<string>(initialData?.image || '');
@@ -205,6 +212,9 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
         images: initialData?.images || [],
         tags,
         ...(showcaseUrl.trim() ? { showcaseUrl: showcaseUrl.trim() } : {}),
+        ...(downloadUrl.trim() ? { downloadUrl: downloadUrl.trim() } : {}),
+        ...(deliveryNote.trim() ? { deliveryNote: deliveryNote.trim() } : {}),
+        deliveryType,
       };
 
       // 3. Save to Firestore
@@ -380,6 +390,154 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
               placeholder="https://www.youtube.com/watch?v=... หรือลิงก์สาธิตสินค้า"
               helperText="เมื่อใส่ลิงก์นี้ จะมีปุ่ม 'รับชม Showcase ตัวอย่าง' แสดงในหน้ารายละเอียดสินค้าให้ลูกค้าคลิกดูได้ทันที"
             />
+          </div>
+
+          {/* Product Delivery & Download Configuration (Exact User Specification) */}
+          <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-md space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <Download className="w-5 h-5 text-cyan-400" />
+                  <span>การส่งมอบสินค้าหลังสั่งซื้อ (Delivery & Download Settings)</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  กำหนดสิ่งที่ลูกค้าจะได้รับหลังจากสั่งซื้อและชำระเงินสำเร็จ (เช่น ลิงก์ Google Drive, ลิงก์เข้าใช้งาน, License Key)
+                </p>
+              </div>
+              <span className="self-start sm:self-auto text-[11px] font-bold text-cyan-400 bg-cyan-500/10 border border-cyan-500/30 px-2.5 py-1 rounded-full whitespace-nowrap">
+                📦 ส่งมอบให้ลูกค้าหลังซื้อ
+              </span>
+            </div>
+
+            {/* Delivery Type Selection */}
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-slate-300">
+                รูปแบบการส่งมอบสินค้า (Delivery Format)
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div
+                  onClick={() => setDeliveryType('link')}
+                  className={`p-3 rounded-xl border cursor-pointer transition-all ${
+                    deliveryType === 'link'
+                      ? 'bg-cyan-500/15 border-cyan-400 text-white shadow-[0_0_15px_rgba(6,182,212,0.25)]'
+                      : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 font-bold text-xs">
+                    <input
+                      type="radio"
+                      name="deliveryType"
+                      checked={deliveryType === 'link'}
+                      onChange={() => setDeliveryType('link')}
+                      className="accent-cyan-400 cursor-pointer"
+                    />
+                    <span>🔗 ลิงก์ดาวน์โหลดสินค้า</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1 pl-5">
+                    ส่งมอบปุ่มดาวน์โหลด Google Drive หรือลิงก์ใช้งานโดยตรง
+                  </p>
+                </div>
+
+                <div
+                  onClick={() => setDeliveryType('both')}
+                  className={`p-3 rounded-xl border cursor-pointer transition-all ${
+                    deliveryType === 'both'
+                      ? 'bg-cyan-500/15 border-cyan-400 text-white shadow-[0_0_15px_rgba(6,182,212,0.25)]'
+                      : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 font-bold text-xs">
+                    <input
+                      type="radio"
+                      name="deliveryType"
+                      checked={deliveryType === 'both'}
+                      onChange={() => setDeliveryType('both')}
+                      className="accent-cyan-400 cursor-pointer"
+                    />
+                    <span>⚡ ลิงก์ + License Key</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1 pl-5">
+                    ส่งมอบทั้ง License Key และปุ่มดาวน์โหลดไฟล์ติดตั้ง
+                  </p>
+                </div>
+
+                <div
+                  onClick={() => setDeliveryType('key')}
+                  className={`p-3 rounded-xl border cursor-pointer transition-all ${
+                    deliveryType === 'key'
+                      ? 'bg-cyan-500/15 border-cyan-400 text-white shadow-[0_0_15px_rgba(6,182,212,0.25)]'
+                      : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 font-bold text-xs">
+                    <input
+                      type="radio"
+                      name="deliveryType"
+                      checked={deliveryType === 'key'}
+                      onChange={() => setDeliveryType('key')}
+                      className="accent-cyan-400 cursor-pointer"
+                    />
+                    <span>🔑 License Key เท่านั้น</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1 pl-5">
+                    ส่งมอบเฉพาะรหัสคีย์เพื่อนำไปเปิดใช้งานหรือเติมสิทธิ์
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Download Link Input with Presets */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <label className="text-xs font-semibold text-slate-300">
+                  ลิงก์สินค้า / ลิงก์ดาวน์โหลดหลังซื้อสำเร็จ (Download URL / Delivery Link)
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDownloadUrl('https://drive.google.com/file/d/1meSdpyuMvpWAUqiWcMybYZNRd-_T43zM/view?usp=sharing');
+                      setDeliveryNote('💡 หมายเหตุ: ไฟล์ zip มีขนาดประมาณ 20-35 MB หากดาวน์โหลดเสร็จแล้วให้แตกไฟล์ (Extract Here) ก่อนเปิดโปรแกรม');
+                    }}
+                    className="text-[10px] text-cyan-400 hover:text-cyan-300 bg-cyan-500/10 hover:bg-cyan-500/20 px-2 py-0.5 rounded border border-cyan-500/30 transition-all cursor-pointer font-medium"
+                  >
+                    + ใส่ลิงก์ Discord Manager
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDownloadUrl('https://drive.google.com/file/d/1ozs5fS2Y_cUcKGkuugp-5yuta5VGs385/view?usp=sharing');
+                      setDeliveryNote('💡 หมายเหตุ: ไฟล์ zip มีขนาดประมาณ 20-35 MB หากดาวน์โหลดเสร็จแล้วให้แตกไฟล์ (Extract Here) ก่อนเปิดโปรแกรม');
+                    }}
+                    className="text-[10px] text-[#7c5cff] hover:text-[#9980ff] bg-[#7c5cff]/10 hover:bg-[#7c5cff]/20 px-2 py-0.5 rounded border border-[#7c5cff]/30 transition-all cursor-pointer font-medium"
+                  >
+                    + ใส่ลิงก์ Discord Profile
+                  </button>
+                </div>
+              </div>
+
+              <Input
+                type="url"
+                value={downloadUrl}
+                onChange={(e) => setDownloadUrl(e.target.value)}
+                placeholder="https://drive.google.com/file/d/... หรือ ลิงก์ดาวน์โหลดที่ต้องการให้ลูกค้า"
+                helperText="ลูกค้ารายการนี้จะได้รับปุ่ม '⬇️ ดาวน์โหลดโปรแกรม / เปิดลิงก์สินค้า' นำไปยังลิงก์นี้ในหน้าสั่งซื้อสำเร็จทันที"
+              />
+            </div>
+
+            {/* Delivery Note / Instructions for Buyer */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-300">
+                ข้อความแนะนำสำหรับลูกค้าหลังซื้อเสร็จ (Delivery Note / Guide)
+              </label>
+              <textarea
+                value={deliveryNote}
+                onChange={(e) => setDeliveryNote(e.target.value)}
+                rows={2}
+                placeholder="เช่น 💡 หมายเหตุ: ไฟล์ zip มีขนาดประมาณ 20-35 MB หากดาวน์โหลดเสร็จแล้วให้แตกไฟล์ (Extract Here) ก่อนเปิดโปรแกรม"
+                className="w-full bg-slate-950/80 text-xs text-slate-200 rounded-xl p-3 border border-slate-700/80 focus:border-cyan-500 outline-none resize-none placeholder:text-slate-500"
+              />
+            </div>
           </div>
         </div>
 
