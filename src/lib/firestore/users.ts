@@ -15,7 +15,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { UserProfile, UserRole, UserTier } from '@/types/user';
-import { getUserDeletionRequest } from './deletionRequests';
+import { getUserDeletionRequest, clearOrArchiveDeletionRequest } from './deletionRequests';
 
 const USERS_COLLECTION = 'users';
 
@@ -101,16 +101,11 @@ export async function createUserProfile(
 ): Promise<UserProfile> {
   if (!db) throw new Error('Firestore is not initialized.');
 
-  // Guard: If account was deleted/approved by admin, prevent recreating profile!
+  // If there was an old deletion request from a previous deleted account, clear it so they start fresh
   try {
-    const deletionReq = await getUserDeletionRequest(uid);
-    if (deletionReq?.status === 'approved') {
-      throw new Error('บัญชีผู้ใช้นี้ถูกลบออกจากระบบแล้ว ไม่สามารถสร้างหรือเข้าสู่ระบบได้อีก');
-    }
+    await clearOrArchiveDeletionRequest(uid);
   } catch (err: any) {
-    if (err.message?.includes('บัญชีผู้ใช้นี้ถูกลบ')) {
-      throw err;
-    }
+    console.warn('Could not clear previous deletion request upon re-registration:', err);
   }
 
   const docRef = doc(db, USERS_COLLECTION, uid);

@@ -31,11 +31,13 @@ import {
   updateUserRole,
   updateUserCredits,
   updateUserProfile,
+  deleteUserDoc,
 } from '@/lib/firestore/users';
 import {
   getAllDeletionRequests,
   approveAccountDeletion,
   rejectAccountDeletion,
+  clearOrArchiveDeletionRequest,
 } from '@/lib/firestore/deletionRequests';
 import { AdminHeader } from '@/components/admin/AdminHeader';
 import { RoleBadge, TierBadge } from '@/components/ui/Badge';
@@ -79,6 +81,10 @@ export default function AdminCustomersPage() {
   const [rejectingRequest, setRejectingRequest] = useState<DeletionRequest | null>(null);
   const [rejectNote, setRejectNote] = useState('');
   const [isProcessingReject, setIsProcessingReject] = useState(false);
+
+  // Direct Delete Customer State
+  const [deletingCustomer, setDeletingCustomer] = useState<UserProfile | null>(null);
+  const [isDeletingDirectly, setIsDeletingDirectly] = useState(false);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -252,6 +258,36 @@ export default function AdminCustomersPage() {
       error(`เกิดข้อผิดพลาดในการปฏิเสธคำขอ: ${err.message || 'กรุณาลองใหม่'}`);
     } finally {
       setIsProcessingReject(false);
+      hideLoading();
+    }
+  };
+
+  // Direct Delete Customer Handler
+  const handleConfirmDirectDelete = async () => {
+    if (!deletingCustomer) return;
+    setIsDeletingDirectly(true);
+    showLoading(`กำลังลบข้อมูลลูกค้า "${deletingCustomer.displayName || deletingCustomer.email}" ออกจากระบบ...`);
+    try {
+      await deleteUserDoc(deletingCustomer.uid);
+      await clearOrArchiveDeletionRequest(deletingCustomer.uid);
+
+      setCustomers((prev) => prev.filter((c) => c.uid !== deletingCustomer.uid));
+      setDeletionRequests((prev) =>
+        prev.map((r) =>
+          r.userId === deletingCustomer.uid
+            ? { ...r, status: 'approved', approvedAt: new Date().toISOString() }
+            : r
+        )
+      );
+      success(`ลบข้อมูลลูกค้า "${deletingCustomer.displayName || deletingCustomer.email}" ออกจากระบบเรียบร้อยแล้ว`);
+      setDeletingCustomer(null);
+      if (editingCustomer?.uid === deletingCustomer.uid) {
+        setEditingCustomer(null);
+      }
+    } catch (err: any) {
+      error(`ไม่สามารถลบข้อมูลลูกค้าได้: ${err.message || 'เกิดข้อผิดพลาด'}`);
+    } finally {
+      setIsDeletingDirectly(false);
       hideLoading();
     }
   };
@@ -450,15 +486,26 @@ export default function AdminCustomersPage() {
 
                           {/* Actions */}
                           <td className="py-3 px-4 sm:px-6 whitespace-nowrap text-right">
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => handleOpenManage(customer)}
-                              leftIcon={<Edit className="w-3.5 h-3.5" />}
-                              className="text-xs font-bold text-cyan-300 border-cyan-500/30 hover:bg-cyan-500/10 hover:border-cyan-400"
-                            >
-                              จัดการ / เติมเงิน
-                            </Button>
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => handleOpenManage(customer)}
+                                leftIcon={<Edit className="w-3.5 h-3.5" />}
+                                className="text-xs font-bold text-cyan-300 border-cyan-500/30 hover:bg-cyan-500/10 hover:border-cyan-400"
+                              >
+                                จัดการ / เติมเงิน
+                              </Button>
+                              <Button
+                                variant="danger"
+                                size="sm"
+                                onClick={() => setDeletingCustomer(customer)}
+                                title="ลบผู้ใช้นี้ออกจากระบบถาวร"
+                                className="p-2 text-rose-400 hover:text-white bg-rose-500/10 hover:bg-rose-600 border border-rose-500/30 transition-all shadow-[0_0_10px_rgba(244,63,94,0.15)]"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -733,25 +780,40 @@ export default function AdminCustomersPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-2">
+            <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-800">
               <Button
                 type="button"
-                variant="ghost"
-                size="md"
-                onClick={() => setEditingCustomer(null)}
+                variant="danger"
+                size="sm"
+                onClick={() => {
+                  const target = editingCustomer;
+                  setDeletingCustomer(target);
+                }}
+                leftIcon={<Trash2 className="w-3.5 h-3.5" />}
+                className="text-xs bg-rose-500/10 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 font-bold"
               >
-                ยกเลิก
+                ลบผู้ใช้นี้ออกจากระบบ
               </Button>
-              <Button
-                type="submit"
-                variant="primary"
-                size="md"
-                isLoading={isSavingModal}
-                leftIcon={<CheckCircle2 className="w-4 h-4" />}
-                className="font-bold shadow-[0_0_15px_rgba(6,182,212,0.35)]"
-              >
-                บันทึกการเปลี่ยนแปลง
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="md"
+                  onClick={() => setEditingCustomer(null)}
+                >
+                  ยกเลิก
+                </Button>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="md"
+                  isLoading={isSavingModal}
+                  leftIcon={<CheckCircle2 className="w-4 h-4" />}
+                  className="font-bold shadow-[0_0_15px_rgba(6,182,212,0.35)]"
+                >
+                  บันทึกการเปลี่ยนแปลง
+                </Button>
+              </div>
             </div>
           </form>
         </Modal>
@@ -872,6 +934,69 @@ export default function AdminCustomersPage() {
                 className="font-bold"
               >
                 ยืนยันการปฏิเสธ
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* MODAL 4: Confirm Delete Customer Directly Modal */}
+      {deletingCustomer && (
+        <Modal
+          isOpen={Boolean(deletingCustomer)}
+          onClose={() => !isDeletingDirectly && setDeletingCustomer(null)}
+          title="⚠️ ยืนยันการลบข้อมูลผู้ใช้งานออกจากระบบ"
+        >
+          <div className="space-y-4">
+            <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+              <div className="space-y-1 text-xs text-rose-200">
+                <span className="font-bold text-rose-100 block">คำเตือน: การลบข้อมูลผู้ใช้จะไม่สามารถกู้คืนได้</span>
+                การดำเนินการนี้จะ <strong>ลบข้อมูลโปรไฟล์ของผู้ใช้นี้ออกจากระบบ Cloud Firestore ทันที</strong> รวมทั้งสิทธิ์ และยอดเงินคงเหลือ
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-400">ชื่อลูกค้า:</span>
+                <span className="font-bold text-white">
+                  {deletingCustomer.displayName || 'Customer'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">อีเมล:</span>
+                <span className="font-mono text-cyan-300">{deletingCustomer.email || '-'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">UID:</span>
+                <span className="font-mono text-slate-400">{deletingCustomer.uid}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">ยอดเงินเครดิตคงเหลือ:</span>
+                <span className="font-mono font-bold text-amber-300">
+                  {formatCurrency(deletingCustomer.credits || 0)}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-800">
+              <Button
+                variant="ghost"
+                size="md"
+                onClick={() => setDeletingCustomer(null)}
+                disabled={isDeletingDirectly}
+              >
+                ยกเลิก
+              </Button>
+              <Button
+                variant="danger"
+                size="md"
+                onClick={handleConfirmDirectDelete}
+                isLoading={isDeletingDirectly}
+                leftIcon={<Trash2 className="w-4 h-4" />}
+                className="font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-[0_0_20px_rgba(225,29,72,0.4)]"
+              >
+                ยืนยันการลบข้อมูลผู้ใช้ถาวร
               </Button>
             </div>
           </div>

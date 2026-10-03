@@ -22,6 +22,7 @@ import {
 import {
   getUserDeletionRequest,
   subscribeUserDeletionRequest,
+  clearOrArchiveDeletionRequest,
 } from '@/lib/firestore/deletionRequests';
 import { UserProfile, UserRole } from '@/types/user';
 import { useToast } from '@/context/ToastContext';
@@ -55,26 +56,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isKickingOutRef = useRef(false);
 
   // Sync profile from Firestore
-  const syncProfile = useCallback(async (firebaseUser: FirebaseUser) => {
+  const syncProfile = useCallback(async (firebaseUser: FirebaseUser, options?: { isExplicitLogin?: boolean }) => {
     try {
-      // 1. Guard against deleted accounts
-      const delReq = await getUserDeletionRequest(firebaseUser.uid);
-      if (delReq?.status === 'approved') {
-        if (!isKickingOutRef.current) {
-          isKickingOutRef.current = true;
-          showLoading('บัญชีของคุณได้รับการอนุมัติการลบออกจากระบบเรียบร้อยแล้ว กำลังออกจากระบบ...');
-          if (auth) await signOut(auth);
-          setUser(null);
-          setProfile(null);
-          setTimeout(() => {
-            hideLoading();
-            toast('บัญชีผู้ใช้นี้ถูกลบออกจากระบบเรียบร้อยแล้ว', 'info');
-            if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
-              window.location.href = '/login?deleted=true';
-            }
-          }, 1200);
+      if (options?.isExplicitLogin) {
+        // Deliberate user action (e.g. login with Google, register): clear old deletion request so user can start fresh
+        await clearOrArchiveDeletionRequest(firebaseUser.uid);
+      } else {
+        // Background session restoration: check if account was deleted while offline
+        const delReq = await getUserDeletionRequest(firebaseUser.uid);
+        if (delReq?.status === 'approved') {
+          if (!isKickingOutRef.current) {
+            isKickingOutRef.current = true;
+            showLoading('บัญชีของคุณได้รับการอนุมัติการลบออกจากระบบเรียบร้อยแล้ว กำลังออกจากระบบ...');
+            await clearOrArchiveDeletionRequest(firebaseUser.uid);
+            if (auth) await signOut(auth);
+            setUser(null);
+            setProfile(null);
+            setTimeout(() => {
+              hideLoading();
+              toast('บัญชีผู้ใช้นี้ถูกลบออกจากระบบเรียบร้อยแล้ว', 'info');
+              if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+                window.location.href = '/login?deleted=true';
+              }
+            }, 1200);
+          }
+          return;
         }
-        return;
       }
 
       let p = await getUserProfile(firebaseUser.uid);
@@ -83,7 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         : (firebaseUser.email ? firebaseUser.email.split('@')[0] : 'Customer');
 
       if (!p) {
-        // First-time record initialization
+        // First-time record initialization (or re-registration after deletion)
         p = await createUserProfile(firebaseUser.uid, {
           email: firebaseUser.email,
           displayName: effectiveName,
@@ -107,6 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!isKickingOutRef.current) {
           isKickingOutRef.current = true;
           showLoading('บัญชีของคุณถูกลบออกจากระบบเรียบร้อยแล้ว...');
+          await clearOrArchiveDeletionRequest(firebaseUser.uid);
           if (auth) await signOut(auth);
           setUser(null);
           setProfile(null);
@@ -196,6 +204,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               if (!isKickingOutRef.current) {
                 isKickingOutRef.current = true;
                 showLoading('บัญชีของคุณได้รับการอนุมัติการลบออกจากระบบเรียบร้อยแล้ว กำลังออกจากระบบ...');
+                await clearOrArchiveDeletionRequest(currentUser.uid);
                 if (auth) await signOut(auth);
                 setUser(null);
                 setProfile(null);
@@ -217,6 +226,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (!isKickingOutRef.current) {
               isKickingOutRef.current = true;
               showLoading('บัญชีของคุณได้รับการอนุมัติการลบออกจากระบบเรียบร้อยแล้ว กำลังออกจากระบบ...');
+              await clearOrArchiveDeletionRequest(currentUser.uid);
               if (auth) await signOut(auth);
               setUser(null);
               setProfile(null);
@@ -249,7 +259,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!auth) throw new Error('Firebase Auth ไม่ได้เปิดใช้งาน กรุณาตั้งค่า .env.local');
     const cred = await signInWithEmailAndPassword(auth, email, pass);
     if (cred.user) {
-      await syncProfile(cred.user);
+      await clearOrArchiveDeletionRequest(cred.user.uid);
+      await syncProfile(cred.user, { isExplicitLogin: true });
     }
   };
 
@@ -258,6 +269,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const cred = await createUserWithEmailAndPassword(auth, email, pass);
     if (cred.user) {
       await updateProfile(cred.user, { displayName: name });
+      await clearOrArchiveDeletionRequest(cred.user.uid);
       const newProfile = await createUserProfile(cred.user.uid, {
         email,
         displayName: name,
@@ -278,7 +290,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     provider.setCustomParameters({ prompt: 'select_account' });
     const cred = await signInWithPopup(auth, provider);
     if (cred.user) {
-      await syncProfile(cred.user);
+      await clearOrArchiveDeletionRequest(cred.user.uid);
+      await syncProfile(cred.user, { isExplicitLogin: true });
     }
   };
 

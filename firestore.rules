@@ -430,11 +430,11 @@ service cloud.firestore {
         request.resource.data.userId == request.auth.uid &&
         request.resource.data.status == 'pending';
 
-      // Update: Admin can approve/reject, or owner can cancel
-      allow update: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      // Update: Admin can approve/reject, or owner can update/cancel
+      allow update: if isAdmin() || (isSignedIn() && (requestId == request.auth.uid || ('userId' in resource.data && resource.data.userId == request.auth.uid)));
 
-      // Delete: Admin only
-      allow delete: if isAdmin();
+      // Delete: Admin or request owner
+      allow delete: if isAdmin() || (isSignedIn() && (requestId == request.auth.uid || ('userId' in resource.data && resource.data.userId == request.auth.uid)));
     }
   }
 }

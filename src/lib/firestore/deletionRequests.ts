@@ -5,6 +5,7 @@ import {
   getDocs,
   setDoc,
   updateDoc,
+  deleteDoc,
   query,
   where,
   orderBy,
@@ -152,11 +153,7 @@ export async function approveAccountDeletion(requestId: string, userId: string, 
   if (!db) throw new Error('Firestore is not initialized.');
 
   // 1. Delete user document from users collection
-  try {
-    await deleteUserDoc(userId);
-  } catch (err: any) {
-    console.warn(`Could not delete user doc for uid ${userId}:`, err);
-  }
+  await deleteUserDoc(userId);
 
   // 2. Mark deletion request as approved
   const docRef = doc(db, DELETION_REQUESTS_COLLECTION, requestId);
@@ -194,6 +191,26 @@ export async function cancelAccountDeletion(userId: string): Promise<void> {
     status: 'cancelled',
     updatedAt: serverTimestamp(),
   });
+}
+
+/**
+ * Clear or cancel a deletion request to unblock re-registration
+ */
+export async function clearOrArchiveDeletionRequest(userId: string): Promise<void> {
+  if (!db || !userId) return;
+  const docRef = doc(db, DELETION_REQUESTS_COLLECTION, userId);
+  try {
+    await deleteDoc(docRef);
+  } catch (err) {
+    try {
+      await updateDoc(docRef, {
+        status: 'cancelled',
+        updatedAt: serverTimestamp(),
+      });
+    } catch (e) {
+      console.warn('Could not clear or cancel deletion request:', e);
+    }
+  }
 }
 
 /**
