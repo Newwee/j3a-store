@@ -6,7 +6,6 @@ import Image from 'next/image';
 import { ArrowRight, ShieldCheck, Zap, Sparkles, Flame, Star } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import dynamic from 'next/dynamic';
-import { ShapeWaves } from '@/components/ui/ShapeWaves';
 
 const ParticleText = dynamic(() => import('@/components/ui/ParticleText'), {
   ssr: false,
@@ -38,10 +37,8 @@ const ElectricLogo = dynamic(() => import('@/components/ui/ElectricLogo'), {
 export function HeroSection() {
   return (
     <section className="relative overflow-hidden pt-8 pb-16 lg:pt-16 lg:pb-24">
-      {/* ShapeWaves background banner */}
-      <div className="absolute inset-0 pointer-events-none z-0 opacity-40">
-        <ShapeWaves cellSize={26} dotSize={0.65} speed={1.1} />
-      </div>
+      {/* Soft ambient atmospheric glow */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[500px] bg-gradient-to-tr from-cyan-500/10 via-indigo-500/10 to-transparent rounded-full blur-[140px] pointer-events-none" />
 
       {/* Ambient background glow and grid */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-cyan-500/10 rounded-full blur-[140px] pointer-events-none" />

@@ -24,6 +24,7 @@ import { compressImageToDataUrl } from '@/lib/utils/image';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useToast } from '@/context/ToastContext';
+import { useLoading } from '@/context/LoadingContext';
 
 interface ProductFormProps {
   initialData?: Product;
@@ -42,6 +43,7 @@ const CATEGORIES = [
 export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
   const router = useRouter();
   const { success, error, toast } = useToast();
+  const { showLoading, hideLoading } = useLoading();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form states
@@ -132,6 +134,7 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
     }
 
     setIsSaving(true);
+    showLoading(isEdit ? 'กำลังอัปเดตข้อมูลสินค้าและอัปโหลดรูปภาพ...' : 'กำลังบันทึกและสร้างสินค้าใหม่...');
     let finalImageUrl = imagePreview || '/logo.png';
 
     try {
@@ -178,6 +181,7 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
           `ขนาดข้อมูลรูปภาพใหญ่เกินขีดจำกัด 1 MB ของฐานข้อมูล (${(finalImageUrl.length / 1024 / 1024).toFixed(2)} MB) กรุณาใช้ไฟล์ไม่เกิน 700 KB หรือใส่ Image URL โดยตรง (เช่น /products/duck.gif)`
         );
         setIsSaving(false);
+        hideLoading();
         return;
       }
 
@@ -219,6 +223,7 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
       error(`เกิดข้อผิดพลาดในการบันทึก: ${err.message || 'กรุณาลองใหม่อีกครั้ง'}`);
     } finally {
       setIsSaving(false);
+      hideLoading();
     }
   };
 

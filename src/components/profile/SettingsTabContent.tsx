@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
+import { useLoading } from '@/context/LoadingContext';
 import { useTheme } from '@/context/ThemeContext';
 import { updateUserProfile } from '@/lib/firestore/users';
 import {
@@ -49,6 +50,7 @@ import { Modal } from '@/components/ui/Modal';
 export function SettingsTabContent() {
   const { user, profile, refreshProfile } = useAuth();
   const { success, error, toast } = useToast();
+  const { showLoading, hideLoading } = useLoading();
 
   const [activeCategory, setActiveCategory] = useState<
     'account' | 'security' | 'notifications' | 'preferences' | 'data'
@@ -115,6 +117,7 @@ export function SettingsTabContent() {
   const handleSubmitDeletionRequest = async () => {
     if (!user) return;
     setIsSubmittingDelete(true);
+    showLoading('กำลังส่งคำขอลบบัญชีไปยังระบบ...');
     try {
       const res = await requestAccountDeletion({
         userId: user.uid,
@@ -130,12 +133,14 @@ export function SettingsTabContent() {
       error(`ไม่สามารถส่งคำขอลบบัญชีได้: ${err.message || 'กรุณาลองใหม่อีกครั้ง'}`);
     } finally {
       setIsSubmittingDelete(false);
+      hideLoading();
     }
   };
 
   const handleCancelDeleteRequest = async () => {
     if (!user) return;
     setIsCancellingDelete(true);
+    showLoading('กำลังยกเลิกคำขอลบบัญชี...');
     try {
       await cancelAccountDeletion(user.uid);
       setDeletionRequest((prev) => (prev ? { ...prev, status: 'cancelled' } : null));
@@ -144,6 +149,7 @@ export function SettingsTabContent() {
       error(`ไม่สามารถยกเลิกคำขอได้: ${err.message || 'เกิดข้อผิดพลาด'}`);
     } finally {
       setIsCancellingDelete(false);
+      hideLoading();
     }
   };
 
@@ -151,6 +157,7 @@ export function SettingsTabContent() {
     e.preventDefault();
     if (!user) return;
     setIsSavingAccount(true);
+    showLoading('กำลังบันทึกข้อมูลส่วนตัว...');
     try {
       await updateUserProfile(user.uid, {
         displayName: displayName.trim(),
@@ -162,6 +169,7 @@ export function SettingsTabContent() {
       error(`เกิดข้อผิดพลาด: ${err.message || 'กรุณาลองใหม่อีกครั้ง'}`);
     } finally {
       setIsSavingAccount(false);
+      hideLoading();
     }
   };
 

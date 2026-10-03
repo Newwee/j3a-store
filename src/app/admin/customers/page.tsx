@@ -41,6 +41,7 @@ import { AdminHeader } from '@/components/admin/AdminHeader';
 import { RoleBadge, TierBadge } from '@/components/ui/Badge';
 import { formatDate, formatCurrency } from '@/lib/utils/formatters';
 import { useToast } from '@/context/ToastContext';
+import { useLoading } from '@/context/LoadingContext';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
@@ -48,6 +49,7 @@ import { Input } from '@/components/ui/Input';
 
 export default function AdminCustomersPage() {
   const { success, error } = useToast();
+  const { showLoading, hideLoading } = useLoading();
 
   // Tab State: 'customers' or 'deletions'
   const [activeTab, setActiveTab] = useState<'customers' | 'deletions'>('customers');
@@ -198,6 +200,7 @@ export default function AdminCustomersPage() {
   const handleConfirmApproval = async () => {
     if (!approvingRequest) return;
     setIsProcessingApproval(true);
+    showLoading('กำลังอนุมัติและลบข้อมูลบัญชีลูกค้าออกจากระบบ...');
     try {
       await approveAccountDeletion(approvingRequest.id, approvingRequest.userId);
       success(
@@ -218,6 +221,7 @@ export default function AdminCustomersPage() {
       error(`ไม่สามารถอนุมัติการลบได้: ${err.message || 'เกิดข้อผิดพลาด'}`);
     } finally {
       setIsProcessingApproval(false);
+      hideLoading();
     }
   };
 
@@ -225,6 +229,7 @@ export default function AdminCustomersPage() {
   const handleConfirmReject = async () => {
     if (!rejectingRequest) return;
     setIsProcessingReject(true);
+    showLoading('กำลังดำเนินการปฏิเสธคำขอลบบัญชี...');
     try {
       await rejectAccountDeletion(rejectingRequest.id, rejectNote);
       success('ปฏิเสธคำขอลบบัญชีเรียบร้อยแล้ว');
@@ -247,6 +252,7 @@ export default function AdminCustomersPage() {
       error(`เกิดข้อผิดพลาดในการปฏิเสธคำขอ: ${err.message || 'กรุณาลองใหม่'}`);
     } finally {
       setIsProcessingReject(false);
+      hideLoading();
     }
   };
 

@@ -5,6 +5,7 @@ import { ThemeProvider } from '@/context/ThemeContext';
 import { AuthProvider } from '@/context/AuthContext';
 import { CartProvider } from '@/context/CartContext';
 import { ToastProvider } from '@/context/ToastContext';
+import { LoadingProvider } from '@/context/LoadingContext';
 import TargetCursor from '@/components/ui/TargetCursor';
 
 const inter = Inter({
@@ -118,7 +119,9 @@ export default function RootLayout({
           <ToastProvider>
             <AuthProvider>
               <CartProvider>
-                {children}
+                <LoadingProvider>
+                  {children}
+                </LoadingProvider>
               </CartProvider>
             </AuthProvider>
           </ToastProvider>

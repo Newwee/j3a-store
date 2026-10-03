@@ -24,6 +24,7 @@ import { formatCurrency, formatDate } from '@/lib/utils/formatters';
 import { OrderStatusBadge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/context/ToastContext';
+import { useLoading } from '@/context/LoadingContext';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LicenseKeyDelivery, getDownloadUrlForProduct } from '@/components/license/LicenseKeyDelivery';
 
@@ -35,6 +36,7 @@ export default function OrderDetailPage({
   const resolvedParams = use(params);
   const orderId = resolvedParams.id;
   const { success, error } = useToast();
+  const { showLoading, hideLoading } = useLoading();
 
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
@@ -66,6 +68,7 @@ export default function OrderDetailPage({
   const handleUploadSlip = async () => {
     if (!selectedSlip || !order) return;
     setUploadingSlip(true);
+    showLoading('กำลังอัปโหลดสลิปหลักฐานการชำระเงิน...');
     try {
       const { downloadUrl } = await uploadProductImage(selectedSlip, 'slips');
       await updatePaymentProof(order.id, downloadUrl);
@@ -76,6 +79,7 @@ export default function OrderDetailPage({
       error(`เกิดข้อผิดพลาดในการอัปโหลด: ${err.message || 'กรุณาลองใหม่'}`);
     } finally {
       setUploadingSlip(false);
+      hideLoading();
     }
   };
 

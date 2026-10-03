@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
+import { useLoading } from '@/context/LoadingContext';
 import { updateUserProfile } from '@/lib/firestore/users';
 import { createTopupRequest, getUserTopups } from '@/lib/firestore/topups';
 import { redeemCodeForUser } from '@/lib/firestore/redeem';
@@ -53,6 +54,7 @@ function ProfileContent() {
 
   const { user, profile, refreshProfile } = useAuth();
   const { success, error, toast } = useToast();
+  const { showLoading, hideLoading } = useLoading();
 
   const [activeTab, setActiveTab] = useState(initialTab);
   const [isRefreshingBalance, setIsRefreshingBalance] = useState(false);
@@ -131,6 +133,7 @@ function ProfileContent() {
 
   const handleRefreshBalance = async () => {
     setIsRefreshingBalance(true);
+    showLoading('กำลังอัปเดตยอดเครดิต...');
     try {
       await refreshProfile();
       if (activeTab === 'topup') {
@@ -141,6 +144,7 @@ function ProfileContent() {
       error('ไม่สามารถรีเฟรชยอดเงินได้');
     } finally {
       setIsRefreshingBalance(false);
+      hideLoading();
     }
   };
 
@@ -162,6 +166,7 @@ function ProfileContent() {
       return;
     }
 
+    showLoading('กำลังประมวลผลรูปภาพสลิป...');
     try {
       setSlipFile(file);
       // Auto compress to lightweight data URL (safe for Firestore < 600,000 bytes)
@@ -169,6 +174,8 @@ function ProfileContent() {
       setSlipPreview(compressed);
     } catch (err: any) {
       error(err.message || 'ไม่สามารถประมวลผลรูปภาพได้');
+    } finally {
+      hideLoading();
     }
   };
 
@@ -184,6 +191,7 @@ function ProfileContent() {
     }
 
     setIsSubmittingTopup(true);
+    showLoading('กำลังอัปโหลดสลิปและส่งคำขอเติมเงิน...');
     try {
       let finalSlipUrl = slipPreview;
 
@@ -218,6 +226,7 @@ function ProfileContent() {
       error(`เกิดข้อผิดพลาด: ${err.message || 'ไม่สามารถส่งคำขอเติมเงินได้'}`);
     } finally {
       setIsSubmittingTopup(false);
+      hideLoading();
     }
   };
 
@@ -228,6 +237,7 @@ function ProfileContent() {
       return;
     }
     setIsRedeeming(true);
+    showLoading('กำลังตรวจสอบและแลกรับของขวัญ...');
     try {
       const res = await redeemCodeForUser(redeemCodeInput, user.uid);
       if (res.success) {
@@ -241,6 +251,7 @@ function ProfileContent() {
       error(err.message || 'เกิดข้อผิดพลาดในการแลกโค้ด');
     } finally {
       setIsRedeeming(false);
+      hideLoading();
     }
   };
 

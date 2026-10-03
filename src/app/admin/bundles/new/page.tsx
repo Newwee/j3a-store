@@ -21,6 +21,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
+import { useLoading } from '@/context/LoadingContext';
 import { getProducts } from '@/lib/firestore/products';
 import { createBundle } from '@/lib/firestore/bundles';
 import { Product } from '@/types/product';
@@ -35,6 +36,7 @@ import { slugify } from '@/lib/utils/formatters';
 export default function CreateBundlePage() {
   const router = useRouter();
   const { success, error, toast } = useToast();
+  const { showLoading, hideLoading } = useLoading();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Products from store
@@ -168,6 +170,7 @@ export default function CreateBundlePage() {
     }
 
     setIsSaving(true);
+    showLoading('กำลังสร้างและบันทึกแพ็กเกจ Bundle...');
     let finalImageUrl = imagePreview || selectedProducts[0]?.image || '/logo.png';
 
     try {
@@ -235,6 +238,7 @@ export default function CreateBundlePage() {
       error(`ไม่สามารถบันทึก Bundle: ${err.message || 'เกิดข้อผิดพลาด'}`);
     } finally {
       setIsSaving(false);
+      hideLoading();
     }
   };
 

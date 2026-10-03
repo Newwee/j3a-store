@@ -21,6 +21,7 @@ import {
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
+import { useLoading } from '@/context/LoadingContext';
 import { createOrder } from '@/lib/firestore/orders';
 import { deductUserCredits } from '@/lib/firestore/users';
 import { PaymentMethod } from '@/types/order';
@@ -38,6 +39,7 @@ export default function CheckoutPage() {
   const { items, subtotal, shipping, total, clearCart } = useCart();
   const { user, profile, refreshProfile } = useAuth();
   const { success, error, toast } = useToast();
+  const { showLoading, hideLoading } = useLoading();
 
   const [storeSettings, setStoreSettings] = useState<StoreSettings>(DEFAULT_STORE_SETTINGS);
   const [mounted, setMounted] = useState(false);
@@ -171,6 +173,7 @@ export default function CheckoutPage() {
     }
 
     setIsProcessing(true);
+    showLoading(paymentMethod === 'wallet' ? 'กำลังตัดยอดเครดิตและสร้างคำสั่งซื้อ...' : 'กำลังประมวลผลคำสั่งซื้อและส่งข้อมูล...');
 
     try {
       // 1. Process Wallet Payment Deduction
@@ -178,6 +181,7 @@ export default function CheckoutPage() {
         if (!user) {
           error('กรุณาเข้าสู่ระบบก่อนทำการชำระเงินด้วยยอดเงินในเว็บไซต์');
           setIsProcessing(false);
+          hideLoading();
           return;
         }
         if (userCredits < total) {
@@ -282,6 +286,7 @@ export default function CheckoutPage() {
       error(`เกิดข้อผิดพลาดในการสร้างคำสั่งซื้อ: ${err.message || 'กรุณาลองใหม่อีกครั้ง'}`);
     } finally {
       setIsProcessing(false);
+      hideLoading();
     }
   };
 

@@ -19,14 +19,6 @@ body {
   color: var(--foreground);
   font-family: var(--font-prompt), var(--font-inter), system-ui, -apple-system, sans-serif;
   overflow-x: hidden;
-  background-image: 
-    radial-gradient(circle at 50% 0%, rgba(6, 182, 212, 0.15) 0%, transparent 50%),
-    radial-gradient(circle at 85% 30%, rgba(168, 85, 247, 0.1) 0%, transparent 40%),
-    radial-gradient(circle at 15% 70%, rgba(6, 182, 212, 0.08) 0%, transparent 45%),
-    linear-gradient(to right, rgba(6, 182, 212, 0.04) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(6, 182, 212, 0.04) 1px, transparent 1px);
-  background-size: 100% 100%, 100% 100%, 100% 100%, 36px 36px, 36px 36px;
-  background-attachment: fixed;
 }
 
 /* ============================================================================
@@ -115,6 +107,45 @@ body {
 .rb-pill:hover {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.16);
+}
+
+/* ============================================================================
+   Aurora Drift Animations (Smooth GPU Transitions)
+   ============================================================================ */
+@keyframes aurora-drift-1 {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(60px, 45px, 0) scale(1.08);
+  }
+  100% {
+    transform: translate3d(-35px, 70px, 0) scale(0.96);
+  }
+}
+
+@keyframes aurora-drift-2 {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(-55px, -35px, 0) scale(1.1);
+  }
+  100% {
+    transform: translate3d(45px, -50px, 0) scale(0.98);
+  }
+}
+
+@keyframes aurora-drift-3 {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(45px, -40px, 0) scale(1.07);
+  }
+  100% {
+    transform: translate3d(-40px, 35px, 0) scale(1.02);
+  }
 }
 
 /* ============================================================================
