@@ -34,7 +34,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { useLoading } from '@/context/LoadingContext';
 import { updateUserProfile } from '@/lib/firestore/users';
-import { createTopupRequest, getUserTopups } from '@/lib/firestore/topups';
+import { createTopupRequest, getUserTopups, subscribeUserTopups } from '@/lib/firestore/topups';
 import { redeemCodeForUser } from '@/lib/firestore/redeem';
 import { getStoreSettings, DEFAULT_STORE_SETTINGS } from '@/lib/firestore/settings';
 import { StoreSettings } from '@/types/settings';
@@ -113,7 +113,12 @@ function ProfileContent() {
 
   useEffect(() => {
     if (activeTab === 'topup' && user) {
-      loadTopupHistory();
+      setLoadingTopups(true);
+      const unsubscribe = subscribeUserTopups(user.uid, (history) => {
+        setUserTopups(history);
+        setLoadingTopups(false);
+      });
+      return () => unsubscribe();
     }
   }, [activeTab, user]);
 

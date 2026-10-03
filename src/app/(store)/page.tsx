@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Sparkles, Flame, Clock } from 'lucide-react';
 import { Product } from '@/types/product';
-import { getProducts } from '@/lib/firestore/products';
+import { getProducts, subscribeProducts } from '@/lib/firestore/products';
 import { HeroSection } from '@/components/home/HeroSection';
 import { LiveStatsSection } from '@/components/home/LiveStatsSection';
 import { FeaturedProductsSection } from '@/components/home/FeaturedProductsSection';
@@ -23,49 +23,23 @@ export default function HomePage() {
   const [loadingNew, setLoadingNew] = useState(true);
 
   useEffect(() => {
-    let isMounted = true;
+    setLoadingFeatured(true);
+    setLoadingNew(true);
 
-    async function loadData() {
-      try {
-        // Fetch featured products and new arrivals concurrently
-        const [featured, newest] = await Promise.all([
-          getProducts({
-            status: 'active',
-            featured: true,
-            limitCount: 8,
-          }),
-          getProducts({
-            status: 'active',
-            sortBy: 'newest',
-            limitCount: 8,
-          }),
-        ]);
+    const unsubscribe = subscribeProducts((prods) => {
+      const active = prods.filter((p) => p.status === 'active');
+      const featured = active.filter((p) => p.featured);
+      setFeaturedProducts(featured.length > 0 ? featured.slice(0, 8) : active.slice(0, 8));
+      setLoadingFeatured(false);
 
-        if (isMounted) {
-          if (featured.length > 0) {
-            setFeaturedProducts(featured);
-          } else {
-            const allActive = await getProducts({ status: 'active', limitCount: 8 });
-            if (isMounted) setFeaturedProducts(allActive);
-          }
-          setLoadingFeatured(false);
-          setNewArrivals(newest);
-          setLoadingNew(false);
-        }
-      } catch (err) {
-        console.error('Error loading products for homepage:', err);
-        if (isMounted) {
-          setLoadingFeatured(false);
-          setLoadingNew(false);
-        }
-      }
-    }
+      const sortedNew = [...active].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      setNewArrivals(sortedNew.slice(0, 8));
+      setLoadingNew(false);
+    }, { status: 'active' });
 
-    loadData();
-
-    return () => {
-      isMounted = false;
-    };
+    return () => unsubscribe();
   }, []);
 
   return (

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import {
   User as FirebaseUser,
   onAuthStateChanged,
@@ -13,8 +13,19 @@ import {
   signInWithPopup,
 } from 'firebase/auth';
 import { auth, isFirebaseConfigured } from '@/lib/firebase/client';
-import { getUserProfile, createUserProfile, updateUserProfile } from '@/lib/firestore/users';
+import {
+  getUserProfile,
+  createUserProfile,
+  updateUserProfile,
+  subscribeUserProfile,
+} from '@/lib/firestore/users';
+import {
+  getUserDeletionRequest,
+  subscribeUserDeletionRequest,
+} from '@/lib/firestore/deletionRequests';
 import { UserProfile, UserRole } from '@/types/user';
+import { useToast } from '@/context/ToastContext';
+import { useLoading } from '@/context/LoadingContext';
 
 interface AuthContextType {
   user: FirebaseUser | null;
@@ -38,9 +49,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const { toast } = useToast();
+  const { showLoading, hideLoading } = useLoading();
+  const prevCreditsRef = useRef<number | null>(null);
+  const isKickingOutRef = useRef(false);
+
   // Sync profile from Firestore
   const syncProfile = useCallback(async (firebaseUser: FirebaseUser) => {
     try {
+      // 1. Guard against deleted accounts
+      const delReq = await getUserDeletionRequest(firebaseUser.uid);
+      if (delReq?.status === 'approved') {
+        if (!isKickingOutRef.current) {
+          isKickingOutRef.current = true;
+          showLoading('บัญชีของคุณได้รับการอนุมัติการลบออกจากระบบเรียบร้อยแล้ว กำลังออกจากระบบ...');
+          if (auth) await signOut(auth);
+          setUser(null);
+          setProfile(null);
+          setTimeout(() => {
+            hideLoading();
+            toast('บัญชีผู้ใช้นี้ถูกลบออกจากระบบเรียบร้อยแล้ว', 'info');
+            if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+              window.location.href = '/login?deleted=true';
+            }
+          }, 1200);
+        }
+        return;
+      }
+
       let p = await getUserProfile(firebaseUser.uid);
       const effectiveName = (firebaseUser.displayName && firebaseUser.displayName !== 'Customer')
         ? firebaseUser.displayName
@@ -65,7 +101,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
       setProfile(p);
-    } catch (err) {
+      prevCreditsRef.current = p ? p.credits : 0;
+    } catch (err: any) {
+      if (err.message?.includes('บัญชีผู้ใช้นี้ถูกลบ')) {
+        if (!isKickingOutRef.current) {
+          isKickingOutRef.current = true;
+          showLoading('บัญชีของคุณถูกลบออกจากระบบเรียบร้อยแล้ว...');
+          if (auth) await signOut(auth);
+          setUser(null);
+          setProfile(null);
+          setTimeout(() => {
+            hideLoading();
+            toast('บัญชีผู้ใช้นี้ถูกลบออกจากระบบเรียบร้อยแล้ว', 'info');
+            if (typeof window !== 'undefined') window.location.href = '/login?deleted=true';
+          }, 1200);
+        }
+        return;
+      }
+
       console.error('Error syncing user profile from Firestore:', err);
       const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'pongpataradanai@gmail.com,admin@j3astore.com,mynameisyee0@gmail.com')
         .toLowerCase()
@@ -89,7 +142,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         updatedAt: new Date().toISOString(),
       });
     }
-  }, []);
+  }, [showLoading, hideLoading, toast]);
 
   const refreshProfile = useCallback(async () => {
     if (user) {
@@ -103,18 +156,94 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    let unsubProfile: (() => void) | undefined;
+    let unsubDeletion: (() => void) | undefined;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
+
+      // Clean up previous listeners
+      if (unsubProfile) {
+        unsubProfile();
+        unsubProfile = undefined;
+      }
+      if (unsubDeletion) {
+        unsubDeletion();
+        unsubDeletion = undefined;
+      }
+
       if (currentUser) {
         await syncProfile(currentUser);
+
+        // 1. Real-time User Profile & Credits listener
+        unsubProfile = subscribeUserProfile(currentUser.uid, async (updatedProfile) => {
+          if (updatedProfile) {
+            // Check for credit changes
+            if (prevCreditsRef.current !== null && prevCreditsRef.current !== updatedProfile.credits) {
+              const diff = updatedProfile.credits - prevCreditsRef.current;
+              if (diff > 0) {
+                toast(`🎉 แอดมินได้อนุมัติ/เติมเครดิตเข้าบัญชีแล้ว! +฿${diff} (ยอดคงเหลือ ฿${updatedProfile.credits})`, 'success');
+              } else if (diff < 0) {
+                toast(`💳 ยอดเครดิตในบัญชีของคุณได้รับการอัปเดต: คงเหลือ ฿${updatedProfile.credits}`, 'info');
+              }
+            }
+            prevCreditsRef.current = updatedProfile.credits;
+            setProfile(updatedProfile);
+          } else {
+            // Document was deleted from users collection
+            const delReq = await getUserDeletionRequest(currentUser.uid);
+            if (delReq?.status === 'approved') {
+              if (!isKickingOutRef.current) {
+                isKickingOutRef.current = true;
+                showLoading('บัญชีของคุณได้รับการอนุมัติการลบออกจากระบบเรียบร้อยแล้ว กำลังออกจากระบบ...');
+                if (auth) await signOut(auth);
+                setUser(null);
+                setProfile(null);
+                setTimeout(() => {
+                  hideLoading();
+                  toast('บัญชีผู้ใช้นี้ถูกลบออกจากระบบเรียบร้อยแล้ว', 'info');
+                  if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+                    window.location.href = '/login?deleted=true';
+                  }
+                }, 1400);
+              }
+            }
+          }
+        });
+
+        // 2. Real-time Deletion Request listener
+        unsubDeletion = subscribeUserDeletionRequest(currentUser.uid, async (delReq) => {
+          if (delReq?.status === 'approved') {
+            if (!isKickingOutRef.current) {
+              isKickingOutRef.current = true;
+              showLoading('บัญชีของคุณได้รับการอนุมัติการลบออกจากระบบเรียบร้อยแล้ว กำลังออกจากระบบ...');
+              if (auth) await signOut(auth);
+              setUser(null);
+              setProfile(null);
+              setTimeout(() => {
+                hideLoading();
+                toast('บัญชีผู้ใช้ของคุณถูกลบออกจากระบบเรียบร้อยแล้ว', 'info');
+                if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+                  window.location.href = '/login?deleted=true';
+                }
+              }, 1500);
+            }
+          }
+        });
       } else {
         setProfile(null);
+        prevCreditsRef.current = null;
+        isKickingOutRef.current = false;
       }
       setLoading(false);
     });
 
-    return () => unsubscribe();
-  }, [syncProfile]);
+    return () => {
+      if (unsubProfile) unsubProfile();
+      if (unsubDeletion) unsubDeletion();
+      unsubscribeAuth();
+    };
+  }, [syncProfile, showLoading, hideLoading, toast]);
 
   const login = async (email: string, pass: string) => {
     if (!auth) throw new Error('Firebase Auth ไม่ได้เปิดใช้งาน กรุณาตั้งค่า .env.local');

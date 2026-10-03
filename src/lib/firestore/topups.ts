@@ -9,6 +9,7 @@ import {
   where,
   serverTimestamp,
   Timestamp,
+  onSnapshot,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { TopupRequest, CreateTopupInput, TopupStatus } from '@/types/topup';
@@ -182,4 +183,28 @@ export async function rejectTopup(topupId: string, reason?: string): Promise<voi
     adminNote: reason || 'สลิปไม่ถูกต้อง หรือไม่พบยอดเงินเข้าบัญชี',
     updatedAt: serverTimestamp(),
   });
+}
+
+/**
+ * Real-time subscription to user's top-up requests
+ */
+export function subscribeUserTopups(
+  userId: string,
+  callback: (topups: TopupRequest[]) => void
+): () => void {
+  if (!db || !userId) return () => {};
+
+  const colRef = collection(db, TOPUPS_COLLECTION);
+  const q = query(colRef, where('userId', '==', userId));
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const topups = snapshot.docs.map(mapDocToTopup);
+      topups.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      callback(topups);
+    },
+    (err) => {
+      console.warn('subscribeUserTopups error:', err);
+    }
+  );
 }

@@ -12,6 +12,7 @@ import {
   limit,
   serverTimestamp,
   Timestamp,
+  onSnapshot,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { BundlePackage, BundleFormData, BundleStatus } from '@/types/bundle';
@@ -266,4 +267,32 @@ export function bundleToProduct(bundle: BundlePackage): Product {
     createdAt: bundle.createdAt,
     updatedAt: bundle.updatedAt,
   };
+}
+
+/**
+ * Real-time subscription to active bundles list
+ */
+export function subscribeBundles(
+  callback: (bundles: BundlePackage[]) => void,
+  options?: { status?: BundleStatus }
+): () => void {
+  if (!db) return () => {};
+
+  const colRef = collection(db, BUNDLES_COLLECTION);
+  const constraints: any[] = [];
+  if (options?.status) {
+    constraints.push(where('status', '==', options.status));
+  }
+
+  const q = query(colRef, ...constraints);
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const bundles = snapshot.docs.map(mapDocToBundle);
+      callback(bundles);
+    },
+    (err) => {
+      console.warn('subscribeBundles error:', err);
+    }
+  );
 }

@@ -117,13 +117,13 @@ export default function RootLayout({
             targetSelector=".cursor-target, button, a, [role='button']"
           />
           <ToastProvider>
-            <AuthProvider>
-              <CartProvider>
-                <LoadingProvider>
+            <LoadingProvider>
+              <AuthProvider>
+                <CartProvider>
                   {children}
-                </LoadingProvider>
-              </CartProvider>
-            </AuthProvider>
+                </CartProvider>
+              </AuthProvider>
+            </LoadingProvider>
           </ToastProvider>
         </ThemeProvider>
       </body>

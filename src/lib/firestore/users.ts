@@ -11,9 +11,11 @@ import {
   serverTimestamp,
   Timestamp,
   increment,
+  onSnapshot,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { UserProfile, UserRole, UserTier } from '@/types/user';
+import { getUserDeletionRequest } from './deletionRequests';
 
 const USERS_COLLECTION = 'users';
 
@@ -98,6 +100,18 @@ export async function createUserProfile(
   data: Partial<UserProfile>
 ): Promise<UserProfile> {
   if (!db) throw new Error('Firestore is not initialized.');
+
+  // Guard: If account was deleted/approved by admin, prevent recreating profile!
+  try {
+    const deletionReq = await getUserDeletionRequest(uid);
+    if (deletionReq?.status === 'approved') {
+      throw new Error('บัญชีผู้ใช้นี้ถูกลบออกจากระบบแล้ว ไม่สามารถสร้างหรือเข้าสู่ระบบได้อีก');
+    }
+  } catch (err: any) {
+    if (err.message?.includes('บัญชีผู้ใช้นี้ถูกลบ')) {
+      throw err;
+    }
+  }
 
   const docRef = doc(db, USERS_COLLECTION, uid);
   const existing = await getDoc(docRef);
@@ -238,5 +252,37 @@ export async function deleteUserDoc(uid: string): Promise<void> {
   if (!db) throw new Error('Firestore is not initialized.');
   const docRef = doc(db, USERS_COLLECTION, uid);
   await deleteDoc(docRef);
+}
+
+/**
+ * Real-time subscription to user profile updates
+ */
+export function subscribeUserProfile(
+  uid: string,
+  onProfile: (profile: UserProfile | null) => void,
+  onError?: (error: any) => void
+): () => void {
+  if (!db || !uid) return () => {};
+
+  const docRef = doc(db, USERS_COLLECTION, uid);
+  return onSnapshot(
+    docRef,
+    (snap) => {
+      if (!snap.exists()) {
+        onProfile(null);
+        return;
+      }
+      const profile = mapDocToUserProfile(snap);
+      const adminEmails = getAdminEmails();
+      if (profile.email && adminEmails.includes(profile.email.toLowerCase())) {
+        profile.role = 'admin';
+      }
+      onProfile(profile);
+    },
+    (err) => {
+      console.warn('subscribeUserProfile error:', err);
+      if (onError) onError(err);
+    }
+  );
 }
 

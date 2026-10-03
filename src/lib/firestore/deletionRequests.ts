@@ -11,6 +11,7 @@ import {
   limit,
   serverTimestamp,
   Timestamp,
+  onSnapshot,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { DeletionRequest, DeletionRequestStatus } from '@/types/user';
@@ -193,4 +194,29 @@ export async function cancelAccountDeletion(userId: string): Promise<void> {
     status: 'cancelled',
     updatedAt: serverTimestamp(),
   });
+}
+
+/**
+ * Real-time subscription to user's deletion request
+ */
+export function subscribeUserDeletionRequest(
+  userId: string,
+  callback: (request: DeletionRequest | null) => void
+): () => void {
+  if (!db || !userId) return () => {};
+
+  const docRef = doc(db, DELETION_REQUESTS_COLLECTION, userId);
+  return onSnapshot(
+    docRef,
+    (snap) => {
+      if (!snap.exists()) {
+        callback(null);
+        return;
+      }
+      callback(mapDocToDeletionRequest(snap));
+    },
+    (err) => {
+      console.warn('subscribeUserDeletionRequest error:', err);
+    }
+  );
 }

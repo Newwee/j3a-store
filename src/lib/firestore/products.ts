@@ -12,6 +12,7 @@ import {
   limit,
   serverTimestamp,
   Timestamp,
+  onSnapshot,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { Product, ProductFormData, ProductStatus } from '@/types/product';
@@ -314,4 +315,35 @@ export async function getDistinctCategories(): Promise<string[]> {
     }
   });
   return Array.from(set);
+}
+
+/**
+ * Real-time subscription to products list
+ */
+export function subscribeProducts(
+  callback: (products: Product[]) => void,
+  options?: { status?: ProductStatus; category?: string }
+): () => void {
+  if (!db) return () => {};
+
+  const colRef = collection(db, PRODUCTS_COLLECTION);
+  const constraints: any[] = [];
+  if (options?.status) {
+    constraints.push(where('status', '==', options.status));
+  }
+  if (options?.category && options.category !== 'all') {
+    constraints.push(where('category', '==', options.category));
+  }
+
+  const q = query(colRef, ...constraints);
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const products = snapshot.docs.map(mapDocToProduct);
+      callback(products);
+    },
+    (err) => {
+      console.warn('subscribeProducts error:', err);
+    }
+  );
 }

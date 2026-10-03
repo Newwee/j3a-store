@@ -5,8 +5,8 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { Store, Layers, Sparkles, Filter, Loader2, Flame } from 'lucide-react';
 import { Product } from '@/types/product';
 import { BundlePackage } from '@/types/bundle';
-import { getProducts, getDistinctCategories } from '@/lib/firestore/products';
-import { getBundles } from '@/lib/firestore/bundles';
+import { getProducts, getDistinctCategories, subscribeProducts } from '@/lib/firestore/products';
+import { getBundles, subscribeBundles } from '@/lib/firestore/bundles';
 import { ProductCard } from '@/components/product/ProductCard';
 import { BundleCard } from '@/components/bundle/BundleCard';
 import { ProductFilter } from '@/components/product/ProductFilter';
@@ -33,20 +33,12 @@ function ShopContent() {
   const [sortBy, setSortBy] = useState(initialSort);
   const [inStockOnly, setInStockOnly] = useState(false);
 
-  // Load distinct categories and active bundles on mount
+  // Load distinct categories and active bundles on mount with real-time sync
   useEffect(() => {
-    async function loadInitialData() {
+    async function loadCategories() {
       try {
-        const [cats, bList] = await Promise.all([
-          getDistinctCategories(),
-          getBundles({ status: 'active' }),
-        ]);
-
-        if (bList.length > 0) {
-          setBundles(bList);
-          const baseCats = cats.length > 0 ? cats : ['เกมยอดนิยม', 'บัตรเติมเงิน', 'บริการดิจิทัล'];
-          setCategories(['แพ็กเกจสุดคุ้ม (Bundle)', ...baseCats.filter((c) => c !== 'แพ็กเกจสุดคุ้ม (Bundle)')]);
-        } else if (cats.length > 0) {
+        const cats = await getDistinctCategories();
+        if (cats.length > 0) {
           setCategories(cats);
         } else {
           setCategories([
@@ -58,42 +50,57 @@ function ShopContent() {
           ]);
         }
       } catch (err) {
-        console.error('Error fetching categories and bundles:', err);
+        console.error('Error fetching categories:', err);
       }
     }
-    loadInitialData();
+    loadCategories();
+
+    // Real-time bundles subscription
+    const unsubBundles = subscribeBundles((bList) => {
+      setBundles(bList);
+      if (bList.length > 0) {
+        setCategories((prev) => [
+          'แพ็กเกจสุดคุ้ม (Bundle)',
+          ...prev.filter((c) => c !== 'แพ็กเกจสุดคุ้ม (Bundle)'),
+        ]);
+      }
+    }, { status: 'active' });
+
+    return () => unsubBundles();
   }, []);
 
-  // Fetch products with active filters
+  // Fetch products with active filters & real-time updates
   useEffect(() => {
-    let isMounted = true;
-    async function fetchFiltered() {
-      setIsLoading(true);
-      try {
-        const result = await getProducts({
-          status: 'active',
-          category: category !== 'all' ? category : undefined,
-          search: search.trim() || undefined,
-          sortBy: sortBy as any,
-        });
-
-        if (isMounted) {
-          setProducts(result);
-        }
-      } catch (err) {
-        console.error('Failed to load shop products:', err);
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+    setIsLoading(true);
+    const unsubscribe = subscribeProducts((prods) => {
+      let filtered = prods;
+      if (category !== 'all') {
+        filtered = filtered.filter((p) => p.category === category);
       }
-    }
+      if (search.trim()) {
+        const q = search.toLowerCase().trim();
+        filtered = filtered.filter(
+          (p) =>
+            p.name.toLowerCase().includes(q) ||
+            p.description.toLowerCase().includes(q) ||
+            p.category.toLowerCase().includes(q) ||
+            (p.tags && p.tags.some((t) => t.toLowerCase().includes(q)))
+        );
+      }
+      if (sortBy === 'price_asc') {
+        filtered.sort((a, b) => a.price - b.price);
+      } else if (sortBy === 'price_desc') {
+        filtered.sort((a, b) => b.price - a.price);
+      } else if (sortBy === 'rating') {
+        filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+      } else {
+        filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      }
+      setProducts(filtered);
+      setIsLoading(false);
+    }, { status: 'active', category: category !== 'all' ? category : undefined });
 
-    fetchFiltered();
-
-    return () => {
-      isMounted = false;
-    };
+    return () => unsubscribe();
   }, [category, search, sortBy]);
 
   // Client filter for inStockOnly
