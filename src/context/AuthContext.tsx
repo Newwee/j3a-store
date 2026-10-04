@@ -324,11 +324,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       provider: 'google',
       options: {
         redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/` : undefined,
+        skipBrowserRedirect: true,
       },
     });
 
     if (error) {
       throw error;
+    }
+
+    if (data?.url) {
+      try {
+        const checkRes = await fetch(data.url, { redirect: 'manual' });
+        if (checkRes.status === 400) {
+          const body = await checkRes.json().catch(() => ({}));
+          if (body.error_code === 'validation_failed' || body.msg?.includes('not enabled')) {
+            throw new Error(
+              '⚠️ ยังไม่ได้เปิดใช้งาน Google Provider บน Supabase Dashboard (Authentication > Providers > Google) กรุณาเข้าไปเปิดใช้งาน หรือเข้าสู่ระบบด้วยอีเมลและรหัสผ่าน'
+            );
+          }
+        }
+      } catch (checkErr: any) {
+        if (checkErr.message?.includes('Supabase Dashboard')) {
+          throw checkErr;
+        }
+      }
+
+      window.location.href = data.url;
     }
   };
 
