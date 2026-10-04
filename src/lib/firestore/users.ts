@@ -225,23 +225,24 @@ export function subscribeUserProfile(
   onProfile: (profile: UserProfile | null) => void,
   onError?: (error: any) => void
 ): () => void {
-  getUserProfile(uid).then(onProfile);
+  getUserProfile(uid).then(onProfile).catch(onError);
 
+  const channelName = `profile_${uid}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   const channel = supabase
-    .channel(`profile_${uid}`)
+    .channel(channelName)
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${uid}` },
       async () => {
-        const p = await getUserProfile(uid);
-        onProfile(p);
+        try {
+          const p = await getUserProfile(uid);
+          onProfile(p);
+        } catch (err) {
+          onError?.(err);
+        }
       }
     )
-    .subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        // Connected
-      }
-    });
+    .subscribe();
 
   return () => {
     supabase.removeChannel(channel);

@@ -237,14 +237,14 @@ export default function AdminBundlesPage() {
                     />
 
                     {/* Discount Badge */}
-                    {bundle.discountPercent > 0 && (
+                    {(bundle.discountPercent ?? 0) > 0 && (
                       <div className="absolute top-3 left-3 flex flex-col gap-1">
                         <span className="inline-flex items-center gap-1 text-[11px] font-black uppercase px-2.5 py-1 rounded-lg bg-rose-600 text-white shadow-lg">
                           <Flame className="w-3.5 h-3.5 fill-current" />
-                          ลด {bundle.discountPercent}%
+                          ลด {bundle.discountPercent || 0}%
                         </span>
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-cyan-500/90 text-slate-950 shadow-sm">
-                          ประหยัด ฿{bundle.savings.toLocaleString()}
+                          ประหยัด ฿{(bundle.savings ?? 0).toLocaleString()}
                         </span>
                       </div>
                     )}
@@ -291,14 +291,14 @@ export default function AdminBundlesPage() {
                           >
                             <div className="flex items-center gap-2 min-w-0">
                               <div className="relative w-6 h-6 rounded overflow-hidden shrink-0 bg-slate-900">
-                                <SafeImage src={item.image} alt={item.name} fill className="object-cover" />
+                                <SafeImage src={item?.image || '/images/default-avatar.png'} alt={item?.name || 'สินค้า'} fill className="object-cover" />
                               </div>
                               <span className="text-slate-300 truncate text-[11px] font-medium">
-                                {item.name}
+                                {item?.name || 'สินค้า'}
                               </span>
                             </div>
                             <span className="text-slate-400 text-[11px] shrink-0 font-mono">
-                              ฿{item.price.toLocaleString()}
+                              ฿{(item?.price ?? 0).toLocaleString()}
                             </span>
                           </div>
                         ))}
@@ -309,11 +309,11 @@ export default function AdminBundlesPage() {
                     <div className="pt-3 border-t border-slate-800 flex items-baseline justify-between">
                       <div className="text-xs text-slate-500">
                         จากราคาปกติ{' '}
-                        <span className="line-through">฿{bundle.originalPrice.toLocaleString()}</span>
+                        <span className="line-through">฿{(bundle.originalPrice ?? 0).toLocaleString()}</span>
                       </div>
                       <div className="text-right">
                         <div className="text-xl font-black text-cyan-400">
-                          ฿{bundle.price.toLocaleString()}
+                          ฿{(bundle.price ?? 0).toLocaleString()}
                         </div>
                       </div>
                     </div>

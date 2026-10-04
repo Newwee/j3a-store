@@ -583,9 +583,9 @@ export default function AdminCustomersPage() {
                           </td>
 
                           <td className="py-3 px-4 whitespace-nowrap">
-                            {req.credits > 0 ? (
+                            {(req.credits ?? 0) > 0 ? (
                               <span className="font-mono font-bold text-amber-400 bg-amber-500/10 px-2 py-1 rounded-lg border border-amber-500/30">
-                                ฿{req.credits.toLocaleString()} บาท
+                                ฿{(req.credits ?? 0).toLocaleString()} บาท
                               </span>
                             ) : (
                               <span className="font-mono text-slate-500">฿0</span>
@@ -853,7 +853,7 @@ export default function AdminCustomersPage() {
               <div className="flex justify-between pt-1 border-t border-slate-800">
                 <span className="text-slate-400">เครดิตค้างอยู่ในระบบ:</span>
                 <span className="font-bold font-mono text-amber-400">
-                  ฿{approvingRequest.credits.toLocaleString()} บาท
+                  ฿{(approvingRequest.credits ?? 0).toLocaleString()} บาท
                 </span>
               </div>
               {approvingRequest.userReason && (

@@ -81,12 +81,56 @@ export async function checkReviewEligibility(
     const cleanSlug = productSlug ? productSlug.replace(/^bundle_/, '').toLowerCase() : '';
     const targetSlug = (productSlug || productId).toLowerCase();
 
+    // Check if user is Admin
+    const ADMIN_EMAILS = [
+      'pongpataradanai@gmail.com',
+      'admin@j3astore.com',
+      'mynameisyee0@gmail.com',
+      'ratchadejchaisomvit@gmail.com',
+    ];
+    const isAdmin = Boolean(userEmail && ADMIN_EMAILS.includes(userEmail.toLowerCase()));
+
+    if (isAdmin) {
+      const { data: existingReviews } = await supabase
+        .from('reviews')
+        .select('*')
+        .eq('user_id', userId);
+
+      const existingMatch = (existingReviews || []).find((r: any) => {
+        const rPid = (r.product_id || '').toLowerCase();
+        const rSlug = (r.product_slug || '').toLowerCase();
+        return (
+          rPid === productId.toLowerCase() ||
+          rSlug === targetSlug ||
+          (cleanId && rPid.replace(/^bundle_/, '') === cleanId) ||
+          (cleanSlug && rSlug === cleanSlug)
+        );
+      });
+
+      if (existingMatch) {
+        return {
+          canReview: false,
+          reason: 'already_reviewed',
+          message: 'คุณได้ให้คะแนนสินค้านี้เรียบร้อยแล้ว ขอบคุณสำหรับรีวิวของคุณ!',
+          orderId: 'admin_verified',
+          existingReview: mapRowToReview(existingMatch),
+        };
+      }
+
+      return {
+        canReview: true,
+        reason: 'eligible',
+        message: 'สิทธิ์ผู้ดูแลระบบ (Admin Verified): คุณสามารถให้คะแนนและรีวิวสินค้านี้ได้ทันที',
+        orderId: 'admin_verified',
+      };
+    }
+
     // Match orders containing this product or bundle
     const candidateOrders: any[] = [];
     userOrders.forEach((ord: any) => {
       const items = Array.isArray(ord.items) ? ord.items : [];
       const hasProduct = items.some((it: any) => {
-        const itemPid = (it.productId || '').toString().toLowerCase();
+        const itemPid = (it.productId || it.id || '').toString().toLowerCase();
         const itemCleanPid = itemPid.replace(/^bundle_/, '');
         const itemSlug = (it.slug || '').toString().toLowerCase();
         const itemName = (it.name || '').toString().toLowerCase();
@@ -100,7 +144,8 @@ export async function checkReviewEligibility(
           itemSlug === targetSlug ||
           (cleanSlug && itemSlug === cleanSlug) ||
           (cleanId && itemSlug === cleanId) ||
-          (cleanId && itemName.includes(cleanId))
+          (cleanId && itemName.includes(cleanId)) ||
+          (itemName.includes('bundle') && (itemName.includes(cleanId) || itemName.includes(cleanSlug)))
         );
       });
       if (hasProduct) {

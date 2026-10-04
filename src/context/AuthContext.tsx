@@ -121,6 +121,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setProfile(p);
       prevCreditsRef.current = p ? p.credits : 0;
+      if (typeof window !== 'undefined' && appUser.email) {
+        localStorage.setItem('j3a_last_google_email', appUser.email);
+      }
     } catch (err: any) {
       console.error('Error syncing user profile from Supabase:', err);
       const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'pongpataradanai@gmail.com,admin@j3astore.com,mynameisyee0@gmail.com')
@@ -317,14 +320,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const loginWithGoogle = async () => {
+    let savedGoogleEmail = '';
     if (typeof window !== 'undefined') {
       localStorage.setItem('j3a_last_auth_provider', 'google');
+      savedGoogleEmail = localStorage.getItem('j3a_last_google_email') || '';
     }
+
+    const queryParams: Record<string, string> = {
+      access_type: 'offline',
+    };
+    if (savedGoogleEmail) {
+      queryParams.login_hint = savedGoogleEmail;
+    }
+
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/` : undefined,
-        skipBrowserRedirect: true,
+        queryParams,
       },
     });
 
@@ -333,22 +346,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (data?.url) {
-      try {
-        const checkRes = await fetch(data.url, { redirect: 'manual' });
-        if (checkRes.status === 400) {
-          const body = await checkRes.json().catch(() => ({}));
-          if (body.error_code === 'validation_failed' || body.msg?.includes('not enabled')) {
-            throw new Error(
-              '⚠️ ยังไม่ได้เปิดใช้งาน Google Provider บน Supabase Dashboard (Authentication > Providers > Google) กรุณาเข้าไปเปิดใช้งาน หรือเข้าสู่ระบบด้วยอีเมลและรหัสผ่าน'
-            );
-          }
-        }
-      } catch (checkErr: any) {
-        if (checkErr.message?.includes('Supabase Dashboard')) {
-          throw checkErr;
-        }
-      }
-
       window.location.href = data.url;
     }
   };

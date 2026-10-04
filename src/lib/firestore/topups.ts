@@ -169,16 +169,21 @@ export function subscribeUserTopups(
   userId: string,
   callback: (topups: TopupRequest[]) => void
 ): () => void {
-  getUserTopups(userId).then(callback);
+  getUserTopups(userId).then(callback).catch(console.error);
 
+  const channelName = `topups_${userId}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   const channel = supabase
-    .channel(`topups_${userId}`)
+    .channel(channelName)
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'topups', filter: `user_id=eq.${userId}` },
       async () => {
-        const topups = await getUserTopups(userId);
-        callback(topups);
+        try {
+          const topups = await getUserTopups(userId);
+          callback(topups);
+        } catch (err) {
+          console.error(err);
+        }
       }
     )
     .subscribe();

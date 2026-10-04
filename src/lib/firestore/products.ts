@@ -320,15 +320,16 @@ export function subscribeProducts(
   options?: { status?: ProductStatus; category?: string }
 ): () => void {
   // Initial fetch
-  getProducts(options).then(callback);
+  getProducts(options).then(callback).catch(console.error);
 
+  const channelName = `products_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   const channel = supabase
-    .channel('products_realtime')
+    .channel(channelName)
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'products' },
       () => {
-        getProducts(options).then(callback);
+        getProducts(options).then(callback).catch(console.error);
       }
     )
     .subscribe();

@@ -3,11 +3,31 @@ import { BundlePackage, BundleFormData, BundleStatus } from '@/types/bundle';
 import { Product } from '@/types/product';
 
 function mapRowToBundle(row: any): BundlePackage {
-  const items = Array.isArray(row.items)
+  const rawItems = Array.isArray(row.items)
     ? row.items
     : typeof row.items === 'string'
     ? JSON.parse(row.items || '[]')
     : [];
+
+  const items = rawItems.map((item: any) => {
+    if (typeof item === 'string') {
+      if (item === 'prod_discord_profile') {
+        return { productId: item, name: 'J3A Discord Profile', price: 30, image: '/products/j3a-discord-profile.jpg' };
+      }
+      if (item === 'prod_discord_manager') {
+        return { productId: item, name: 'J3A Discord Manager', price: 50, image: '/products/j3a-discord-manager.jpg' };
+      }
+      return { productId: item, name: item, price: 0, image: '/logo.png' };
+    }
+    return {
+      productId: item.productId || item.id || '',
+      name: item.name || '',
+      price: Number(item.price) || 0,
+      image: item.image || '/logo.png',
+      category: item.category,
+      stock: item.stock,
+    };
+  });
 
   const images = Array.isArray(row.images)
     ? row.images
@@ -230,28 +250,30 @@ export async function deleteBundle(id: string): Promise<void> {
  * Helper to convert BundlePackage into standard Product format
  */
 export function bundleToProduct(bundle: BundlePackage): Product {
-  const itemNames = bundle.items.map((i) => `• ${i.name} (฿${i.price.toLocaleString()})`).join('\n');
+  const itemNames = (bundle.items || [])
+    .map((i) => `• ${i?.name || 'สินค้า'} (฿${(i?.price ?? 0).toLocaleString()})`)
+    .join('\n');
   return {
-    id: `bundle_${bundle.id}`,
-    name: `[Bundle] ${bundle.name}`,
+    id: bundle.id.startsWith('bundle_') ? bundle.id : `bundle_${bundle.id}`,
+    name: bundle.name.startsWith('[Bundle]') ? bundle.name : `[Bundle] ${bundle.name}`,
     slug: bundle.slug || `bundle-${bundle.id}`,
     description: `${bundle.description || 'แพ็กเกจรวมสินค้าราคาพิเศษ'}\n\nสินค้าที่ได้รับในแพ็กเกจ:\n${itemNames}`,
-    price: bundle.price,
+    price: bundle.price ?? 0,
     comparePrice: bundle.originalPrice,
-    image: bundle.image,
-    images: bundle.images && bundle.images.length > 0 ? bundle.images : [bundle.image],
+    image: bundle.image || '/logo.png',
+    images: bundle.images && bundle.images.length > 0 ? bundle.images : [bundle.image || '/logo.png'],
     category: 'แพ็กเกจบันเดิล (Bundle)',
-    stock: bundle.stock,
+    stock: bundle.stock ?? 999,
     status: bundle.status === 'active' ? 'active' : 'draft',
     featured: Boolean(bundle.featured),
     tags: ['bundle', 'package', 'discount', ...(bundle.tags || [])],
     specs: {
       'ประเภท': 'แพ็กเกจรวมสินค้าสุดคุ้ม (Bundle Package)',
-      'จำนวนสินค้าในชุด': `${bundle.items.length} ชิ้น`,
-      'ประหยัดได้': `฿${bundle.savings.toLocaleString()} (${bundle.discountPercent}% OFF)`,
+      'จำนวนสินค้าในชุด': `${bundle.items?.length || 0} ชิ้น`,
+      'ประหยัดได้': `฿${(bundle.savings ?? 0).toLocaleString()} (${bundle.discountPercent || 0}% OFF)`,
     },
-    rating: 5.0,
-    reviewCount: 0,
+    rating: (bundle as any).rating || 5.0,
+    reviewCount: (bundle as any).reviewCount || 0,
     createdAt: bundle.createdAt,
     updatedAt: bundle.updatedAt,
   };
@@ -264,15 +286,16 @@ export function subscribeBundles(
   callback: (bundles: BundlePackage[]) => void,
   options?: { status?: BundleStatus }
 ): () => void {
-  getBundles(options).then(callback);
+  getBundles(options).then(callback).catch(console.error);
 
+  const channelName = `bundles_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   const channel = supabase
-    .channel('bundles_realtime')
+    .channel(channelName)
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'bundles' },
       () => {
-        getBundles(options).then(callback);
+        getBundles(options).then(callback).catch(console.error);
       }
     )
     .subscribe();

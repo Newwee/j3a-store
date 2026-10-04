@@ -1,14 +1,16 @@
-export function formatCurrency(amount: number): string {
+export function formatCurrency(amount: number | undefined | null): string {
+  const safeAmount = typeof amount === 'number' && !isNaN(amount) ? amount : 0;
   return new Intl.NumberFormat('th-TH', {
     style: 'currency',
     currency: 'THB',
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
-  }).format(amount);
+  }).format(safeAmount);
 }
 
-export function formatNumber(num: number): string {
-  return new Intl.NumberFormat('th-TH').format(num);
+export function formatNumber(num: number | undefined | null): string {
+  const safeNum = typeof num === 'number' && !isNaN(num) ? num : 0;
+  return new Intl.NumberFormat('th-TH').format(safeNum);
 }
 
 export function formatDate(dateString: string | undefined | null): string {

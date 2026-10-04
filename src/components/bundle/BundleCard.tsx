@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import {
   Layers,
   ShoppingCart,
@@ -11,6 +12,7 @@ import {
   Info,
   ChevronDown,
   ChevronUp,
+  Star,
 } from 'lucide-react';
 import { BundlePackage } from '@/types/bundle';
 import { bundleToProduct } from '@/lib/firestore/bundles';
@@ -61,11 +63,11 @@ export function BundleCard({ bundle }: BundleCardProps) {
           <div className="absolute top-3 left-3 flex flex-col gap-1 z-10">
             <span className="inline-flex items-center gap-1 text-[11px] font-black uppercase px-2.5 py-1 rounded-lg bg-gradient-to-r from-rose-600 to-pink-600 text-white shadow-[0_0_12px_rgba(225,29,72,0.5)]">
               <Flame className="w-3.5 h-3.5 fill-current" />
-              ลด {bundle.discountPercent}%
+              ลด {bundle.discountPercent || 0}%
             </span>
-            {bundle.savings > 0 && (
+            {(bundle.savings ?? 0) > 0 && (
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-cyan-400 text-slate-950 shadow-sm">
-                ประหยัด ฿{bundle.savings.toLocaleString()}
+                ประหยัด ฿{(bundle.savings ?? 0).toLocaleString()}
               </span>
             )}
           </div>
@@ -95,9 +97,26 @@ export function BundleCard({ bundle }: BundleCardProps) {
               </span>
             </div>
 
-            <h3 className="font-black text-sm sm:text-base text-white group-hover:text-cyan-400 transition-colors line-clamp-1 leading-snug">
-              {bundle.name}
-            </h3>
+            <Link href={`/products/${bundle.slug || bundle.id}`} className="block group/link">
+              <h3 className="font-black text-sm sm:text-base text-white group-hover/link:text-cyan-400 transition-colors line-clamp-1 leading-snug">
+                {bundle.name}
+              </h3>
+            </Link>
+
+            {/* Bundle Rating & Review Link */}
+            <div className="flex items-center gap-2 mt-1.5">
+              <Link
+                href={`/products/${bundle.slug || bundle.id}?openReview=true`}
+                className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-400 hover:text-amber-300 transition-colors group/rate"
+                title="กดเพื่อให้คะแนนหรือดูรีวิวแพ็กเกจนี้"
+              >
+                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                <span>{((bundle as any).rating || 5.0).toFixed(1)}</span>
+                <span className="text-[10px] text-slate-400 font-normal group-hover/rate:text-cyan-400 underline ml-0.5">
+                  ({(bundle as any).reviewCount || 0} รีวิว • ให้คะแนน ⭐)
+                </span>
+              </Link>
+            </div>
 
             <p className="text-xs text-slate-400 line-clamp-2 mt-1 leading-relaxed">
               {bundle.description || 'แพ็กเกจรวมสินค้าสุดคุ้มในราคาพิเศษ'}
@@ -125,10 +144,10 @@ export function BundleCard({ bundle }: BundleCardProps) {
                   <div key={idx} className="flex items-center justify-between gap-2 text-[11px]">
                     <div className="flex items-center gap-1.5 truncate">
                       <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0" />
-                      <span className="text-slate-300 truncate">{item.name}</span>
+                      <span className="text-slate-300 truncate">{item?.name || 'สินค้า'}</span>
                     </div>
                     <span className="text-slate-500 font-mono shrink-0">
-                      ฿{item.price.toLocaleString()}
+                      ฿{(item?.price ?? 0).toLocaleString()}
                     </span>
                   </div>
                 ))}
@@ -140,10 +159,10 @@ export function BundleCard({ bundle }: BundleCardProps) {
           <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
             <div>
               <div className="text-[11px] text-slate-500 line-through">
-                ฿{bundle.originalPrice.toLocaleString()}
+                ฿{(bundle.originalPrice ?? 0).toLocaleString()}
               </div>
               <div className="text-lg sm:text-xl font-black text-cyan-400 leading-tight">
-                ฿{bundle.price.toLocaleString()}
+                ฿{(bundle.price ?? 0).toLocaleString()}
               </div>
             </div>
 
@@ -186,11 +205,13 @@ export function BundleCard({ bundle }: BundleCardProps) {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="text-xs font-black uppercase px-2.5 py-0.5 rounded-lg bg-rose-600 text-white">
-                ลด {bundle.discountPercent}%
+                ลด {bundle.discountPercent || 0}%
               </span>
-              <span className="text-xs font-bold text-cyan-400">
-                ประหยัด ฿{bundle.savings.toLocaleString()} บาท
-              </span>
+              {(bundle.savings ?? 0) > 0 && (
+                <span className="text-xs font-bold text-cyan-400">
+                  ประหยัด ฿{(bundle.savings ?? 0).toLocaleString()} บาท
+                </span>
+              )}
             </div>
             <p className="text-xs sm:text-sm text-slate-300 whitespace-pre-line leading-relaxed">
               {bundle.description || 'แพ็กเกจสุดคุ้มรวมสินค้าหลายรายการ'}
@@ -210,15 +231,15 @@ export function BundleCard({ bundle }: BundleCardProps) {
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className="relative w-8 h-8 rounded-lg bg-slate-900 overflow-hidden shrink-0">
-                      <SafeImage src={item.image} alt={item.name} fill className="object-cover" />
+                      <SafeImage src={item?.image || '/images/default-avatar.png'} alt={item?.name || 'สินค้า'} fill className="object-cover" />
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-white truncate">{item.name}</p>
-                      <p className="text-[10px] text-slate-400">{item.category || 'สินค้าทั่วไป'}</p>
+                      <p className="text-xs font-bold text-white truncate">{item?.name || 'สินค้า'}</p>
+                      <p className="text-[10px] text-slate-400">{item?.category || 'สินค้าทั่วไป'}</p>
                     </div>
                   </div>
                   <span className="text-xs font-bold text-slate-300 font-mono shrink-0">
-                    ฿{item.price.toLocaleString()}
+                    ฿{(item?.price ?? 0).toLocaleString()}
                   </span>
                 </div>
               ))}
@@ -229,10 +250,10 @@ export function BundleCard({ bundle }: BundleCardProps) {
           <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
             <div>
               <span className="text-xs text-slate-400 block">
-                ราคาปกติ ฿{bundle.originalPrice.toLocaleString()}
+                ราคาปกติ ฿{(bundle.originalPrice ?? 0).toLocaleString()}
               </span>
               <span className="text-xl font-black text-cyan-400">
-                พิเศษเพียง ฿{bundle.price.toLocaleString()}
+                พิเศษเพียง ฿{(bundle.price ?? 0).toLocaleString()}
               </span>
             </div>
 
@@ -249,6 +270,24 @@ export function BundleCard({ bundle }: BundleCardProps) {
             >
               สั่งซื้อแพ็กเกจนี้
             </Button>
+          </div>
+
+          {/* Action to Go to Detail & Review Page */}
+          <div className="pt-2 border-t border-slate-800/60">
+            <Link
+              href={`/products/${bundle.slug || bundle.id}?openReview=true`}
+              onClick={() => setShowDetailModal(false)}
+              className="block"
+            >
+              <Button
+                variant="secondary"
+                size="sm"
+                leftIcon={<Star className="w-4 h-4 text-amber-400 fill-amber-400" />}
+                className="w-full text-xs font-bold border-amber-500/30 text-amber-300 hover:bg-amber-500/10 justify-center cursor-pointer"
+              >
+                ⭐ ดูหน้ารายละเอียด & ให้คะแนนแพ็กเกจนี้
+              </Button>
+            </Link>
           </div>
         </div>
       </Modal>

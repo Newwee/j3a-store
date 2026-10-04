@@ -171,16 +171,21 @@ export function subscribeUserDeletionRequest(
   userId: string,
   callback: (request: DeletionRequest | null) => void
 ): () => void {
-  getUserDeletionRequest(userId).then(callback);
+  getUserDeletionRequest(userId).then(callback).catch(console.error);
 
+  const channelName = `deletion_req_${userId}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   const channel = supabase
-    .channel(`deletion_req_${userId}`)
+    .channel(channelName)
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'deletion_requests', filter: `user_id=eq.${userId}` },
       async () => {
-        const req = await getUserDeletionRequest(userId);
-        callback(req);
+        try {
+          const req = await getUserDeletionRequest(userId);
+          callback(req);
+        } catch (err) {
+          console.error(err);
+        }
       }
     )
     .subscribe();

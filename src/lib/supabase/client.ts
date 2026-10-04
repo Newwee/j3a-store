@@ -18,9 +18,9 @@ export const supabase =
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
+      storageKey: 'j3a_store_auth_token',
+      storage: typeof window !== 'undefined' ? window.localStorage : undefined,
     },
   });
 
-if (process.env.NODE_ENV !== 'production') {
-  globalForSupabase.supabaseInstance = supabase;
-}
+globalForSupabase.supabaseInstance = supabase;
