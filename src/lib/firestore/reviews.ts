@@ -89,7 +89,8 @@ export async function getProductReviews(productId: string): Promise<Review[]> {
 export async function checkReviewEligibility(
   productId: string,
   userId?: string | null,
-  userEmail?: string | null
+  userEmail?: string | null,
+  productSlug?: string | null
 ): Promise<ReviewEligibility> {
   if (!userId) {
     return {
@@ -113,14 +114,33 @@ export async function checkReviewEligibility(
     const q = query(ordersCol, where('userId', '==', userId));
     const snap = await getDocs(q);
 
-    // Match orders containing this product
+    const cleanId = productId ? productId.replace(/^bundle_/, '').toLowerCase() : '';
+    const cleanSlug = productSlug ? productSlug.replace(/^bundle_/, '').toLowerCase() : '';
+    const targetSlug = (productSlug || productId).toLowerCase();
+
+    // Match orders containing this product or bundle
     const candidateOrders: Order[] = [];
     snap.forEach((d) => {
       const ordData = d.data();
       const items = Array.isArray(ordData.items) ? ordData.items : [];
-      const hasProduct = items.some(
-        (it: any) => it.productId === productId || it.slug === productId
-      );
+      const hasProduct = items.some((it: any) => {
+        const itemPid = (it.productId || '').toString().toLowerCase();
+        const itemCleanPid = itemPid.replace(/^bundle_/, '');
+        const itemSlug = (it.slug || '').toString().toLowerCase();
+        const itemName = (it.name || '').toString().toLowerCase();
+
+        return (
+          itemPid === productId.toLowerCase() ||
+          itemPid === targetSlug ||
+          (cleanId && itemCleanPid === cleanId) ||
+          (cleanSlug && itemCleanPid === cleanSlug) ||
+          itemSlug === productId.toLowerCase() ||
+          itemSlug === targetSlug ||
+          (cleanSlug && itemSlug === cleanSlug) ||
+          (cleanId && itemSlug === cleanId) ||
+          (cleanId && itemName.includes(cleanId))
+        );
+      });
       if (hasProduct) {
         candidateOrders.push({ id: d.id, ...ordData } as Order);
       }
@@ -150,19 +170,30 @@ export async function checkReviewEligibility(
     const reviewsCol = collection(db, REVIEWS_COLLECTION);
     const revQuery = query(
       reviewsCol,
-      where('productId', '==', productId),
       where('userId', '==', userId)
     );
     const revSnap = await getDocs(revQuery);
 
-    if (!revSnap.empty) {
-      const existing = mapDocToReview(revSnap.docs[0]);
+    const existingMatch = revSnap.docs
+      .map(mapDocToReview)
+      .find((r) => {
+        const rPid = (r.productId || '').toLowerCase();
+        const rSlug = (r.productSlug || '').toLowerCase();
+        return (
+          rPid === productId.toLowerCase() ||
+          rSlug === targetSlug ||
+          (cleanId && rPid.replace(/^bundle_/, '') === cleanId) ||
+          (cleanSlug && rSlug === cleanSlug)
+        );
+      });
+
+    if (existingMatch) {
       return {
         canReview: false,
         reason: 'already_reviewed',
         message: 'คุณได้ให้คะแนนสินค้านี้เรียบร้อยแล้ว ขอบคุณสำหรับรีวิวของคุณ!',
         orderId: completedOrder.id,
-        existingReview: existing,
+        existingReview: existingMatch,
       };
     }
 
@@ -219,7 +250,7 @@ export async function submitProductReview(data: {
   const colRef = collection(db, REVIEWS_COLLECTION);
   const docRef = await addDoc(colRef, reviewDoc);
 
-  // Recalculate average rating for this product
+  // Recalculate average rating for this product or bundle
   try {
     const allReviews = await getProductReviews(data.productId);
     const totalCount = allReviews.length;
@@ -229,14 +260,24 @@ export async function submitProductReview(data: {
     }, 0);
     const avg = totalCount > 0 ? Number((sum / totalCount).toFixed(1)) : (star > 5 ? Number((star / 2).toFixed(1)) : star);
 
-    const prodDocRef = doc(db, PRODUCTS_COLLECTION, data.productId);
-    await updateDoc(prodDocRef, {
-      rating: avg,
-      reviewCount: totalCount,
-      updatedAt: serverTimestamp(),
-    });
+    if (data.productId.startsWith('bundle_')) {
+      const cleanBundleId = data.productId.replace(/^bundle_/, '');
+      const bundleDocRef = doc(db, 'bundles', cleanBundleId);
+      await updateDoc(bundleDocRef, {
+        rating: avg,
+        reviewCount: totalCount,
+        updatedAt: serverTimestamp(),
+      }).catch((e) => console.warn('Could not update bundle average rating:', e));
+    } else {
+      const prodDocRef = doc(db, PRODUCTS_COLLECTION, data.productId);
+      await updateDoc(prodDocRef, {
+        rating: avg,
+        reviewCount: totalCount,
+        updatedAt: serverTimestamp(),
+      }).catch((e) => console.warn('Could not update product average rating:', e));
+    }
   } catch (err) {
-    console.warn('Could not update product average rating:', err);
+    console.warn('Could not update average rating:', err);
   }
 
   return {

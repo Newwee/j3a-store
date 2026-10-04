@@ -1,18 +1,20 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
-import { Lock, Mail, ArrowRight, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Lock, Mail, ArrowRight, ShieldCheck, AlertCircle, Loader2, Sparkles } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 
-export default function LoginPage() {
+function LoginFormContent() {
   const router = useRouter();
-  const { login, loginWithGoogle, isFirebaseReady } = useAuth();
+  const searchParams = useSearchParams();
+  const redirectUrl = searchParams.get('redirect') || '/';
+  const { user, login, loginWithGoogle, isFirebaseReady } = useAuth();
   const { success, error } = useToast();
 
   const [email, setEmail] = useState('');
@@ -20,6 +22,27 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [wasGoogleUser, setWasGoogleUser] = useState(false);
+
+  // If already logged in, redirect immediately
+  useEffect(() => {
+    if (user) {
+      router.replace(redirectUrl);
+    }
+  }, [user, redirectUrl, router]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const last = localStorage.getItem('j3a_last_auth_provider');
+      if (last === 'google') {
+        setWasGoogleUser(true);
+      }
+      const savedEmail = localStorage.getItem('j3a_last_email');
+      if (savedEmail && !email) {
+        setEmail(savedEmail);
+      }
+    }
+  }, []);
 
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
@@ -27,7 +50,7 @@ export default function LoginPage() {
     try {
       await loginWithGoogle();
       success('เข้าสู่ระบบด้วย Google สำเร็จ ยินดีต้อนรับ!');
-      router.push('/');
+      router.push(redirectUrl);
       router.refresh();
     } catch (err: any) {
       console.error('Google Sign-in error:', err);
@@ -158,36 +181,49 @@ export default function LoginPage() {
           </div>
 
           {/* Google Sign-In Button */}
-          <button
-            type="button"
-            onClick={handleGoogleSignIn}
-            disabled={googleLoading || loading}
-            className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 hover:border-slate-600 text-slate-200 hover:text-white text-xs sm:text-sm font-semibold transition-all duration-200 shadow-sm active:scale-[0.98] disabled:opacity-50 cursor-pointer"
-          >
-            {googleLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
-            ) : (
-              <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.03 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
-                />
-              </svg>
+          <div className="relative">
+            {wasGoogleUser && (
+              <div className="absolute -top-2.5 right-3 z-10">
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 shadow-[0_0_10px_rgba(6,182,212,0.3)]">
+                  <Sparkles className="w-2.5 h-2.5" /> เข้าใช้งานล่าสุด
+                </span>
+              </div>
             )}
-            <span>เข้าสู่ระบบด้วย Google</span>
-          </button>
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={googleLoading || loading}
+              className={`w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl ${
+                wasGoogleUser
+                  ? 'bg-gradient-to-r from-cyan-950/40 via-slate-900 to-slate-900 hover:from-cyan-950/60 border-cyan-500/40 text-white shadow-[0_0_15px_rgba(6,182,212,0.15)]'
+                  : 'bg-slate-900/80 hover:bg-slate-800 border-slate-700/80 hover:border-slate-600 text-slate-200 hover:text-white'
+              } border text-xs sm:text-sm font-semibold transition-all duration-200 shadow-sm active:scale-[0.98] disabled:opacity-50 cursor-pointer`}
+            >
+              {googleLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
+              ) : (
+                <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.03 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+                  />
+                </svg>
+              )}
+              <span>เข้าสู่ระบบด้วย Google</span>
+            </button>
+          </div>
 
           {/* Footer Navigation */}
           <div className="pt-4 border-t border-slate-800 text-center text-xs text-slate-400">
@@ -199,5 +235,19 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="py-24 flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-cyan-400" />
+        </div>
+      }
+    >
+      <LoginFormContent />
+    </React.Suspense>
   );
 }

@@ -132,8 +132,24 @@ export async function getBundleBySlug(slug: string): Promise<BundlePackage | nul
     const colRef = collection(db, BUNDLES_COLLECTION);
     const q = query(colRef, where('slug', '==', slug), limit(1));
     const snap = await getDocs(q);
-    if (snap.empty) return null;
-    return mapDocToBundle(snap.docs[0]);
+    if (!snap.empty) {
+      return mapDocToBundle(snap.docs[0]);
+    }
+
+    // Resilient fallback: lookup by normalized slug or bundle ID
+    const normSlug = slug.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const allSnap = await getDocs(colRef);
+    const found = allSnap.docs
+      .map(mapDocToBundle)
+      .find((b) => {
+        if (!b) return false;
+        if (b.id === slug || b.id.replace(/^bundle_/, '') === slug.replace(/^bundle_/, '')) return true;
+        const bNorm = (b.slug || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const bNameNorm = (b.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        return bNorm === normSlug || bNameNorm.includes(normSlug) || normSlug.includes(bNorm);
+      });
+
+    return found || null;
   } catch (error) {
     console.error(`Error fetching bundle slug=${slug}:`, error);
     return null;

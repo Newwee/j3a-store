@@ -23,10 +23,14 @@ import { uploadProductImage } from '@/lib/storage/upload';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
 import { OrderStatusBadge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Modal } from '@/components/ui/Modal';
+import PeekRating from '@/components/ui/PeekRating';
 import { useToast } from '@/context/ToastContext';
+import { useAuth } from '@/context/AuthContext';
 import { useLoading } from '@/context/LoadingContext';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LicenseKeyDelivery, getDownloadUrlForProduct } from '@/components/license/LicenseKeyDelivery';
+import { submitProductReview } from '@/lib/firestore/reviews';
 
 export default function OrderDetailPage({
   params,
@@ -35,6 +39,7 @@ export default function OrderDetailPage({
 }) {
   const resolvedParams = use(params);
   const orderId = resolvedParams.id;
+  const { user } = useAuth();
   const { success, error } = useToast();
   const { showLoading, hideLoading } = useLoading();
 
@@ -42,6 +47,17 @@ export default function OrderDetailPage({
   const [loading, setLoading] = useState(true);
   const [uploadingSlip, setUploadingSlip] = useState(false);
   const [selectedSlip, setSelectedSlip] = useState<File | null>(null);
+
+  // Review Modal State
+  const [reviewItem, setReviewItem] = useState<{
+    productId?: string;
+    slug?: string;
+    name: string;
+  } | null>(null);
+  const [reviewRating, setReviewRating] = useState(10);
+  const [reviewComment, setReviewComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewedItemIds, setReviewedItemIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let isMounted = true;
@@ -80,6 +96,44 @@ export default function OrderDetailPage({
     } finally {
       setUploadingSlip(false);
       hideLoading();
+    }
+  };
+
+  const handleReviewSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reviewItem || !order || !user) {
+      error('กรุณาเข้าสู่ระบบก่อนให้คะแนน');
+      return;
+    }
+    if (!reviewComment.trim()) {
+      error('กรุณากรอกข้อความรีวิวสินค้า');
+      return;
+    }
+
+    setSubmittingReview(true);
+    try {
+      await submitProductReview({
+        productId: reviewItem.productId || reviewItem.slug || 'product',
+        productSlug: reviewItem.slug,
+        productName: reviewItem.name,
+        orderId: order.id,
+        userId: user.uid,
+        userName: user.displayName || user.email?.split('@')[0] || 'ผู้ซื้อที่ผ่านการยืนยัน',
+        userPhoto: user.photoURL || undefined,
+        rating: reviewRating,
+        comment: reviewComment.trim(),
+      });
+
+      success(`บันทึกคะแนนและรีวิวสินค้า "${reviewItem.name}" เรียบร้อยแล้ว ขอบคุณมากครับ!`);
+      const key = reviewItem.productId || reviewItem.slug || reviewItem.name;
+      setReviewedItemIds((prev) => new Set([...prev, key]));
+      setReviewItem(null);
+      setReviewComment('');
+    } catch (err: any) {
+      console.error('Error submitting review:', err);
+      error(err.message || 'เกิดข้อผิดพลาดในการบันทึกรีวิว');
+    } finally {
+      setSubmittingReview(false);
     }
   };
 
@@ -228,17 +282,43 @@ export default function OrderDetailPage({
                         </a>
                       );
                     })()}
-                    {order.status === 'completed' && (
-                      <Link href={`/products/${item.slug}?openReview=true`}>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          className="text-xs text-amber-300 border-amber-500/30 hover:bg-amber-500/10 hover:border-amber-400 font-bold"
-                        >
-                          ⭐ ให้คะแนน
-                        </Button>
-                      </Link>
-                    )}
+                    {order.status === 'completed' && (() => {
+                      const itemKey = item.productId || item.slug || item.name;
+                      const isReviewed = reviewedItemIds.has(itemKey);
+                      return (
+                        <div className="flex items-center gap-1.5">
+                          {isReviewed ? (
+                            <span className="text-xs text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1 rounded-xl">
+                              ✓ ให้คะแนนแล้ว
+                            </span>
+                          ) : (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => {
+                                setReviewItem({
+                                  productId: item.productId,
+                                  slug: item.slug,
+                                  name: item.name,
+                                });
+                                setReviewRating(10);
+                                setReviewComment('');
+                              }}
+                              className="text-xs text-amber-300 border-amber-500/30 hover:bg-amber-500/10 hover:border-amber-400 font-bold shadow-[0_0_12px_rgba(245,158,11,0.15)]"
+                            >
+                              ⭐ ให้คะแนน
+                            </Button>
+                          )}
+                          <Link
+                            href={`/products/${item.slug || item.productId}?openReview=true`}
+                            className="p-1.5 rounded-xl text-slate-400 hover:text-cyan-400 hover:bg-slate-800 transition-colors"
+                            title="ดูหน้ารายละเอียดและรีวิวสินค้า"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </Link>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               ))}
@@ -361,6 +441,79 @@ export default function OrderDetailPage({
           )}
         </div>
       </div>
+
+      {/* Quick In-Place Review Modal */}
+      <Modal
+        isOpen={Boolean(reviewItem)}
+        onClose={() => setReviewItem(null)}
+        title="⭐ ให้คะแนนและเขียนรีวิวสินค้า"
+        description={reviewItem?.name}
+      >
+        <form onSubmit={handleReviewSubmit} className="space-y-4 pt-2">
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-semibold text-slate-300">
+                ระดับคะแนนความพึงพอใจ:
+              </label>
+              <span className="text-xs font-bold text-amber-400">
+                {reviewRating} / 10 ดาว
+              </span>
+            </div>
+            <div className="flex items-center justify-center p-3 rounded-2xl bg-slate-950/80 border border-slate-800">
+              <PeekRating
+                value={reviewRating}
+                count={10}
+                onChange={(val) => setReviewRating(val)}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-slate-300 block mb-1.5">
+              ข้อความรีวิวสินค้า:
+            </label>
+            <textarea
+              value={reviewComment}
+              onChange={(e) => setReviewComment(e.target.value)}
+              rows={3}
+              placeholder="บอกเล่าความรู้สึก คุณภาพสินค้า หรือประสบการณ์การใช้งาน..."
+              className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs placeholder:text-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all"
+              required
+            />
+          </div>
+
+          <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+            {reviewItem?.slug && (
+              <Link
+                href={`/products/${reviewItem.slug}?openReview=true`}
+                className="text-[11px] text-slate-400 hover:text-cyan-400 flex items-center gap-1 transition-colors"
+                onClick={() => setReviewItem(null)}
+              >
+                <span>ดูหน้ารายละเอียดแบบเต็ม</span>
+                <ExternalLink className="w-3 h-3" />
+              </Link>
+            )}
+            <div className="flex items-center gap-2 ml-auto">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setReviewItem(null)}
+              >
+                ยกเลิก
+              </Button>
+              <Button
+                type="submit"
+                variant="neon"
+                size="sm"
+                disabled={submittingReview || !reviewComment.trim()}
+              >
+                {submittingReview ? 'กำลังบันทึก...' : `ส่งรีวิว (${reviewRating} ดาว)`}
+              </Button>
+            </div>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

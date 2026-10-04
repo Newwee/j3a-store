@@ -11,6 +11,8 @@ import {
   updateProfile,
   GoogleAuthProvider,
   signInWithPopup,
+  setPersistence,
+  browserLocalPersistence,
 } from 'firebase/auth';
 import { auth, isFirebaseConfigured } from '@/lib/firebase/client';
 import {
@@ -164,6 +166,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    // Explicitly guarantee browserLocalPersistence for staying logged in across closing & reopening browser
+    setPersistence(auth, browserLocalPersistence).catch((err) => {
+      console.warn('Could not set persistence on Firebase Auth:', err);
+    });
+
     let unsubProfile: (() => void) | undefined;
     let unsubDeletion: (() => void) | undefined;
 
@@ -286,10 +293,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loginWithGoogle = async () => {
     if (!auth) throw new Error('Firebase Auth ไม่ได้เปิดใช้งาน กรุณาตั้งค่า .env.local');
+    // Set local persistence so user remains logged in across closing and reopening browser
+    await setPersistence(auth, browserLocalPersistence).catch(() => {});
     const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: 'select_account' });
+    // Intentionally no forced 'select_account' prompt so Google automatically uses the existing session
     const cred = await signInWithPopup(auth, provider);
     if (cred.user) {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('j3a_last_auth_provider', 'google');
+        localStorage.setItem('j3a_last_email', cred.user.email || '');
+      }
       await clearOrArchiveDeletionRequest(cred.user.uid);
       await syncProfile(cred.user, { isExplicitLogin: true });
     }
@@ -298,6 +311,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     if (!auth) return;
     await signOut(auth);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('j3a_last_auth_provider');
+    }
     setUser(null);
     setProfile(null);
   };

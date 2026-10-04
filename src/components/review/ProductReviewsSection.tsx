@@ -59,7 +59,7 @@ export function ProductReviewsSection({
     try {
       const [revs, elig] = await Promise.all([
         getProductReviews(productId),
-        checkReviewEligibility(productId, user?.uid, user?.email),
+        checkReviewEligibility(productId, user?.uid, user?.email, productSlug),
       ]);
       setReviews(revs);
       setEligibility(elig);

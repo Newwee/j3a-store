@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { Product } from '@/types/product';
 import { getProductBySlug } from '@/lib/firestore/products';
+import { getBundleBySlug, getBundleById, bundleToProduct } from '@/lib/firestore/bundles';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { useCart } from '@/context/CartContext';
 import { useToast } from '@/context/ToastContext';
@@ -49,7 +50,14 @@ export default function ProductDetailPage({
     let isMounted = true;
     async function loadProduct() {
       try {
-        const item = await getProductBySlug(slug);
+        let item = await getProductBySlug(slug);
+        if (!item) {
+          const cleanSlug = slug.replace(/^bundle_/, '');
+          const bundle = (await getBundleBySlug(cleanSlug)) || (await getBundleById(cleanSlug));
+          if (bundle) {
+            item = bundleToProduct(bundle);
+          }
+        }
         if (isMounted) {
           setProduct(item);
         }
