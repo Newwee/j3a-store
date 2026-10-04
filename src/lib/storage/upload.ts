@@ -1,27 +1,22 @@
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
-import { storage } from '@/lib/firebase/client';
+import { supabase } from '@/lib/supabase/client';
+import { compressImageToDataUrl } from '@/lib/utils/image';
 
 export interface UploadProgressCallback {
   (progress: number): void;
 }
 
+const BUCKET_NAME = 'store-images';
+
 /**
- * Uploads an image file to Firebase Storage under the products directory
- * @param file The File object from input
- * @param path Optional custom directory path (default: 'products')
- * @param onProgress Optional callback receiving 0-100 percentage
- * @returns Promise resolving to public download URL and storage path
+ * Uploads an image file to Supabase Storage under the specified folder
+ * With automatic fallback to high-efficiency compressed base64 data URL if storage is unavailable.
  */
 export async function uploadProductImage(
   file: File,
   folder: string = 'products',
   onProgress?: UploadProgressCallback,
-  timeoutMs: number = 4000
+  timeoutMs: number = 6000
 ): Promise<{ downloadUrl: string; storagePath: string }> {
-  if (!storage) {
-    throw new Error('Firebase Storage is not initialized. Please verify your environment variables.');
-  }
-
   // Validate file type
   const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
   if (!validTypes.includes(file.type)) {
@@ -34,106 +29,76 @@ export async function uploadProductImage(
   }
 
   const timestamp = Date.now();
-  const sanitizedName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
-  const storagePath = `${folder}/${timestamp}_${sanitizedName}`;
-  const storageRef = ref(storage, storagePath);
+  const fileExt = file.name.split('.').pop() || 'png';
+  const cleanBaseName = file.name.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9]/g, '_');
+  const filePath = `${folder}/${timestamp}_${cleanBaseName}.${fileExt}`;
 
-  const uploadTask = uploadBytesResumable(storageRef, file, {
-    contentType: file.type,
-    customMetadata: {
-      uploadedAt: new Date().toISOString(),
-    },
-  });
+  if (onProgress) onProgress(20);
 
-  return new Promise((resolve, reject) => {
-    let timer: NodeJS.Timeout | null = null;
-    let isSettled = false;
+  try {
+    // Attempt Supabase Storage Upload
+    const uploadPromise = supabase.storage.from(BUCKET_NAME).upload(filePath, file, {
+      cacheControl: '3600',
+      upsert: true,
+      contentType: file.type,
+    });
 
-    if (timeoutMs > 0) {
-      timer = setTimeout(async () => {
-        if (!isSettled) {
-          isSettled = true;
-          try {
-            uploadTask.cancel();
-          } catch {}
-          console.warn('Firebase Storage timed out (CORS or network policy). Falling back to high-efficiency compressed base64 data URL.');
-          try {
-            const { compressImageToDataUrl } = await import('@/lib/utils/image');
-            const dataUrl = await compressImageToDataUrl(file, 800, 800, 0.75);
-            resolve({ downloadUrl: dataUrl, storagePath: 'base64_fallback' });
-          } catch (compErr) {
-            reject(new Error('Firebase Storage connection timed out (CORS or network policy).'));
-          }
-        }
-      }, timeoutMs);
+    // Timeout protection
+    const timeoutPromise = new Promise<{ data: null; error: Error }>((_, reject) =>
+      setTimeout(() => reject(new Error('Supabase Storage timeout')), timeoutMs)
+    );
+
+    const { data, error } = await Promise.race([uploadPromise, timeoutPromise]) as any;
+
+    if (error) {
+      console.warn('Supabase storage upload returned error, falling back to compressed base64:', error.message);
+      const dataUrl = await compressImageToDataUrl(file, 800, 800, 0.75);
+      if (onProgress) onProgress(100);
+      return { downloadUrl: dataUrl, storagePath: 'base64_fallback' };
     }
 
-    uploadTask.on(
-      'state_changed',
-      (snapshot) => {
-        const progress = Math.round(
-          (snapshot.bytesTransferred / snapshot.totalBytes) * 100
-        );
-        if (onProgress) {
-          onProgress(progress);
-        }
-      },
-      async (error) => {
-        if (timer) clearTimeout(timer);
-        if (!isSettled) {
-          isSettled = true;
-          console.warn('Firebase Storage upload error (e.g. CORS preflight / bucket not ready). Falling back to high-efficiency compressed base64 data URL:', error);
-          try {
-            const { compressImageToDataUrl } = await import('@/lib/utils/image');
-            const dataUrl = await compressImageToDataUrl(file, 800, 800, 0.75);
-            resolve({ downloadUrl: dataUrl, storagePath: 'base64_fallback' });
-          } catch (compErr) {
-            reject(new Error(`เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ: ${error.message}`));
-          }
-        }
-      },
-      async () => {
-        if (timer) clearTimeout(timer);
-        if (!isSettled) {
-          isSettled = true;
-          try {
-            const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-            resolve({ downloadUrl, storagePath });
-          } catch (urlError) {
-            reject(urlError);
-          }
-        }
-      }
-    );
-  });
+    if (onProgress) onProgress(80);
+
+    const { data: publicUrlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filePath);
+    const downloadUrl = publicUrlData.publicUrl;
+
+    if (onProgress) onProgress(100);
+    return { downloadUrl, storagePath: filePath };
+  } catch (err: any) {
+    console.warn('Storage upload exception, falling back to base64 data URL:', err.message);
+    try {
+      const dataUrl = await compressImageToDataUrl(file, 800, 800, 0.75);
+      if (onProgress) onProgress(100);
+      return { downloadUrl: dataUrl, storagePath: 'base64_fallback' };
+    } catch (fallbackErr: any) {
+      throw new Error(`เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ: ${err.message}`);
+    }
+  }
 }
 
 /**
- * Deletes an image from Firebase Storage by URL or path
+ * Deletes an image from Supabase Storage by path or URL
  */
 export async function deleteProductImage(imageUrlOrPath: string): Promise<boolean> {
-  if (!storage || !imageUrlOrPath) return false;
+  if (!imageUrlOrPath || imageUrlOrPath.startsWith('data:')) return true;
 
   try {
-    // If it's a full Firebase Storage download URL, get reference from URL
-    let storageRef;
-    if (imageUrlOrPath.startsWith('http')) {
-      // Firebase Storage URLs contain /o/<path>?alt=media
-      const match = imageUrlOrPath.match(/\/o\/([^?]+)/);
-      if (match && match[1]) {
-        const decodedPath = decodeURIComponent(match[1]);
-        storageRef = ref(storage, decodedPath);
-      } else {
-        return false;
+    let storagePath = imageUrlOrPath;
+    if (imageUrlOrPath.includes(`/${BUCKET_NAME}/`)) {
+      const parts = imageUrlOrPath.split(`/${BUCKET_NAME}/`);
+      if (parts[1]) {
+        storagePath = decodeURIComponent(parts[1].split('?')[0]);
       }
-    } else {
-      storageRef = ref(storage, imageUrlOrPath);
     }
 
-    await deleteObject(storageRef);
+    const { error } = await supabase.storage.from(BUCKET_NAME).remove([storagePath]);
+    if (error) {
+      console.warn('Could not remove image from Supabase storage:', error.message);
+      return false;
+    }
     return true;
   } catch (error) {
-    console.warn('Could not delete image from Firebase Storage:', error);
+    console.warn('Exception removing image from Supabase Storage:', error);
     return false;
   }
 }

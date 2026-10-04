@@ -386,7 +386,7 @@ function ProfileContent() {
             <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-md space-y-3">
               <span className="text-xs font-semibold text-slate-400">สถานะความปลอดภัย</span>
               <div className="flex items-center gap-1.5 text-emerald-400 text-sm font-bold">
-                <CheckCircle2 className="w-4 h-4" /> ป้องกันด้วย Firebase Auth
+                <CheckCircle2 className="w-4 h-4" /> ป้องกันด้วย Supabase Auth
               </div>
               <p className="text-xs text-slate-500">ข้อมูลของคุณถูกเข้ารหัสอย่างปลอดภัย</p>
             </div>

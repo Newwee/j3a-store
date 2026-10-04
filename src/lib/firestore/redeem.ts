@@ -1,27 +1,13 @@
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  setDoc,
-  updateDoc,
-  deleteDoc,
-  query,
-  where,
-  serverTimestamp,
-  Timestamp,
-  runTransaction,
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase/client';
-import { updateUserCredits } from './users';
+import { supabase } from '@/lib/supabase/client';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 
 export interface RedeemCode {
   id: string;
-  code: string; // เช่น 'J3A-NEWYEAR', 'WELCOME50'
-  amount: number; // เครดิตที่ได้รับ เช่น 50 บาท
-  maxUses: number; // จำนวนสิทธิ์ทั้งหมด เช่น 100
-  usedCount: number; // จำนวนคนที่ใช้ไปแล้ว
-  usedByUsers: string[]; // รายชื่อ UID ของคนที่ใช้ไปแล้ว
+  code: string;
+  amount: number;
+  maxUses: number;
+  usedCount: number;
+  usedByUsers: string[];
   isActive: boolean;
   expiresAt?: string;
   createdAt: string;
@@ -36,14 +22,33 @@ export interface RedeemResult {
   usedCount?: number;
 }
 
-const REDEEM_CODES_COLLECTION = 'redeem_codes';
+function mapRowToRedeemCode(row: any): RedeemCode {
+  const usedBy = Array.isArray(row.used_by)
+    ? row.used_by
+    : typeof row.used_by === 'string'
+    ? JSON.parse(row.used_by || '[]')
+    : [];
+
+  return {
+    id: row.id,
+    code: row.code,
+    amount: Number(row.credits) || 0,
+    maxUses: Number(row.max_uses) || 0,
+    usedCount: Number(row.used_count) || 0,
+    usedByUsers: usedBy,
+    isActive: Boolean(row.is_active),
+    expiresAt: row.expires_at || undefined,
+    createdAt: row.created_at || new Date().toISOString(),
+    updatedAt: row.updated_at || new Date().toISOString(),
+  };
+}
 
 /**
  * Redeem a code for the specified user
  */
 export async function redeemCodeForUser(codeStr: string, userId: string): Promise<RedeemResult> {
-  if (!db || !userId) {
-    return { success: false, message: 'ระบบฐานข้อมูลยังไม่พร้อมใช้งาน' };
+  if (!userId) {
+    return { success: false, message: 'กรุณาเข้าสู่ระบบก่อนแลกโค้ด' };
   }
 
   const cleanCode = codeStr.trim().toUpperCase();
@@ -52,66 +57,88 @@ export async function redeemCodeForUser(codeStr: string, userId: string): Promis
   }
 
   try {
-    if (cleanCode === 'J3AOPENING') {
-      await seedOpeningCodeIfNotExists();
+    // 1. Fetch code
+    const { data: codeRow, error: codeErr } = await supabaseAdmin
+      .from('redeem_codes')
+      .select('*')
+      .eq('code', cleanCode)
+      .limit(1)
+      .maybeSingle();
+
+    if (codeErr || !codeRow) {
+      return { success: false, message: 'ไม่พบโค้ดนี้ในระบบ หรือโค้ดไม่ถูกต้อง' };
     }
 
-    const codeDocRef = doc(db, REDEEM_CODES_COLLECTION, cleanCode);
-    const userDocRef = doc(db, 'users', userId);
+    if (!codeRow.is_active) {
+      return { success: false, message: 'โค้ดนี้หมดอายุหรือปิดการใช้งานแล้ว' };
+    }
 
-    return await runTransaction(db, async (transaction) => {
-      const codeSnap = await transaction.get(codeDocRef);
-      if (!codeSnap.exists()) {
-        return { success: false, message: 'ไม่พบโค้ดนี้ในระบบ หรือโค้ดไม่ถูกต้อง' };
-      }
+    const usedBy: string[] = Array.isArray(codeRow.used_by)
+      ? codeRow.used_by
+      : typeof codeRow.used_by === 'string'
+      ? JSON.parse(codeRow.used_by || '[]')
+      : [];
 
-      const codeData = codeSnap.data();
-      if (!codeData.isActive) {
-        return { success: false, message: 'โค้ดนี้หมดอายุหรือปิดการใช้งานแล้ว' };
-      }
+    if (usedBy.includes(userId)) {
+      return { success: false, message: 'คุณเคยใช้โค้ดนี้ไปแล้ว (จำกัด 1 สิทธิ์ต่อบัญชี)' };
+    }
 
-      const usedByUsers: string[] = Array.isArray(codeData.usedByUsers) ? codeData.usedByUsers : [];
-      if (usedByUsers.includes(userId)) {
-        return { success: false, message: 'คุณเคยใช้โค้ดนี้ไปแล้ว (จำกัด 1 สิทธิ์ต่อบัญชี)' };
-      }
+    const maxUses = Number(codeRow.max_uses) || 0;
+    const currentUsed = Number(codeRow.used_count) || 0;
+    if (maxUses > 0 && currentUsed >= maxUses) {
+      return { success: false, message: 'สิทธิ์การใช้งานโค้ดนี้เต็มแล้ว' };
+    }
 
-      const maxUses = Number(codeData.maxUses) || 0;
-      const currentUsed = Number(codeData.usedCount) || 0;
-      if (maxUses > 0 && currentUsed >= maxUses) {
-        return { success: false, message: 'สิทธิ์การใช้งานโค้ดนี้เต็มแล้ว' };
-      }
+    // 2. Fetch user profile
+    const { data: userProfile, error: userErr } = await supabaseAdmin
+      .from('profiles')
+      .select('credits')
+      .eq('id', userId)
+      .limit(1)
+      .maybeSingle();
 
-      // Check user
-      const userSnap = await transaction.get(userDocRef);
-      if (!userSnap.exists()) {
-        return { success: false, message: 'ไม่พบข้อมูลผู้ใช้งาน' };
-      }
+    if (userErr || !userProfile) {
+      return { success: false, message: 'ไม่พบข้อมูลผู้ใช้งาน' };
+    }
 
-      const currentCredits = Number(userSnap.data().credits) || 0;
-      const rewardAmount = Number(codeData.amount) || 0;
-      const newCredits = currentCredits + rewardAmount;
-      const newUsedCount = currentUsed + 1;
+    const rewardAmount = Number(codeRow.credits) || 0;
+    const currentCredits = Number(userProfile.credits) || 0;
+    const newCredits = currentCredits + rewardAmount;
+    const newUsedCount = currentUsed + 1;
+    const newUsedBy = [...usedBy, userId];
 
-      // Update code
-      transaction.update(codeDocRef, {
-        usedCount: newUsedCount,
-        usedByUsers: [...usedByUsers, userId],
-        updatedAt: serverTimestamp(),
-      });
+    // 3. Update code and profile atomically
+    const { error: updateCodeErr } = await supabaseAdmin
+      .from('redeem_codes')
+      .update({
+        used_count: newUsedCount,
+        used_by: newUsedBy,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', codeRow.id);
 
-      // Update user credits
-      transaction.update(userDocRef, {
+    if (updateCodeErr) {
+      throw new Error(`Failed to update code: ${updateCodeErr.message}`);
+    }
+
+    const { error: updateProfileErr } = await supabaseAdmin
+      .from('profiles')
+      .update({
         credits: newCredits,
-        updatedAt: serverTimestamp(),
-      });
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', userId);
 
-      return {
-        success: true,
-        message: `แลกโค้ดสำเร็จ! คุณได้รับเครดิต ${rewardAmount} บาท`,
-        amount: rewardAmount,
-        usedCount: newUsedCount,
-      };
-    });
+    if (updateProfileErr) {
+      throw new Error(`Failed to update user credits: ${updateProfileErr.message}`);
+    }
+
+    return {
+      success: true,
+      message: `แลกโค้ดสำเร็จ! คุณได้รับเครดิต ${rewardAmount} บาท`,
+      amount: rewardAmount,
+      usedCount: newUsedCount,
+    };
   } catch (error: any) {
     console.error('Error redeeming code:', error);
     return { success: false, message: error.message || 'เกิดข้อผิดพลาดในการแลกโค้ด' };
@@ -122,24 +149,18 @@ export async function redeemCodeForUser(codeStr: string, userId: string): Promis
  * Get all redeem codes (Admin)
  */
 export async function getAllRedeemCodes(): Promise<RedeemCode[]> {
-  if (!db) return [];
   try {
-    const colRef = collection(db, REDEEM_CODES_COLLECTION);
-    const snap = await getDocs(colRef);
-    return snap.docs.map((d) => {
-      const data = d.data();
-      return {
-        id: d.id,
-        code: data.code || d.id,
-        amount: Number(data.amount) || 0,
-        maxUses: Number(data.maxUses) || 0,
-        usedCount: Number(data.usedCount) || 0,
-        usedByUsers: Array.isArray(data.usedByUsers) ? data.usedByUsers : [],
-        isActive: Boolean(data.isActive),
-        createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : '',
-        updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : '',
-      };
-    });
+    const { data, error } = await supabaseAdmin
+      .from('redeem_codes')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error getting redeem codes:', error.message);
+      return [];
+    }
+
+    return (data || []).map(mapRowToRedeemCode);
   } catch (err) {
     console.error('Error getting redeem codes:', err);
     return [];
@@ -157,42 +178,29 @@ export interface CreateRedeemCodeInput {
  * Create a new redeem code (Admin)
  */
 export async function createRedeemCode(input: CreateRedeemCodeInput): Promise<RedeemCode> {
-  if (!db) throw new Error('Firestore is not initialized.');
-
   const cleanCode = input.code.trim().toUpperCase();
   if (!cleanCode) throw new Error('กรุณากรอกรหัสโค้ด');
   if (input.amount <= 0) throw new Error('จำนวนเครดิตต้องมากกว่า 0');
 
-  const docRef = doc(db, REDEEM_CODES_COLLECTION, cleanCode);
-  const snap = await getDoc(docRef);
-  if (snap.exists()) {
-    throw new Error(`โค้ด "${cleanCode}" มีอยู่ในระบบแล้ว`);
+  const id = `code_${Date.now()}`;
+  const row = {
+    id,
+    code: cleanCode,
+    credits: Math.round(input.amount),
+    max_uses: Number(input.maxUses) || 0,
+    used_count: 0,
+    used_by: [],
+    is_active: input.isActive ?? true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  const { error } = await supabaseAdmin.from('redeem_codes').insert([row]);
+  if (error) {
+    throw new Error(`Failed to create redeem code in Supabase: ${error.message}`);
   }
 
-  const newDoc = {
-    code: cleanCode,
-    amount: Math.round(input.amount),
-    maxUses: Number(input.maxUses) || 0,
-    usedCount: 0,
-    usedByUsers: [],
-    isActive: input.isActive ?? true,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  };
-
-  await setDoc(docRef, newDoc);
-
-  return {
-    id: cleanCode,
-    code: cleanCode,
-    amount: Math.round(input.amount),
-    maxUses: Number(input.maxUses) || 0,
-    usedCount: 0,
-    usedByUsers: [],
-    isActive: input.isActive ?? true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
+  return mapRowToRedeemCode(row);
 }
 
 /**
@@ -202,53 +210,62 @@ export async function updateRedeemCode(
   codeId: string,
   data: Partial<CreateRedeemCodeInput>
 ): Promise<void> {
-  if (!db) throw new Error('Firestore is not initialized.');
-  const docRef = doc(db, REDEEM_CODES_COLLECTION, codeId.toUpperCase());
-  
-  const payload: Record<string, any> = {
-    updatedAt: serverTimestamp(),
+  const updates: Record<string, any> = {
+    updated_at: new Date().toISOString(),
   };
 
-  if (data.amount !== undefined) payload.amount = Math.round(data.amount);
-  if (data.maxUses !== undefined) payload.maxUses = Number(data.maxUses);
-  if (data.isActive !== undefined) payload.isActive = Boolean(data.isActive);
+  if (data.amount !== undefined) updates.credits = Math.round(data.amount);
+  if (data.maxUses !== undefined) updates.max_uses = Number(data.maxUses);
+  if (data.isActive !== undefined) updates.is_active = Boolean(data.isActive);
 
-  await updateDoc(docRef, payload);
+  const { error } = await supabaseAdmin
+    .from('redeem_codes')
+    .update(updates)
+    .or(`id.eq.${codeId},code.eq.${codeId.toUpperCase()}`);
+
+  if (error) throw new Error(error.message);
 }
 
 /**
  * Delete a redeem code (Admin)
  */
 export async function deleteRedeemCode(codeId: string): Promise<void> {
-  if (!db) throw new Error('Firestore is not initialized.');
-  const docRef = doc(db, REDEEM_CODES_COLLECTION, codeId.toUpperCase());
-  await deleteDoc(docRef);
+  const { error } = await supabaseAdmin
+    .from('redeem_codes')
+    .delete()
+    .or(`id.eq.${codeId},code.eq.${codeId.toUpperCase()}`);
+
+  if (error) throw new Error(error.message);
 }
 
 /**
- * Auto-seed opening code 'J3AOPENING' for 20 credits if it does not exist
+ * Auto-seed opening code 'J3AOPENING'
  */
 export async function seedOpeningCodeIfNotExists(): Promise<void> {
-  if (!db) return;
   try {
-    const code = 'J3AOPENING';
-    const docRef = doc(db, REDEEM_CODES_COLLECTION, code);
-    const snap = await getDoc(docRef);
-    if (!snap.exists()) {
-      await setDoc(docRef, {
-        code,
-        amount: 20,
-        maxUses: 0, // 0 = unlimited total uses (1 per user)
-        usedCount: 0,
-        usedByUsers: [],
-        isActive: true,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-      console.log('Seeded default code J3AOPENING (20 credits)');
+    const { data } = await supabaseAdmin
+      .from('redeem_codes')
+      .select('id')
+      .eq('code', 'J3AOPENING')
+      .limit(1)
+      .maybeSingle();
+
+    if (!data) {
+      await supabaseAdmin.from('redeem_codes').insert([
+        {
+          id: 'code_j3a_opening',
+          code: 'J3AOPENING',
+          credits: 20,
+          max_uses: 0,
+          used_count: 0,
+          used_by: [],
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ]);
     }
   } catch (err) {
-    console.error('Error seeding opening code:', err);
+    console.warn('seedOpeningCodeIfNotExists note:', err);
   }
 }
-

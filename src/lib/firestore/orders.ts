@@ -1,61 +1,48 @@
-import {
-  collection,
-  doc,
-  getDocs,
-  getDoc,
-  addDoc,
-  updateDoc,
-  query,
-  where,
-  orderBy,
-  limit,
-  serverTimestamp,
-  Timestamp,
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase/client';
+import { supabase } from '@/lib/supabase/client';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import { Order, CreateOrderInput, OrderStatus } from '@/types/order';
 import { generateOrderNumber } from '@/lib/utils/formatters';
 
-const ORDERS_COLLECTION = 'orders';
+function mapRowToOrder(row: any): Order {
+  const items = Array.isArray(row.items)
+    ? row.items
+    : typeof row.items === 'string'
+    ? JSON.parse(row.items || '[]')
+    : [];
 
-function mapDocToOrder(docSnap: { id: string; data: () => Record<string, unknown> }): Order {
-  const data = docSnap.data();
-
-  let createdAt = new Date().toISOString();
-  if (data.createdAt instanceof Timestamp) {
-    createdAt = data.createdAt.toDate().toISOString();
-  } else if (typeof data.createdAt === 'string') {
-    createdAt = data.createdAt;
-  }
-
-  let updatedAt = new Date().toISOString();
-  if (data.updatedAt instanceof Timestamp) {
-    updatedAt = data.updatedAt.toDate().toISOString();
-  } else if (typeof data.updatedAt === 'string') {
-    updatedAt = data.updatedAt;
-  }
+  const customer = typeof row.customer === 'object' && row.customer !== null
+    ? row.customer
+    : typeof row.customer === 'string'
+    ? JSON.parse(row.customer || '{}')
+    : {
+        name: row.customer_name || '',
+        email: row.customer_email || '',
+        phone: '',
+        address: '',
+      };
 
   return {
-    id: docSnap.id,
-    orderNumber: (data.orderNumber as string) || docSnap.id.slice(0, 8).toUpperCase(),
-    userId: (data.userId as string) || 'guest',
-    customer: (data.customer as Order['customer']) || {
-      name: '',
-      email: '',
-      phone: '',
-      address: '',
+    id: row.id,
+    orderNumber: row.order_number || (row.id ? row.id.slice(0, 8).toUpperCase() : ''),
+    userId: row.user_id || 'guest',
+    customer: {
+      name: customer.name || row.customer_name || '',
+      email: customer.email || row.customer_email || '',
+      phone: customer.phone || '',
+      address: customer.address || '',
+      notes: customer.notes || row.delivery_note || undefined,
     },
-    items: Array.isArray(data.items) ? (data.items as Order['items']) : [],
-    subtotal: Number(data.subtotal) || 0,
-    shipping: Number(data.shipping) || 0,
-    discount: Number(data.discount) || 0,
-    total: Number(data.total) || 0,
-    paymentMethod: (data.paymentMethod as Order['paymentMethod']) || 'promptpay',
-    status: (data.status as OrderStatus) || 'pending',
-    paymentProofUrl: (data.paymentProofUrl as string) || undefined,
-    transactionRef: (data.transactionRef as string) || undefined,
-    createdAt,
-    updatedAt,
+    items,
+    subtotal: Number(row.subtotal) || Number(row.total) || 0,
+    shipping: Number(row.shipping) || 0,
+    discount: Number(row.discount) || 0,
+    total: Number(row.total) || 0,
+    paymentMethod: (row.payment_method as Order['paymentMethod']) || 'promptpay',
+    status: (row.status as OrderStatus) || 'pending',
+    paymentProofUrl: row.payment_proof_url || undefined,
+    transactionRef: row.transaction_ref || undefined,
+    createdAt: row.created_at || new Date().toISOString(),
+    updatedAt: row.updated_at || new Date().toISOString(),
   };
 }
 
@@ -65,83 +52,62 @@ export interface GetOrdersFilter {
   limitCount?: number;
 }
 
-function removeUndefinedDeep<T>(obj: T): T {
-  if (obj === null || obj === undefined) {
-    return obj;
-  }
-  if (Array.isArray(obj)) {
-    return obj.map((item) => removeUndefinedDeep(item)) as unknown as T;
-  }
-  if (typeof obj === 'object') {
-    // Preserve Date and Firestore FieldValues/Timestamps
-    if (
-      obj instanceof Date ||
-      (obj as any)._methodName ||
-      (obj as any).toMillis
-    ) {
-      return obj;
-    }
-    const clean: Record<string, any> = {};
-    for (const [key, val] of Object.entries(obj)) {
-      if (val !== undefined) {
-        clean[key] = removeUndefinedDeep(val);
-      }
-    }
-    return clean as T;
-  }
-  return obj;
-}
-
 /**
- * Create a new order in Firestore
+ * Create a new order in Supabase
  */
 export async function createOrder(input: CreateOrderInput): Promise<Order> {
-  if (!db) {
-    throw new Error('Firestore is not initialized.');
-  }
-
   const orderNumber = generateOrderNumber();
-
-  // Recursively strip any undefined fields (including customer.notes, paymentProofUrl, etc.)
-  const sanitizedInput = removeUndefinedDeep(input);
-
+  const id = `order_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   const initialStatus: OrderStatus = input.status || 'pending';
 
-  const newDoc = {
-    ...sanitizedInput,
-    orderNumber,
+  // Ensure valid UUID or null for Postgres user_id
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.userId || '');
+  const userId = isUuid ? input.userId : null;
+
+  const row = {
+    id,
+    order_number: orderNumber,
+    user_id: userId,
+    customer_name: input.customer.name,
+    customer_email: input.customer.email,
+    customer: input.customer,
+    items: input.items,
+    subtotal: Number(input.subtotal) || Number(input.total),
+    shipping: Number(input.shipping) || 0,
+    discount: Number(input.discount) || 0,
+    total: Number(input.total) || 0,
+    payment_method: input.paymentMethod,
     status: initialStatus,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
+    payment_proof_url: input.paymentProofUrl || null,
+    delivery_note: input.customer.notes || null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
   };
 
-  const docRef = await addDoc(collection(db, ORDERS_COLLECTION), newDoc);
+  const { error } = await supabase.from('orders').insert([row]);
+  if (error) {
+    throw new Error(`Failed to create order in Supabase: ${error.message}`);
+  }
 
-  return {
-    id: docRef.id,
-    orderNumber,
-    ...input,
-    status: initialStatus,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
+  return mapRowToOrder(row);
 }
 
 /**
  * Get single order by ID
  */
 export async function getOrderById(id: string): Promise<Order | null> {
-  if (!db || !id) return null;
+  if (!id) return null;
 
   try {
-    const docRef = doc(db, ORDERS_COLLECTION, id);
-    const snap = await getDoc(docRef);
+    const { data, error } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('id', id)
+      .limit(1)
+      .maybeSingle();
 
-    if (!snap.exists()) {
-      return null;
-    }
-
-    return mapDocToOrder(snap);
+    if (error || !data) return null;
+    return mapRowToOrder(data);
   } catch (error) {
     console.error('Error fetching order by ID:', error);
     return null;
@@ -152,34 +118,30 @@ export async function getOrderById(id: string): Promise<Order | null> {
  * Fetch orders list with optional filters
  */
 export async function getOrders(filter: GetOrdersFilter = {}): Promise<Order[]> {
-  if (!db) {
-    console.warn('Firestore is not initialized.');
-    return [];
-  }
-
   try {
-    const colRef = collection(db, ORDERS_COLLECTION);
-    let q = query(colRef);
+    let query = supabase.from('orders').select('*');
 
     if (filter.userId) {
-      q = query(q, where('userId', '==', filter.userId));
+      query = query.eq('user_id', filter.userId);
     }
 
     if (filter.status && filter.status !== 'all') {
-      q = query(q, where('status', '==', filter.status));
+      query = query.eq('status', filter.status);
     }
 
     if (filter.limitCount && filter.limitCount > 0) {
-      q = query(q, limit(filter.limitCount));
+      query = query.limit(filter.limitCount);
     }
 
-    const snapshot = await getDocs(q);
-    const orders = snapshot.docs.map(mapDocToOrder);
+    const { data, error } = await query;
+    if (error) {
+      console.error('Error fetching orders from Supabase:', error.message);
+      return [];
+    }
 
-    // Sort newest first
-    return orders.sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
+    const orders = (data || []).map(mapRowToOrder);
+    orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return orders;
   } catch (error) {
     console.error('Error fetching orders:', error);
     return [];
@@ -187,26 +149,29 @@ export async function getOrders(filter: GetOrdersFilter = {}): Promise<Order[]> 
 }
 
 /**
- * Update order status (pending, paid, processing, completed, cancelled)
+ * Update order status
  */
 export async function updateOrderStatus(orderId: string, status: OrderStatus): Promise<void> {
-  if (!db) throw new Error('Firestore is not initialized.');
-  const docRef = doc(db, ORDERS_COLLECTION, orderId);
-  await updateDoc(docRef, {
-    status,
-    updatedAt: serverTimestamp(),
-  });
+  const { error } = await supabase
+    .from('orders')
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq('id', orderId);
+
+  if (error) throw new Error(error.message);
 }
 
 /**
  * Update payment proof slip URL
  */
 export async function updatePaymentProof(orderId: string, paymentProofUrl: string): Promise<void> {
-  if (!db) throw new Error('Firestore is not initialized.');
-  const docRef = doc(db, ORDERS_COLLECTION, orderId);
-  await updateDoc(docRef, {
-    paymentProofUrl,
-    status: 'paid',
-    updatedAt: serverTimestamp(),
-  });
+  const { error } = await supabase
+    .from('orders')
+    .update({
+      payment_proof_url: paymentProofUrl,
+      status: 'paid',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', orderId);
+
+  if (error) throw new Error(error.message);
 }

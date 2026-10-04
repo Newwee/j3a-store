@@ -625,7 +625,7 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
             {isUploading && (
               <div className="space-y-1.5">
                 <div className="flex justify-between text-xs text-slate-400">
-                  <span>กำลังอัปโหลดขึ้น Firebase Storage...</span>
+                  <span>กำลังอัปโหลดขึ้นระบบจัดเก็บไฟล์...</span>
                   <span className="font-bold text-cyan-400">{uploadProgress}%</span>
                 </div>
                 <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">

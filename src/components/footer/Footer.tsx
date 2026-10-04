@@ -138,7 +138,7 @@ export function Footer() {
 
         {/* Bottom bar */}
         <div className="mt-12 pt-8 border-t border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
-          <p>© {new Date().getFullYear()} J3A STORE. All rights reserved. Created with Next.js & Firebase.</p>
+          <p>© {new Date().getFullYear()} J3A STORE. All rights reserved. Powered by Next.js & Supabase.</p>
           <div className="flex items-center gap-6">
             <span>Server Status: <span className="text-emerald-400 font-semibold">● Online</span></span>
             <span>Version: 1.0.0 (Production)</span>

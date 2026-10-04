@@ -1,9 +1,10 @@
-import { collection, getCountFromServer, getDocs, query, orderBy, limit } from 'firebase/firestore';
-import { db } from '@/lib/firebase/client';
+import { supabase } from '@/lib/supabase/client';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import { Order } from '@/types/order';
 import { Product } from '@/types/product';
 import { getProducts } from './products';
 import { getOrders } from './orders';
+import { getStoreReviewStats } from './reviews';
 
 export interface StoreStats {
   totalProducts: number;
@@ -20,7 +21,6 @@ export interface StoreStats {
 
 /**
  * Fetch overview statistics for Admin Dashboard and Live Stats widgets
- * Designed to gracefully fall back without throwing permission errors to ordinary users
  */
 export async function getStoreDashboardStats(isAdmin = false): Promise<StoreStats> {
   const fallbackStats: StoreStats = {
@@ -36,101 +36,68 @@ export async function getStoreDashboardStats(isAdmin = false): Promise<StoreStat
     recentProducts: [],
   };
 
-  if (!db) return fallbackStats;
-
-  let totalProducts = 0;
-  let totalOrders = 0;
-  let totalCustomers = 1;
-  let totalRevenue = 0;
-  let pendingTopupsCount = 0;
-  let recentOrders: Order[] = [];
-  let recentProducts: Product[] = [];
-  let averageRating = 5.0;
-  let totalReviews = 0;
-  let satisfactionRate = '100%';
-
-  // 1. Products: Fetch publicly active products count & list
   try {
+    let totalProducts = 0;
+    let totalOrders = 0;
+    let totalCustomers = 1;
+    let totalRevenue = 0;
+    let pendingTopupsCount = 0;
+    let recentOrders: Order[] = [];
+    let recentProducts: Product[] = [];
+
+    // 1. Products
     const products = await getProducts({ status: 'active', limitCount: 8, sortBy: 'newest' });
     recentProducts = products;
     totalProducts = products.length;
-  } catch {
-    // Non-blocking
-  }
 
-  // 2. Members count: Try reading total registered members
-  try {
-    const usersCol = collection(db, 'users');
-    const userCountSnap = await getCountFromServer(usersCol);
-    totalCustomers = userCountSnap.data().count;
-  } catch {
+    // 2. Members count
     try {
-      const usersCol = collection(db, 'users');
-      const usrs = await getDocs(usersCol);
-      if (usrs.size > 0) totalCustomers = usrs.size;
+      const { count } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
+      totalCustomers = count !== null && count !== undefined ? Math.max(1, count) : 1;
     } catch {
-      // Default fallback
       totalCustomers = 1;
     }
-  }
 
-  // 3. Admin-only stats: only fetch when isAdmin is true
-  if (isAdmin) {
-    try {
-      const orders = await getOrders({ limitCount: 50 });
-      recentOrders = orders;
-      totalOrders = orders.length;
-      totalRevenue = orders.reduce((sum, ord) => {
-        if (ord.status === 'paid' || ord.status === 'completed' || ord.status === 'processing') {
-          return sum + (ord.total || 0);
-        }
-        return sum;
-      }, 0);
-    } catch {
-      // Non-blocking
+    // 3. Admin stats
+    if (isAdmin) {
+      try {
+        const orders = await getOrders({ limitCount: 50 });
+        recentOrders = orders;
+        totalOrders = orders.length;
+        totalRevenue = orders.reduce((sum, ord) => {
+          if (ord.status === 'paid' || ord.status === 'completed' || ord.status === 'processing') {
+            return sum + (ord.total || 0);
+          }
+          return sum;
+        }, 0);
+      } catch {}
+
+      try {
+        const { count } = await supabaseAdmin
+          .from('topups')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'pending');
+        pendingTopupsCount = count || 0;
+      } catch {}
     }
 
-    try {
-      const topupsCol = collection(db, 'topups');
-      const topupSnap = await getDocs(query(topupsCol));
-      pendingTopupsCount = topupSnap.docs.filter((d) => d.data().status === 'pending').length;
-    } catch {
-      // Non-blocking
-    }
-  }
+    // 4. Reviews
+    const reviewStats = await getStoreReviewStats();
 
-  // 4. Reviews: Try reading public reviews
-  try {
-    const reviewsCol = collection(db, 'reviews');
-    const revSnap = await getDocs(reviewsCol);
-    if (!revSnap.empty) {
-      totalReviews = revSnap.size;
-      let sum = 0;
-      let high = 0;
-      revSnap.forEach((d) => {
-        const raw = Number(d.data().rating) || 10;
-        // The store review score is out of 10, divide by 2 before averaging
-        const r = raw > 5 ? raw / 2 : raw;
-        sum += r;
-        if (r >= 4) high++;
-      });
-      averageRating = Number((sum / totalReviews).toFixed(1));
-      satisfactionRate = Math.round((high / totalReviews) * 100) + '%';
-    }
-  } catch {
-    // Non-blocking
+    return {
+      totalProducts,
+      totalOrders,
+      totalCustomers,
+      totalRevenue,
+      averageRating: reviewStats.averageRating,
+      totalReviews: reviewStats.totalReviews,
+      satisfactionRate: reviewStats.satisfactionRate,
+      pendingTopupsCount,
+      recentOrders,
+      recentProducts,
+    };
+  } catch (error) {
+    console.error('Error fetching dashboard stats:', error);
+    return fallbackStats;
   }
-
-  return {
-    totalProducts,
-    totalOrders,
-    totalCustomers,
-    totalRevenue,
-    averageRating,
-    totalReviews,
-    satisfactionRate,
-    pendingTopupsCount,
-    recentOrders,
-    recentProducts,
-  };
 }

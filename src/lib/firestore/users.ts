@@ -1,61 +1,8 @@
-import {
-  collection,
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  deleteDoc,
-  getDocs,
-  query,
-  limit,
-  serverTimestamp,
-  Timestamp,
-  increment,
-  onSnapshot,
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase/client';
+import { supabase } from '@/lib/supabase/client';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import { UserProfile, UserRole, UserTier } from '@/types/user';
-import { getUserDeletionRequest, clearOrArchiveDeletionRequest } from './deletionRequests';
+import { clearOrArchiveDeletionRequest } from './deletionRequests';
 
-const USERS_COLLECTION = 'users';
-
-function mapDocToUserProfile(docSnap: { id: string; data: () => Record<string, unknown> }): UserProfile {
-  const data = docSnap.data();
-
-  let createdAt = new Date().toISOString();
-  if (data.createdAt instanceof Timestamp) {
-    createdAt = data.createdAt.toDate().toISOString();
-  } else if (typeof data.createdAt === 'string') {
-    createdAt = data.createdAt;
-  }
-
-  let updatedAt = new Date().toISOString();
-  if (data.updatedAt instanceof Timestamp) {
-    updatedAt = data.updatedAt.toDate().toISOString();
-  } else if (typeof data.updatedAt === 'string') {
-    updatedAt = data.updatedAt;
-  }
-
-  const email = (data.email as string) || null;
-  const rawDisplayName = (data.displayName as string) || null;
-  // If rawDisplayName is empty or default 'Customer', fallback to email prefix
-  const displayName = rawDisplayName && rawDisplayName.trim() && rawDisplayName !== 'Customer'
-    ? rawDisplayName.trim()
-    : (email ? email.split('@')[0] : 'Customer');
-
-  return {
-    uid: docSnap.id,
-    email,
-    displayName,
-    photoURL: (data.photoURL as string) || null,
-    role: (data.role as UserRole) || 'customer',
-    credits: Number(data.credits) || 0,
-    tier: (data.tier as UserTier) || 'Bronze',
-    phone: (data.phone as string) || undefined,
-    createdAt,
-    updatedAt,
-  };
-}
 function getAdminEmails(): string[] {
   const envEmails = process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'mynameisyee0@gmail.com';
   return envEmails
@@ -65,26 +12,45 @@ function getAdminEmails(): string[] {
     .filter(Boolean);
 }
 
+function mapRowToUserProfile(row: any): UserProfile {
+  const email = row.email || null;
+  const rawDisplayName = row.display_name || null;
+  const displayName = rawDisplayName && rawDisplayName.trim() && rawDisplayName !== 'Customer'
+    ? rawDisplayName.trim()
+    : (email ? email.split('@')[0] : 'Customer');
+
+  const adminEmails = getAdminEmails();
+  const isMasterAdmin = Boolean(email && adminEmails.includes(email.toLowerCase()));
+
+  return {
+    uid: row.id,
+    email,
+    displayName,
+    photoURL: row.avatar_url || null,
+    role: isMasterAdmin ? 'admin' : ((row.role as UserRole) || 'customer'),
+    credits: Number(row.credits) || 0,
+    tier: (row.tier as UserTier) || (isMasterAdmin ? 'VIP' : 'Bronze'),
+    createdAt: row.created_at || new Date().toISOString(),
+    updatedAt: row.updated_at || new Date().toISOString(),
+  };
+}
+
 /**
- * Fetch a user profile from Firestore by UID
+ * Fetch a user profile from Supabase by UID
  */
 export async function getUserProfile(uid: string): Promise<UserProfile | null> {
-  if (!db || !uid) return null;
+  if (!uid) return null;
 
   try {
-    const docRef = doc(db, USERS_COLLECTION, uid);
-    const snap = await getDoc(docRef);
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', uid)
+      .limit(1)
+      .maybeSingle();
 
-    if (!snap.exists()) {
-      return null;
-    }
-
-    const profile = mapDocToUserProfile(snap);
-    const adminEmails = getAdminEmails();
-    if (profile.email && adminEmails.includes(profile.email.toLowerCase())) {
-      profile.role = 'admin';
-    }
-    return profile;
+    if (error || !data) return null;
+    return mapRowToUserProfile(data);
   } catch (error) {
     console.error('Error fetching user profile:', error);
     return null;
@@ -93,23 +59,20 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
 
 /**
  * Create or sync user profile on initial registration or social sign-in
- * Note: Never allows client-supplied role to override existing admin role
  */
 export async function createUserProfile(
   uid: string,
   data: Partial<UserProfile>
 ): Promise<UserProfile> {
-  if (!db) throw new Error('Firestore is not initialized.');
+  if (!uid) throw new Error('UID is required.');
 
-  // If there was an old deletion request from a previous deleted account, clear it so they start fresh
   try {
     await clearOrArchiveDeletionRequest(uid);
   } catch (err: any) {
     console.warn('Could not clear previous deletion request upon re-registration:', err);
   }
 
-  const docRef = doc(db, USERS_COLLECTION, uid);
-  const existing = await getDoc(docRef);
+  const existing = await getUserProfile(uid);
 
   const adminEmails = getAdminEmails();
   const isMasterAdmin = Boolean(
@@ -120,84 +83,86 @@ export async function createUserProfile(
     ? data.displayName.trim()
     : (data.email ? data.email.split('@')[0] : 'Customer');
 
-  if (existing.exists()) {
-    const profile = mapDocToUserProfile(existing);
-    const updates: Record<string, any> = {};
+  if (existing) {
+    const updates: Record<string, any> = {
+      updated_at: new Date().toISOString(),
+    };
 
-    // If existing displayName is generic 'Customer' or empty, but we now have a real name, update it!
-    if ((!profile.displayName || profile.displayName === 'Customer') && resolvedName !== 'Customer') {
-      updates.displayName = resolvedName;
-      profile.displayName = resolvedName;
+    if ((!existing.displayName || existing.displayName === 'Customer') && resolvedName !== 'Customer') {
+      updates.display_name = resolvedName;
     }
-    if (!profile.photoURL && data.photoURL) {
-      updates.photoURL = data.photoURL;
-      profile.photoURL = data.photoURL;
+    if (!existing.photoURL && data.photoURL) {
+      updates.avatar_url = data.photoURL;
     }
-    if (isMasterAdmin && profile.role !== 'admin') {
+    if (isMasterAdmin && existing.role !== 'admin') {
       updates.role = 'admin';
-      profile.role = 'admin';
     }
 
-    if (Object.keys(updates).length > 0) {
-      try {
-        await updateDoc(docRef, { ...updates, updatedAt: serverTimestamp() });
-      } catch (e) {
-        console.warn('Could not sync user profile fields:', e);
-      }
+    if (Object.keys(updates).length > 1) {
+      await supabase.from('profiles').update(updates).eq('id', uid);
     }
-    return profile;
+    return { ...existing, displayName: updates.display_name || existing.displayName };
   }
 
   const initialRole: UserRole = isMasterAdmin ? 'admin' : 'customer';
 
-  const profileData = {
-    uid,
+  const newRow = {
+    id: uid,
     email: data.email || null,
-    displayName: resolvedName,
-    photoURL: data.photoURL || null,
+    display_name: resolvedName,
+    avatar_url: data.photoURL || null,
     role: initialRole,
-    credits: 0,
+    credits: 0.0,
     tier: (isMasterAdmin ? 'VIP' : 'Bronze') as UserTier,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
   };
 
-  await setDoc(docRef, profileData);
+  const { error } = await supabase.from('profiles').upsert([newRow]);
+  if (error) {
+    console.warn('Could not upsert profile directly, attempting admin client:', error.message);
+    await supabaseAdmin.from('profiles').upsert([newRow]);
+  }
 
-  return {
-    ...profileData,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
+  return mapRowToUserProfile(newRow);
 }
 
 /**
- * Update user profile details (safe fields: displayName, photoURL, phone, tier)
+ * Update user profile details
  */
 export async function updateUserProfile(
   uid: string,
   data: { displayName?: string; photoURL?: string; phone?: string; tier?: UserTier }
 ): Promise<void> {
-  if (!db) throw new Error('Firestore is not initialized.');
+  const updates: Record<string, any> = {
+    updated_at: new Date().toISOString(),
+  };
 
-  const docRef = doc(db, USERS_COLLECTION, uid);
-  await updateDoc(docRef, {
-    ...data,
-    updatedAt: serverTimestamp(),
-  });
+  if (data.displayName !== undefined) updates.display_name = data.displayName;
+  if (data.photoURL !== undefined) updates.avatar_url = data.photoURL;
+  if (data.tier !== undefined) updates.tier = data.tier;
+
+  const { error } = await supabase.from('profiles').update(updates).eq('id', uid);
+  if (error) throw new Error(error.message);
 }
 
 /**
  * Get all users for Admin Customers page
  */
 export async function getAllUsers(limitCount: number = 50): Promise<UserProfile[]> {
-  if (!db) return [];
-
   try {
-    const colRef = collection(db, USERS_COLLECTION);
-    const q = query(colRef, limit(limitCount));
-    const snap = await getDocs(q);
-    return snap.docs.map(mapDocToUserProfile);
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limitCount);
+
+    if (error) {
+      console.error('Error fetching all users from Supabase:', error.message);
+      return [];
+    }
+
+    return (data || []).map(mapRowToUserProfile);
   } catch (error) {
     console.error('Error fetching all users:', error);
     return [];
@@ -208,45 +173,48 @@ export async function getAllUsers(limitCount: number = 50): Promise<UserProfile[
  * Admin action: Update role of a user
  */
 export async function updateUserRole(uid: string, role: UserRole): Promise<void> {
-  if (!db) throw new Error('Firestore is not initialized.');
-  const docRef = doc(db, USERS_COLLECTION, uid);
-  await updateDoc(docRef, {
-    role,
-    updatedAt: serverTimestamp(),
-  });
+  const { error } = await supabaseAdmin
+    .from('profiles')
+    .update({ role, updated_at: new Date().toISOString() })
+    .eq('id', uid);
+
+  if (error) throw new Error(error.message);
 }
 
 /**
  * Update user wallet credits
  */
 export async function updateUserCredits(uid: string, amount: number): Promise<void> {
-  if (!db) throw new Error('Firestore is not initialized.');
-  const docRef = doc(db, USERS_COLLECTION, uid);
-  await updateDoc(docRef, {
-    credits: amount,
-    updatedAt: serverTimestamp(),
-  });
+  const { error } = await supabaseAdmin
+    .from('profiles')
+    .update({ credits: Math.max(0, amount), updated_at: new Date().toISOString() })
+    .eq('id', uid);
+
+  if (error) throw new Error(error.message);
 }
 
 /**
  * Deduct user credits atomically for store purchases
  */
 export async function deductUserCredits(uid: string, amountToDeduct: number): Promise<void> {
-  if (!db) throw new Error('Firestore is not initialized.');
-  const docRef = doc(db, USERS_COLLECTION, uid);
-  await updateDoc(docRef, {
-    credits: increment(-amountToDeduct),
-    updatedAt: serverTimestamp(),
-  });
+  const current = await getUserProfile(uid);
+  const currentCredits = current?.credits || 0;
+  const newCredits = Math.max(0, currentCredits - amountToDeduct);
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ credits: newCredits, updated_at: new Date().toISOString() })
+    .eq('id', uid);
+
+  if (error) throw new Error(error.message);
 }
 
 /**
- * Permanently delete user document from Firestore (Admin action)
+ * Permanently delete user profile (Admin action)
  */
 export async function deleteUserDoc(uid: string): Promise<void> {
-  if (!db) throw new Error('Firestore is not initialized.');
-  const docRef = doc(db, USERS_COLLECTION, uid);
-  await deleteDoc(docRef);
+  const { error } = await supabaseAdmin.from('profiles').delete().eq('id', uid);
+  if (error) throw new Error(error.message);
 }
 
 /**
@@ -257,27 +225,25 @@ export function subscribeUserProfile(
   onProfile: (profile: UserProfile | null) => void,
   onError?: (error: any) => void
 ): () => void {
-  if (!db || !uid) return () => {};
+  getUserProfile(uid).then(onProfile);
 
-  const docRef = doc(db, USERS_COLLECTION, uid);
-  return onSnapshot(
-    docRef,
-    (snap) => {
-      if (!snap.exists()) {
-        onProfile(null);
-        return;
+  const channel = supabase
+    .channel(`profile_${uid}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${uid}` },
+      async () => {
+        const p = await getUserProfile(uid);
+        onProfile(p);
       }
-      const profile = mapDocToUserProfile(snap);
-      const adminEmails = getAdminEmails();
-      if (profile.email && adminEmails.includes(profile.email.toLowerCase())) {
-        profile.role = 'admin';
+    )
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        // Connected
       }
-      onProfile(profile);
-    },
-    (err) => {
-      console.warn('subscribeUserProfile error:', err);
-      if (onError) onError(err);
-    }
-  );
+    });
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
 }
-

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/firebase/client';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 
 // Protected server-side endpoint - Not exposed to client bundle
 const GOOGLE_APPS_SCRIPT_URL =
@@ -60,14 +59,16 @@ export async function POST(req: NextRequest) {
 
     // Case 1: Successfully retrieved key
     if (data.success === true && data.key) {
-      // If orderId is provided and db is ready, save the key to the order in Firestore
-      if (orderId && db) {
+      // If orderId is provided, save the key to the order in Supabase
+      if (orderId) {
         try {
-          const orderRef = doc(db, 'orders', orderId);
-          await updateDoc(orderRef, {
-            transactionRef: data.key,
-            updatedAt: serverTimestamp(),
-          });
+          await supabaseAdmin
+            .from('orders')
+            .update({
+              transaction_ref: data.key,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', orderId);
         } catch (dbErr) {
           console.warn('Could not attach license key to order document:', dbErr);
         }

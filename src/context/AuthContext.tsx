@@ -1,20 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
-import {
-  User as FirebaseUser,
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut,
-  sendPasswordResetEmail,
-  updateProfile,
-  GoogleAuthProvider,
-  signInWithPopup,
-  setPersistence,
-  browserLocalPersistence,
-} from 'firebase/auth';
-import { auth, isFirebaseConfigured } from '@/lib/firebase/client';
+import { supabase } from '@/lib/supabase/client';
 import {
   getUserProfile,
   createUserProfile,
@@ -30,8 +17,17 @@ import { UserProfile, UserRole } from '@/types/user';
 import { useToast } from '@/context/ToastContext';
 import { useLoading } from '@/context/LoadingContext';
 
+export interface AppUser {
+  id: string;
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+  [key: string]: any;
+}
+
 interface AuthContextType {
-  user: FirebaseUser | null;
+  user: AppUser | null;
   profile: UserProfile | null;
   role: UserRole;
   isAdmin: boolean;
@@ -47,8 +43,25 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function mapSupabaseUserToAppUser(user: any): AppUser | null {
+  if (!user) return null;
+  const meta = user.user_metadata || {};
+  const email = user.email || null;
+  const displayName = meta.full_name || meta.name || meta.user_name || (email ? email.split('@')[0] : 'Customer');
+  const photoURL = meta.avatar_url || meta.picture || null;
+
+  return {
+    ...user,
+    id: user.id,
+    uid: user.id,
+    email,
+    displayName,
+    photoURL,
+  };
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -57,21 +70,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const prevCreditsRef = useRef<number | null>(null);
   const isKickingOutRef = useRef(false);
 
-  // Sync profile from Firestore
-  const syncProfile = useCallback(async (firebaseUser: FirebaseUser, options?: { isExplicitLogin?: boolean }) => {
+  // Sync profile from Supabase
+  const syncProfile = useCallback(async (appUser: AppUser, options?: { isExplicitLogin?: boolean }) => {
     try {
       if (options?.isExplicitLogin) {
-        // Deliberate user action (e.g. login with Google, register): clear old deletion request so user can start fresh
-        await clearOrArchiveDeletionRequest(firebaseUser.uid);
+        await clearOrArchiveDeletionRequest(appUser.uid);
       } else {
-        // Background session restoration: check if account was deleted while offline
-        const delReq = await getUserDeletionRequest(firebaseUser.uid);
+        const delReq = await getUserDeletionRequest(appUser.uid);
         if (delReq?.status === 'approved') {
           if (!isKickingOutRef.current) {
             isKickingOutRef.current = true;
             showLoading('บัญชีของคุณได้รับการอนุมัติการลบออกจากระบบเรียบร้อยแล้ว กำลังออกจากระบบ...');
-            await clearOrArchiveDeletionRequest(firebaseUser.uid);
-            if (auth) await signOut(auth);
+            await clearOrArchiveDeletionRequest(appUser.uid);
+            await supabase.auth.signOut();
             setUser(null);
             setProfile(null);
             setTimeout(() => {
@@ -86,65 +97,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      let p = await getUserProfile(firebaseUser.uid);
-      const effectiveName = (firebaseUser.displayName && firebaseUser.displayName !== 'Customer')
-        ? firebaseUser.displayName
-        : (firebaseUser.email ? firebaseUser.email.split('@')[0] : 'Customer');
+      let p = await getUserProfile(appUser.uid);
+      const effectiveName = (appUser.displayName && appUser.displayName !== 'Customer')
+        ? appUser.displayName
+        : (appUser.email ? appUser.email.split('@')[0] : 'Customer');
 
       if (!p) {
-        // First-time record initialization (or re-registration after deletion)
-        p = await createUserProfile(firebaseUser.uid, {
-          email: firebaseUser.email,
+        p = await createUserProfile(appUser.uid, {
+          email: appUser.email || undefined,
           displayName: effectiveName,
-          photoURL: firebaseUser.photoURL,
+          photoURL: appUser.photoURL || undefined,
         });
       } else {
-        // If the profile document still has 'Customer', but we now have a real name, sync it!
         if ((!p.displayName || p.displayName === 'Customer') && effectiveName !== 'Customer') {
           try {
-            await updateUserProfile(firebaseUser.uid, { displayName: effectiveName });
+            await updateUserProfile(appUser.uid, { displayName: effectiveName });
             p.displayName = effectiveName;
           } catch (e) {
             console.warn('Could not sync user profile name:', e);
           }
         }
       }
+
       setProfile(p);
       prevCreditsRef.current = p ? p.credits : 0;
     } catch (err: any) {
-      if (err.message?.includes('บัญชีผู้ใช้นี้ถูกลบ')) {
-        if (!isKickingOutRef.current) {
-          isKickingOutRef.current = true;
-          showLoading('บัญชีของคุณถูกลบออกจากระบบเรียบร้อยแล้ว...');
-          await clearOrArchiveDeletionRequest(firebaseUser.uid);
-          if (auth) await signOut(auth);
-          setUser(null);
-          setProfile(null);
-          setTimeout(() => {
-            hideLoading();
-            toast('บัญชีผู้ใช้นี้ถูกลบออกจากระบบเรียบร้อยแล้ว', 'info');
-            if (typeof window !== 'undefined') window.location.href = '/login?deleted=true';
-          }, 1200);
-        }
-        return;
-      }
-
-      console.error('Error syncing user profile from Firestore:', err);
+      console.error('Error syncing user profile from Supabase:', err);
       const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'pongpataradanai@gmail.com,admin@j3astore.com,mynameisyee0@gmail.com')
         .toLowerCase()
         .split(',')
         .map((e) => e.trim())
         .filter(Boolean);
       const isMaster = Boolean(
-        firebaseUser.email && adminEmails.includes(firebaseUser.email.toLowerCase())
+        appUser.email && adminEmails.includes(appUser.email.toLowerCase())
       );
 
-      // Fallback profile if firestore unavailable
       setProfile({
-        uid: firebaseUser.uid,
-        email: firebaseUser.email,
-        displayName: firebaseUser.displayName || (firebaseUser.email ? firebaseUser.email.split('@')[0] : 'Customer'),
-        photoURL: firebaseUser.photoURL,
+        uid: appUser.uid,
+        email: appUser.email,
+        displayName: appUser.displayName || (appUser.email ? appUser.email.split('@')[0] : 'Customer'),
+        photoURL: appUser.photoURL,
         role: isMaster ? 'admin' : 'customer',
         credits: 0,
         tier: isMaster ? 'VIP' : 'Bronze',
@@ -161,23 +153,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user, syncProfile]);
 
   useEffect(() => {
-    if (!auth || !isFirebaseConfigured) {
-      setLoading(false);
-      return;
-    }
-
-    // Explicitly guarantee browserLocalPersistence for staying logged in across closing & reopening browser
-    setPersistence(auth, browserLocalPersistence).catch((err) => {
-      console.warn('Could not set persistence on Firebase Auth:', err);
-    });
-
     let unsubProfile: (() => void) | undefined;
     let unsubDeletion: (() => void) | undefined;
 
-    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
+    // Check initial session
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      const initialUser = mapSupabaseUserToAppUser(session?.user);
+      setUser(initialUser);
+
+      if (initialUser) {
+        await syncProfile(initialUser);
+
+        unsubProfile = subscribeUserProfile(initialUser.uid, async (updatedProfile) => {
+          if (updatedProfile) {
+            if (prevCreditsRef.current !== null && prevCreditsRef.current !== updatedProfile.credits) {
+              const diff = updatedProfile.credits - prevCreditsRef.current;
+              if (diff > 0) {
+                toast(`🎉 แอดมินได้อนุมัติ/เติมเครดิตเข้าบัญชีแล้ว! +฿${diff} (ยอดคงเหลือ ฿${updatedProfile.credits})`, 'success');
+              } else if (diff < 0) {
+                toast(`💳 ยอดเครดิตในบัญชีของคุณได้รับการอัปเดต: คงเหลือ ฿${updatedProfile.credits}`, 'info');
+              }
+            }
+            prevCreditsRef.current = updatedProfile.credits;
+            setProfile(updatedProfile);
+          }
+        });
+
+        unsubDeletion = subscribeUserDeletionRequest(initialUser.uid, async (delReq) => {
+          if (delReq?.status === 'approved') {
+            if (!isKickingOutRef.current) {
+              isKickingOutRef.current = true;
+              showLoading('บัญชีของคุณได้รับการอนุมัติการลบออกจากระบบเรียบร้อยแล้ว กำลังออกจากระบบ...');
+              await clearOrArchiveDeletionRequest(initialUser.uid);
+              await supabase.auth.signOut();
+              setUser(null);
+              setProfile(null);
+              setTimeout(() => {
+                hideLoading();
+                toast('บัญชีผู้ใช้ของคุณถูกลบออกจากระบบเรียบร้อยแล้ว', 'info');
+                if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+                  window.location.href = '/login?deleted=true';
+                }
+              }, 1500);
+            }
+          }
+        });
+      }
+      setLoading(false);
+    });
+
+    // Listen to Auth State Changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const currentUser = mapSupabaseUserToAppUser(session?.user);
       setUser(currentUser);
 
-      // Clean up previous listeners
       if (unsubProfile) {
         unsubProfile();
         unsubProfile = undefined;
@@ -190,10 +219,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (currentUser) {
         await syncProfile(currentUser);
 
-        // 1. Real-time User Profile & Credits listener
-        unsubProfile = subscribeUserProfile(currentUser.uid, async (updatedProfile) => {
+        unsubProfile = subscribeUserProfile(currentUser.uid, (updatedProfile) => {
           if (updatedProfile) {
-            // Check for credit changes
             if (prevCreditsRef.current !== null && prevCreditsRef.current !== updatedProfile.credits) {
               const diff = updatedProfile.credits - prevCreditsRef.current;
               if (diff > 0) {
@@ -204,37 +231,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
             prevCreditsRef.current = updatedProfile.credits;
             setProfile(updatedProfile);
-          } else {
-            // Document was deleted from users collection
-            const delReq = await getUserDeletionRequest(currentUser.uid);
-            if (delReq?.status === 'approved') {
-              if (!isKickingOutRef.current) {
-                isKickingOutRef.current = true;
-                showLoading('บัญชีของคุณได้รับการอนุมัติการลบออกจากระบบเรียบร้อยแล้ว กำลังออกจากระบบ...');
-                await clearOrArchiveDeletionRequest(currentUser.uid);
-                if (auth) await signOut(auth);
-                setUser(null);
-                setProfile(null);
-                setTimeout(() => {
-                  hideLoading();
-                  toast('บัญชีผู้ใช้นี้ถูกลบออกจากระบบเรียบร้อยแล้ว', 'info');
-                  if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
-                    window.location.href = '/login?deleted=true';
-                  }
-                }, 1400);
-              }
-            }
           }
         });
 
-        // 2. Real-time Deletion Request listener
         unsubDeletion = subscribeUserDeletionRequest(currentUser.uid, async (delReq) => {
           if (delReq?.status === 'approved') {
             if (!isKickingOutRef.current) {
               isKickingOutRef.current = true;
               showLoading('บัญชีของคุณได้รับการอนุมัติการลบออกจากระบบเรียบร้อยแล้ว กำลังออกจากระบบ...');
               await clearOrArchiveDeletionRequest(currentUser.uid);
-              if (auth) await signOut(auth);
+              await supabase.auth.signOut();
               setUser(null);
               setProfile(null);
               setTimeout(() => {
@@ -258,59 +264,76 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       if (unsubProfile) unsubProfile();
       if (unsubDeletion) unsubDeletion();
-      unsubscribeAuth();
+      subscription.unsubscribe();
     };
   }, [syncProfile, showLoading, hideLoading, toast]);
 
   const login = async (email: string, pass: string) => {
-    if (!auth) throw new Error('Firebase Auth ไม่ได้เปิดใช้งาน กรุณาตั้งค่า .env.local');
-    const cred = await signInWithEmailAndPassword(auth, email, pass);
-    if (cred.user) {
-      await clearOrArchiveDeletionRequest(cred.user.uid);
-      await syncProfile(cred.user, { isExplicitLogin: true });
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password: pass,
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    if (data.user) {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('j3a_last_auth_provider', 'email');
+        localStorage.setItem('j3a_last_email', data.user.email || '');
+      }
+      const appUser = mapSupabaseUserToAppUser(data.user)!;
+      await clearOrArchiveDeletionRequest(appUser.uid);
+      await syncProfile(appUser, { isExplicitLogin: true });
     }
   };
 
   const register = async (email: string, pass: string, name: string) => {
-    if (!auth) throw new Error('Firebase Auth ไม่ได้เปิดใช้งาน กรุณาตั้งค่า .env.local');
-    const cred = await createUserWithEmailAndPassword(auth, email, pass);
-    if (cred.user) {
-      await updateProfile(cred.user, { displayName: name });
-      await clearOrArchiveDeletionRequest(cred.user.uid);
-      const newProfile = await createUserProfile(cred.user.uid, {
-        email,
-        displayName: name,
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password: pass,
+      options: {
+        data: {
+          full_name: name.trim(),
+          name: name.trim(),
+        },
+      },
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    if (data.user) {
+      const appUser = mapSupabaseUserToAppUser(data.user)!;
+      await clearOrArchiveDeletionRequest(appUser.uid);
+      const newProfile = await createUserProfile(appUser.uid, {
+        email: appUser.email || undefined,
+        displayName: name.trim(),
       });
-      try {
-        await updateUserProfile(cred.user.uid, { displayName: name });
-        newProfile.displayName = name;
-      } catch (e) {
-        console.warn('Could not force update displayName in firestore:', e);
-      }
       setProfile(newProfile);
     }
   };
 
   const loginWithGoogle = async () => {
-    if (!auth) throw new Error('Firebase Auth ไม่ได้เปิดใช้งาน กรุณาตั้งค่า .env.local');
-    // Set local persistence so user remains logged in across closing and reopening browser
-    await setPersistence(auth, browserLocalPersistence).catch(() => {});
-    const provider = new GoogleAuthProvider();
-    // Intentionally no forced 'select_account' prompt so Google automatically uses the existing session
-    const cred = await signInWithPopup(auth, provider);
-    if (cred.user) {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('j3a_last_auth_provider', 'google');
-        localStorage.setItem('j3a_last_email', cred.user.email || '');
-      }
-      await clearOrArchiveDeletionRequest(cred.user.uid);
-      await syncProfile(cred.user, { isExplicitLogin: true });
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('j3a_last_auth_provider', 'google');
+    }
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/` : undefined,
+      },
+    });
+
+    if (error) {
+      throw error;
     }
   };
 
   const logout = async () => {
-    if (!auth) return;
-    await signOut(auth);
+    await supabase.auth.signOut();
     if (typeof window !== 'undefined') {
       localStorage.removeItem('j3a_last_auth_provider');
     }
@@ -319,8 +342,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const resetPassword = async (email: string) => {
-    if (!auth) throw new Error('Firebase Auth ไม่ได้เปิดใช้งาน');
-    await sendPasswordResetEmail(auth, email);
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/forgot-password` : undefined,
+    });
+    if (error) throw error;
   };
 
   const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'pongpataradanai@gmail.com,admin@j3astore.com,mynameisyee0@gmail.com')
@@ -343,7 +368,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role,
         isAdmin,
         loading,
-        isFirebaseReady: isFirebaseConfigured,
+        isFirebaseReady: true,
         login,
         register,
         loginWithGoogle,

@@ -1,51 +1,21 @@
-import {
-  collection,
-  doc,
-  getDocs,
-  getDoc,
-  addDoc,
-  updateDoc,
-  query,
-  where,
-  serverTimestamp,
-  Timestamp,
-  onSnapshot,
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase/client';
+import { supabase } from '@/lib/supabase/client';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import { TopupRequest, CreateTopupInput, TopupStatus } from '@/types/topup';
 import { getUserProfile, updateUserCredits } from './users';
 
-const TOPUPS_COLLECTION = 'topups';
-
-function mapDocToTopup(docSnap: { id: string; data: () => Record<string, unknown> }): TopupRequest {
-  const data = docSnap.data();
-
-  let createdAt = new Date().toISOString();
-  if (data.createdAt instanceof Timestamp) {
-    createdAt = data.createdAt.toDate().toISOString();
-  } else if (typeof data.createdAt === 'string') {
-    createdAt = data.createdAt;
-  }
-
-  let updatedAt = new Date().toISOString();
-  if (data.updatedAt instanceof Timestamp) {
-    updatedAt = data.updatedAt.toDate().toISOString();
-  } else if (typeof data.updatedAt === 'string') {
-    updatedAt = data.updatedAt;
-  }
-
+function mapRowToTopup(row: any): TopupRequest {
   return {
-    id: docSnap.id,
-    topupNumber: (data.topupNumber as string) || `TOP-${docSnap.id.slice(-6).toUpperCase()}`,
-    userId: (data.userId as string) || '',
-    userEmail: (data.userEmail as string) || '',
-    userName: (data.userName as string) || 'ลูกค้า',
-    amount: Number(data.amount) || 0,
-    paymentSlipUrl: (data.paymentSlipUrl as string) || '',
-    status: (data.status as TopupStatus) || 'pending',
-    adminNote: (data.adminNote as string) || undefined,
-    createdAt,
-    updatedAt,
+    id: row.id,
+    topupNumber: row.topup_number || `TOP-${row.id.slice(-6).toUpperCase()}`,
+    userId: row.user_id || '',
+    userEmail: row.user_email || '',
+    userName: row.user_name || 'ลูกค้า',
+    amount: Number(row.amount) || 0,
+    paymentSlipUrl: row.payment_slip_url || '',
+    status: (row.status as TopupStatus) || 'pending',
+    adminNote: row.admin_note || undefined,
+    createdAt: row.created_at || new Date().toISOString(),
+    updatedAt: row.updated_at || new Date().toISOString(),
   };
 }
 
@@ -53,57 +23,55 @@ function mapDocToTopup(docSnap: { id: string; data: () => Record<string, unknown
  * Customer submits a top-up request with payment slip
  */
 export async function createTopupRequest(input: CreateTopupInput): Promise<TopupRequest> {
-  if (!db) throw new Error('Firestore is not initialized.');
   if (input.amount <= 0) throw new Error('ยอดเงินต้องมากกว่า 0 บาท');
   if (!input.paymentSlipUrl) throw new Error('กรุณาแนบรูปภาพสลิปการโอนเงิน');
 
-  const timestamp = Date.now().toString().slice(-6);
-  const topupNumber = `TOP-${timestamp}`;
+  const id = `topup_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+  const topupNumber = `TOP-${Date.now().toString().slice(-6)}`;
 
-  const topupDoc = {
-    topupNumber,
-    userId: input.userId,
-    userEmail: input.userEmail,
-    userName: input.userName,
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.userId || '');
+  const userId = isUuid ? input.userId : null;
+
+  const row = {
+    id,
+    topup_number: topupNumber,
+    user_id: userId,
+    user_email: input.userEmail,
+    user_name: input.userName,
     amount: Math.round(input.amount),
-    paymentSlipUrl: input.paymentSlipUrl,
+    payment_slip_url: input.paymentSlipUrl,
     status: 'pending' as TopupStatus,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
   };
 
-  const colRef = collection(db, TOPUPS_COLLECTION);
-  const docRef = await addDoc(colRef, topupDoc);
+  const { error } = await supabase.from('topups').insert([row]);
+  if (error) {
+    throw new Error(`Failed to create topup request in Supabase: ${error.message}`);
+  }
 
-  return {
-    id: docRef.id,
-    topupNumber,
-    userId: input.userId,
-    userEmail: input.userEmail,
-    userName: input.userName,
-    amount: Math.round(input.amount),
-    paymentSlipUrl: input.paymentSlipUrl,
-    status: 'pending',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
+  return mapRowToTopup(row);
 }
 
 /**
  * Fetch top-up requests for a specific user
  */
 export async function getUserTopups(userId: string): Promise<TopupRequest[]> {
-  if (!db || !userId) return [];
+  if (!userId) return [];
 
   try {
-    const colRef = collection(db, TOPUPS_COLLECTION);
-    const q = query(colRef, where('userId', '==', userId));
-    const snap = await getDocs(q);
+    const { data, error } = await supabase
+      .from('topups')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
 
-    const items = snap.docs.map(mapDocToTopup);
-    // Sort descending by creation date
-    items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    return items;
+    if (error) {
+      console.error('Error fetching user top-ups from Supabase:', error.message);
+      return [];
+    }
+
+    return (data || []).map(mapRowToTopup);
   } catch (error) {
     console.error('Error fetching user top-ups:', error);
     return [];
@@ -114,19 +82,20 @@ export async function getUserTopups(userId: string): Promise<TopupRequest[]> {
  * Admin: Fetch all top-up requests
  */
 export async function getAllTopups(filterStatus?: TopupStatus | 'all'): Promise<TopupRequest[]> {
-  if (!db) return [];
-
   try {
-    const colRef = collection(db, TOPUPS_COLLECTION);
-    let q = query(colRef);
+    let query = supabaseAdmin.from('topups').select('*');
+
     if (filterStatus && filterStatus !== 'all') {
-      q = query(colRef, where('status', '==', filterStatus));
+      query = query.eq('status', filterStatus);
     }
 
-    const snap = await getDocs(q);
-    const items = snap.docs.map(mapDocToTopup);
-    items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    return items;
+    const { data, error } = await query.order('created_at', { ascending: false });
+    if (error) {
+      console.error('Error fetching all top-ups from Supabase:', error.message);
+      return [];
+    }
+
+    return (data || []).map(mapRowToTopup);
   } catch (error) {
     console.error('Error fetching all top-ups:', error);
     return [];
@@ -137,36 +106,42 @@ export async function getAllTopups(filterStatus?: TopupStatus | 'all'): Promise<
  * Admin Action: Approve top-up request and credit amount to User's Wallet balance
  */
 export async function approveTopup(topupId: string): Promise<{ success: boolean; newCredits: number }> {
-  if (!db) throw new Error('Firestore is not initialized.');
+  const { data: topupRow, error: topupErr } = await supabaseAdmin
+    .from('topups')
+    .select('*')
+    .eq('id', topupId)
+    .limit(1)
+    .maybeSingle();
 
-  const topupDocRef = doc(db, TOPUPS_COLLECTION, topupId);
-  const topupSnap = await getDoc(topupDocRef);
-
-  if (!topupSnap.exists()) {
+  if (topupErr || !topupRow) {
     throw new Error('ไม่พบคำขอเติมเงินนี้ในระบบ');
   }
 
-  const topupData = topupSnap.data();
-  if (topupData.status === 'approved') {
+  if (topupRow.status === 'approved') {
     throw new Error('คำขอนี้ได้รับการอนุมัติเงินเข้าบัญชีไปแล้ว');
   }
 
-  const userId = topupData.userId as string;
-  const amount = Number(topupData.amount) || 0;
+  const userId = topupRow.user_id as string;
+  const amount = Number(topupRow.amount) || 0;
 
-  // 1. Fetch user's current credits
+  // 1. Fetch user profile
   const userProfile = await getUserProfile(userId);
   const currentCredits = userProfile?.credits || 0;
   const newCredits = currentCredits + amount;
 
-  // 2. Credit the money to User's Wallet in Firestore
+  // 2. Credit the money to User's Wallet in Supabase
   await updateUserCredits(userId, newCredits);
 
   // 3. Mark top-up as approved
-  await updateDoc(topupDocRef, {
-    status: 'approved',
-    updatedAt: serverTimestamp(),
-  });
+  const { error: updateErr } = await supabaseAdmin
+    .from('topups')
+    .update({
+      status: 'approved',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', topupId);
+
+  if (updateErr) throw new Error(updateErr.message);
 
   return { success: true, newCredits };
 }
@@ -175,14 +150,16 @@ export async function approveTopup(topupId: string): Promise<{ success: boolean;
  * Admin Action: Reject top-up request with optional reason
  */
 export async function rejectTopup(topupId: string, reason?: string): Promise<void> {
-  if (!db) throw new Error('Firestore is not initialized.');
+  const { error } = await supabaseAdmin
+    .from('topups')
+    .update({
+      status: 'rejected',
+      admin_note: reason || 'สลิปไม่ถูกต้อง หรือไม่พบยอดเงินเข้าบัญชี',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', topupId);
 
-  const topupDocRef = doc(db, TOPUPS_COLLECTION, topupId);
-  await updateDoc(topupDocRef, {
-    status: 'rejected',
-    adminNote: reason || 'สลิปไม่ถูกต้อง หรือไม่พบยอดเงินเข้าบัญชี',
-    updatedAt: serverTimestamp(),
-  });
+  if (error) throw new Error(error.message);
 }
 
 /**
@@ -192,19 +169,21 @@ export function subscribeUserTopups(
   userId: string,
   callback: (topups: TopupRequest[]) => void
 ): () => void {
-  if (!db || !userId) return () => {};
+  getUserTopups(userId).then(callback);
 
-  const colRef = collection(db, TOPUPS_COLLECTION);
-  const q = query(colRef, where('userId', '==', userId));
-  return onSnapshot(
-    q,
-    (snapshot) => {
-      const topups = snapshot.docs.map(mapDocToTopup);
-      topups.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      callback(topups);
-    },
-    (err) => {
-      console.warn('subscribeUserTopups error:', err);
-    }
-  );
+  const channel = supabase
+    .channel(`topups_${userId}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'topups', filter: `user_id=eq.${userId}` },
+      async () => {
+        const topups = await getUserTopups(userId);
+        callback(topups);
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
 }

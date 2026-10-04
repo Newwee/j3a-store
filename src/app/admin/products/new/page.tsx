@@ -9,7 +9,7 @@ export default function NewProductPage() {
     <div className="space-y-6">
       <AdminHeader
         title="เพิ่มสินค้าใหม่ (Create Product)"
-        description="กรอกข้อมูลสินค้า อัปโหลดรูปภาพขึ้น Firebase Storage และบันทึกลงระบบทันที"
+        description="กรอกข้อมูลสินค้า อัปโหลดรูปภาพ และบันทึกลงระบบทันที"
         actionText=""
         actionHref=""
       />

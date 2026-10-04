@@ -1,69 +1,22 @@
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  setDoc,
-  updateDoc,
-  deleteDoc,
-  query,
-  where,
-  orderBy,
-  limit,
-  serverTimestamp,
-  Timestamp,
-  onSnapshot,
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase/client';
+import { supabase } from '@/lib/supabase/client';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import { DeletionRequest, DeletionRequestStatus } from '@/types/user';
 import { deleteUserDoc } from '@/lib/firestore/users';
 
-const DELETION_REQUESTS_COLLECTION = 'deletion_requests';
-
-function mapDocToDeletionRequest(docSnap: { id: string; data: () => Record<string, unknown> }): DeletionRequest {
-  const data = docSnap.data();
-
-  let createdAt = new Date().toISOString();
-  if (data.createdAt instanceof Timestamp) {
-    createdAt = data.createdAt.toDate().toISOString();
-  } else if (typeof data.createdAt === 'string') {
-    createdAt = data.createdAt;
-  }
-
-  let updatedAt = new Date().toISOString();
-  if (data.updatedAt instanceof Timestamp) {
-    updatedAt = data.updatedAt.toDate().toISOString();
-  } else if (typeof data.updatedAt === 'string') {
-    updatedAt = data.updatedAt;
-  }
-
-  let approvedAt: string | undefined = undefined;
-  if (data.approvedAt instanceof Timestamp) {
-    approvedAt = data.approvedAt.toDate().toISOString();
-  } else if (typeof data.approvedAt === 'string') {
-    approvedAt = data.approvedAt;
-  }
-
-  let rejectedAt: string | undefined = undefined;
-  if (data.rejectedAt instanceof Timestamp) {
-    rejectedAt = data.rejectedAt.toDate().toISOString();
-  } else if (typeof data.rejectedAt === 'string') {
-    rejectedAt = data.rejectedAt;
-  }
-
+function mapRowToDeletionRequest(row: any): DeletionRequest {
   return {
-    id: docSnap.id,
-    userId: (data.userId as string) || docSnap.id,
-    email: (data.email as string) || null,
-    displayName: (data.displayName as string) || null,
-    credits: Number(data.credits) || 0,
-    status: (data.status as DeletionRequestStatus) || 'pending',
-    userReason: (data.userReason as string) || undefined,
-    adminNote: (data.adminNote as string) || undefined,
-    createdAt,
-    updatedAt,
-    approvedAt,
-    rejectedAt,
+    id: row.id,
+    userId: row.user_id || row.id,
+    email: row.email || null,
+    displayName: row.display_name || null,
+    credits: Number(row.credits) || 0,
+    status: (row.status as DeletionRequestStatus) || 'pending',
+    userReason: row.user_reason || undefined,
+    adminNote: row.admin_note || undefined,
+    createdAt: row.created_at || new Date().toISOString(),
+    updatedAt: row.updated_at || new Date().toISOString(),
+    approvedAt: row.approved_at || undefined,
+    rejectedAt: row.rejected_at || undefined,
   };
 }
 
@@ -77,51 +30,44 @@ export async function requestAccountDeletion(params: {
   credits?: number;
   userReason?: string;
 }): Promise<DeletionRequest> {
-  if (!db) throw new Error('Firestore is not initialized.');
   if (!params.userId) throw new Error('User ID is required.');
 
-  const docRef = doc(db, DELETION_REQUESTS_COLLECTION, params.userId);
-
-  const payload = {
-    userId: params.userId,
+  const row = {
+    id: params.userId,
+    user_id: params.userId,
     email: params.email || null,
-    displayName: params.displayName || null,
+    display_name: params.displayName || null,
     credits: Number(params.credits) || 0,
     status: 'pending' as DeletionRequestStatus,
-    userReason: params.userReason?.trim() || '',
-    updatedAt: serverTimestamp(),
+    user_reason: params.userReason?.trim() || null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
   };
 
-  const existing = await getDoc(docRef);
-  if (existing.exists()) {
-    await updateDoc(docRef, payload);
-  } else {
-    await setDoc(docRef, {
-      ...payload,
-      createdAt: serverTimestamp(),
-    });
+  const { error } = await supabaseAdmin.from('deletion_requests').upsert([row]);
+  if (error) {
+    throw new Error(`Failed to request account deletion in Supabase: ${error.message}`);
   }
 
-  return {
-    id: params.userId,
-    ...payload,
-    userReason: params.userReason?.trim() || undefined,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
+  return mapRowToDeletionRequest(row);
 }
 
 /**
  * Get active deletion request for a specific user
  */
 export async function getUserDeletionRequest(userId: string): Promise<DeletionRequest | null> {
-  if (!db || !userId) return null;
+  if (!userId) return null;
 
   try {
-    const docRef = doc(db, DELETION_REQUESTS_COLLECTION, userId);
-    const snap = await getDoc(docRef);
-    if (!snap.exists()) return null;
-    return mapDocToDeletionRequest(snap);
+    const { data, error } = await supabaseAdmin
+      .from('deletion_requests')
+      .select('*')
+      .or(`id.eq.${userId},user_id.eq.${userId}`)
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return mapRowToDeletionRequest(data);
   } catch (error) {
     console.error('Error fetching deletion request for user:', error);
     return null;
@@ -132,14 +78,18 @@ export async function getUserDeletionRequest(userId: string): Promise<DeletionRe
  * Get all deletion requests for Admin Customers page
  */
 export async function getAllDeletionRequests(): Promise<DeletionRequest[]> {
-  if (!db) return [];
-
   try {
-    const colRef = collection(db, DELETION_REQUESTS_COLLECTION);
-    const snap = await getDocs(colRef);
-    const requests = snap.docs.map(mapDocToDeletionRequest);
-    // Sort newest first
-    return requests.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const { data, error } = await supabaseAdmin
+      .from('deletion_requests')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching all deletion requests from Supabase:', error.message);
+      return [];
+    }
+
+    return (data || []).map(mapRowToDeletionRequest);
   } catch (error) {
     console.error('Error fetching all deletion requests:', error);
     return [];
@@ -147,69 +97,70 @@ export async function getAllDeletionRequests(): Promise<DeletionRequest[]> {
 }
 
 /**
- * Admin action: Approve account deletion, permanently deleting the user's data from Firestore
+ * Admin action: Approve account deletion, permanently deleting the user's data
  */
 export async function approveAccountDeletion(requestId: string, userId: string, adminNote?: string): Promise<void> {
-  if (!db) throw new Error('Firestore is not initialized.');
-
-  // 1. Delete user document from users collection
+  // 1. Delete user profile
   await deleteUserDoc(userId);
 
   // 2. Mark deletion request as approved
-  const docRef = doc(db, DELETION_REQUESTS_COLLECTION, requestId);
-  await updateDoc(docRef, {
-    status: 'approved',
-    adminNote: adminNote?.trim() || 'อนุมัติการลบบัญชีและข้อมูลผู้ใช้เรียบร้อยแล้ว',
-    approvedAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
+  const { error } = await supabaseAdmin
+    .from('deletion_requests')
+    .update({
+      status: 'approved',
+      admin_note: adminNote?.trim() || 'อนุมัติการลบบัญชีและข้อมูลผู้ใช้เรียบร้อยแล้ว',
+      approved_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .or(`id.eq.${requestId},user_id.eq.${userId}`);
+
+  if (error) throw new Error(error.message);
 }
 
 /**
  * Admin action: Reject account deletion request
  */
 export async function rejectAccountDeletion(requestId: string, adminNote?: string): Promise<void> {
-  if (!db) throw new Error('Firestore is not initialized.');
+  const { error } = await supabaseAdmin
+    .from('deletion_requests')
+    .update({
+      status: 'rejected',
+      admin_note: adminNote?.trim() || 'คำขอลบบัญชีถูกปฏิเสธโดยผู้ดูแลระบบ',
+      rejected_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', requestId);
 
-  const docRef = doc(db, DELETION_REQUESTS_COLLECTION, requestId);
-  await updateDoc(docRef, {
-    status: 'rejected',
-    adminNote: adminNote?.trim() || 'คำขอลบบัญชีถูกปฏิเสธโดยผู้ดูแลระบบ',
-    rejectedAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
+  if (error) throw new Error(error.message);
 }
 
 /**
  * User action: Cancel own pending deletion request
  */
 export async function cancelAccountDeletion(userId: string): Promise<void> {
-  if (!db) throw new Error('Firestore is not initialized.');
+  const { error } = await supabaseAdmin
+    .from('deletion_requests')
+    .update({
+      status: 'cancelled',
+      updated_at: new Date().toISOString(),
+    })
+    .or(`id.eq.${userId},user_id.eq.${userId}`);
 
-  const docRef = doc(db, DELETION_REQUESTS_COLLECTION, userId);
-  await updateDoc(docRef, {
-    status: 'cancelled',
-    updatedAt: serverTimestamp(),
-  });
+  if (error) throw new Error(error.message);
 }
 
 /**
  * Clear or cancel a deletion request to unblock re-registration
  */
 export async function clearOrArchiveDeletionRequest(userId: string): Promise<void> {
-  if (!db || !userId) return;
-  const docRef = doc(db, DELETION_REQUESTS_COLLECTION, userId);
+  if (!userId) return;
   try {
-    await deleteDoc(docRef);
+    await supabaseAdmin
+      .from('deletion_requests')
+      .delete()
+      .or(`id.eq.${userId},user_id.eq.${userId}`);
   } catch (err) {
-    try {
-      await updateDoc(docRef, {
-        status: 'cancelled',
-        updatedAt: serverTimestamp(),
-      });
-    } catch (e) {
-      console.warn('Could not clear or cancel deletion request:', e);
-    }
+    console.warn('Could not clear deletion request:', err);
   }
 }
 
@@ -220,20 +171,21 @@ export function subscribeUserDeletionRequest(
   userId: string,
   callback: (request: DeletionRequest | null) => void
 ): () => void {
-  if (!db || !userId) return () => {};
+  getUserDeletionRequest(userId).then(callback);
 
-  const docRef = doc(db, DELETION_REQUESTS_COLLECTION, userId);
-  return onSnapshot(
-    docRef,
-    (snap) => {
-      if (!snap.exists()) {
-        callback(null);
-        return;
+  const channel = supabase
+    .channel(`deletion_req_${userId}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'deletion_requests', filter: `user_id=eq.${userId}` },
+      async () => {
+        const req = await getUserDeletionRequest(userId);
+        callback(req);
       }
-      callback(mapDocToDeletionRequest(snap));
-    },
-    (err) => {
-      console.warn('subscribeUserDeletionRequest error:', err);
-    }
-  );
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
 }

@@ -1,44 +1,28 @@
-import {
-  collection,
-  doc,
-  getDocs,
-  getDoc,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  query,
-  where,
-  orderBy,
-  limit,
-  serverTimestamp,
-  Timestamp,
-  onSnapshot,
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase/client';
+import { supabase } from '@/lib/supabase/client';
 import { BundlePackage, BundleFormData, BundleStatus } from '@/types/bundle';
 import { Product } from '@/types/product';
 
-const BUNDLES_COLLECTION = 'bundles';
+function mapRowToBundle(row: any): BundlePackage {
+  const items = Array.isArray(row.items)
+    ? row.items
+    : typeof row.items === 'string'
+    ? JSON.parse(row.items || '[]')
+    : [];
 
-function mapDocToBundle(docSnap: { id: string; data: () => Record<string, unknown> }): BundlePackage {
-  const data = docSnap.data();
+  const images = Array.isArray(row.images)
+    ? row.images
+    : typeof row.images === 'string'
+    ? JSON.parse(row.images || '[]')
+    : [row.image || '/logo.png'];
 
-  let createdAt = new Date().toISOString();
-  if (data.createdAt instanceof Timestamp) {
-    createdAt = data.createdAt.toDate().toISOString();
-  } else if (typeof data.createdAt === 'string') {
-    createdAt = data.createdAt;
-  }
+  const tags = Array.isArray(row.tags)
+    ? row.tags
+    : typeof row.tags === 'string'
+    ? JSON.parse(row.tags || '[]')
+    : ['bundle', 'promotion'];
 
-  let updatedAt = new Date().toISOString();
-  if (data.updatedAt instanceof Timestamp) {
-    updatedAt = data.updatedAt.toDate().toISOString();
-  } else if (typeof data.updatedAt === 'string') {
-    updatedAt = data.updatedAt;
-  }
-
-  const originalPrice = Number(data.originalPrice) || 0;
-  const price = Number(data.price) || 0;
+  const originalPrice = Number(row.compare_price || row.original_price) || items.reduce((sum: number, it: any) => sum + (Number(it.price) || 0), 0);
+  const price = Number(row.price) || 0;
   const savings = Math.max(0, originalPrice - price);
   const discountPercent =
     originalPrice > 0 && price < originalPrice
@@ -46,23 +30,23 @@ function mapDocToBundle(docSnap: { id: string; data: () => Record<string, unknow
       : 0;
 
   return {
-    id: docSnap.id,
-    name: (data.name as string) || '',
-    slug: (data.slug as string) || '',
-    description: (data.description as string) || '',
-    image: (data.image as string) || '/logo.png',
-    images: Array.isArray(data.images) ? data.images : [],
-    items: Array.isArray(data.items) ? (data.items as any) : [],
+    id: row.id,
+    name: row.name || '',
+    slug: row.slug || '',
+    description: row.description || '',
+    image: row.image || '/logo.png',
+    images,
+    items,
     originalPrice,
     price,
     savings,
     discountPercent,
-    stock: Number(data.stock) || 0,
-    status: (data.status as BundleStatus) || 'active',
-    featured: Boolean(data.featured),
-    tags: Array.isArray(data.tags) ? data.tags : [],
-    createdAt,
-    updatedAt,
+    stock: Number(row.stock) || 999,
+    status: (row.status as BundleStatus) || 'active',
+    featured: Boolean(row.featured),
+    tags,
+    createdAt: row.created_at || new Date().toISOString(),
+    updatedAt: row.updated_at || new Date().toISOString(),
   };
 }
 
@@ -75,32 +59,28 @@ export interface GetBundlesFilter {
  * Fetch all bundle packages
  */
 export async function getBundles(filter: GetBundlesFilter = {}): Promise<BundlePackage[]> {
-  if (!db) {
-    console.warn('Firestore is not initialized.');
-    return [];
-  }
-
   try {
-    const colRef = collection(db, BUNDLES_COLLECTION);
-    let q = query(colRef);
+    let query = supabase.from('bundles').select('*');
 
     if (filter.status && filter.status !== 'all') {
-      q = query(q, where('status', '==', filter.status));
+      query = query.eq('status', filter.status);
     }
 
     if (filter.limitCount && filter.limitCount > 0) {
-      q = query(q, limit(filter.limitCount));
+      query = query.limit(filter.limitCount);
     }
 
-    const snapshot = await getDocs(q);
-    const bundles = snapshot.docs.map(mapDocToBundle);
+    const { data, error } = await query;
+    if (error) {
+      console.error('Error fetching bundles from Supabase:', error.message);
+      return [];
+    }
 
-    // Sort by createdAt desc
+    const bundles = (data || []).map(mapRowToBundle);
     bundles.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
     return bundles;
   } catch (error) {
-    console.error('Error fetching bundles from Firestore:', error);
+    console.error('Error fetching bundles:', error);
     return [];
   }
 }
@@ -109,13 +89,18 @@ export async function getBundles(filter: GetBundlesFilter = {}): Promise<BundleP
  * Fetch a single bundle by ID
  */
 export async function getBundleById(id: string): Promise<BundlePackage | null> {
-  if (!db || !id) return null;
+  if (!id) return null;
 
   try {
-    const docRef = doc(db, BUNDLES_COLLECTION, id);
-    const snap = await getDoc(docRef);
-    if (!snap.exists()) return null;
-    return mapDocToBundle(snap);
+    const { data, error } = await supabase
+      .from('bundles')
+      .select('*')
+      .eq('id', id)
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return mapRowToBundle(data);
   } catch (error) {
     console.error(`Error fetching bundle id=${id}:`, error);
     return null;
@@ -126,28 +111,28 @@ export async function getBundleById(id: string): Promise<BundlePackage | null> {
  * Fetch a single bundle by slug
  */
 export async function getBundleBySlug(slug: string): Promise<BundlePackage | null> {
-  if (!db || !slug) return null;
+  if (!slug) return null;
 
   try {
-    const colRef = collection(db, BUNDLES_COLLECTION);
-    const q = query(colRef, where('slug', '==', slug), limit(1));
-    const snap = await getDocs(q);
-    if (!snap.empty) {
-      return mapDocToBundle(snap.docs[0]);
-    }
+    const { data, error } = await supabase
+      .from('bundles')
+      .select('*')
+      .eq('slug', slug)
+      .limit(1)
+      .maybeSingle();
 
-    // Resilient fallback: lookup by normalized slug or bundle ID
+    if (data) return mapRowToBundle(data);
+
+    // Normalized fallback: look up by ID or substring
+    const allBundles = await getBundles();
     const normSlug = slug.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const allSnap = await getDocs(colRef);
-    const found = allSnap.docs
-      .map(mapDocToBundle)
-      .find((b) => {
-        if (!b) return false;
-        if (b.id === slug || b.id.replace(/^bundle_/, '') === slug.replace(/^bundle_/, '')) return true;
-        const bNorm = (b.slug || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-        const bNameNorm = (b.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-        return bNorm === normSlug || bNameNorm.includes(normSlug) || normSlug.includes(bNorm);
-      });
+    const found = allBundles.find((b) => {
+      if (!b) return false;
+      if (b.id === slug || b.id.replace(/^bundle_/, '') === slug.replace(/^bundle_/, '')) return true;
+      const bNorm = (b.slug || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const bNameNorm = (b.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      return bNorm === normSlug || bNameNorm.includes(normSlug) || normSlug.includes(bNorm);
+    });
 
     return found || null;
   } catch (error) {
@@ -160,14 +145,13 @@ export async function getBundleBySlug(slug: string): Promise<BundlePackage | nul
  * Create a new bundle package (Admin)
  */
 export async function createBundle(data: BundleFormData): Promise<BundlePackage> {
-  if (!db) throw new Error('Firestore is not initialized.');
-
   if (!data.name.trim()) throw new Error('กรุณาระบุชื่อแพ็กเกจ Bundle');
   if (!data.items || data.items.length < 2) {
     throw new Error('แพ็กเกจ Bundle จะต้องประกอบด้วยสินค้าอย่างน้อย 2 รายการ');
   }
   if (data.price <= 0) throw new Error('ราคาบันเดิลต้องมากกว่า 0 บาท');
 
+  const id = `bundle_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
   const slug =
     data.slug?.trim() ||
     data.name
@@ -179,83 +163,71 @@ export async function createBundle(data: BundleFormData): Promise<BundlePackage>
 
   const originalPrice = data.items.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
   const price = Math.round(Number(data.price));
-  const savings = Math.max(0, originalPrice - price);
-  const discountPercent =
-    originalPrice > 0 && price < originalPrice
-      ? Math.round(((originalPrice - price) / originalPrice) * 100)
-      : 0;
 
-  const docPayload = {
+  const row = {
+    id,
     name: data.name.trim(),
     slug,
     description: data.description?.trim() || '',
     image: data.image?.trim() || data.items[0]?.image || '/logo.png',
-    images: data.images || [data.image || data.items[0]?.image || '/logo.png'],
     items: data.items,
-    originalPrice,
+    compare_price: originalPrice,
     price,
-    savings,
-    discountPercent,
-    stock: Number(data.stock) || 0,
-    status: data.status || 'active',
     featured: Boolean(data.featured),
-    tags: data.tags || ['bundle', 'promotion'],
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
+    status: data.status || 'active',
+    rating: 5.0,
+    review_count: 0,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
   };
 
-  const colRef = collection(db, BUNDLES_COLLECTION);
-  const docRef = await addDoc(colRef, docPayload);
+  const { error } = await supabase.from('bundles').insert([row]);
+  if (error) {
+    throw new Error(`Failed to create bundle in Supabase: ${error.message}`);
+  }
 
-  return {
-    id: docRef.id,
-    ...docPayload,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
+  return mapRowToBundle(row);
 }
 
 /**
  * Update an existing bundle package (Admin)
  */
 export async function updateBundle(id: string, data: Partial<BundleFormData>): Promise<void> {
-  if (!db) throw new Error('Firestore is not initialized.');
-
-  const docRef = doc(db, BUNDLES_COLLECTION, id);
-  const payload: Record<string, any> = {
-    ...data,
-    updatedAt: serverTimestamp(),
+  const updates: Record<string, any> = {
+    updated_at: new Date().toISOString(),
   };
 
-  if (data.items && data.items.length >= 2) {
+  if (data.name !== undefined) updates.name = data.name.trim();
+  if (data.slug !== undefined) updates.slug = data.slug.trim();
+  if (data.description !== undefined) updates.description = data.description;
+  if (data.image !== undefined) updates.image = data.image;
+  if (data.items !== undefined) {
+    updates.items = data.items;
     const originalPrice = data.items.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
-    payload.originalPrice = originalPrice;
-    if (data.price !== undefined) {
-      const price = Math.round(Number(data.price));
-      payload.price = price;
-      payload.savings = Math.max(0, originalPrice - price);
-      payload.discountPercent =
-        originalPrice > 0 && price < originalPrice
-          ? Math.round(((originalPrice - price) / originalPrice) * 100)
-          : 0;
-    }
+    updates.compare_price = originalPrice;
   }
+  if (data.price !== undefined) updates.price = Math.round(Number(data.price));
+  if (data.featured !== undefined) updates.featured = Boolean(data.featured);
+  if (data.status !== undefined) updates.status = data.status;
 
-  await updateDoc(docRef, payload);
+  const { error } = await supabase.from('bundles').update(updates).eq('id', id);
+  if (error) {
+    throw new Error(`Failed to update bundle in Supabase: ${error.message}`);
+  }
 }
 
 /**
  * Delete a bundle package (Admin)
  */
 export async function deleteBundle(id: string): Promise<void> {
-  if (!db) throw new Error('Firestore is not initialized.');
-  const docRef = doc(db, BUNDLES_COLLECTION, id);
-  await deleteDoc(docRef);
+  const { error } = await supabase.from('bundles').delete().eq('id', id);
+  if (error) {
+    throw new Error(`Failed to delete bundle in Supabase: ${error.message}`);
+  }
 }
 
 /**
  * Helper to convert BundlePackage into standard Product format
- * so it can be added directly to the Cart and handled by Checkout seamlessly.
  */
 export function bundleToProduct(bundle: BundlePackage): Product {
   const itemNames = bundle.items.map((i) => `• ${i.name} (฿${i.price.toLocaleString()})`).join('\n');
@@ -292,23 +264,20 @@ export function subscribeBundles(
   callback: (bundles: BundlePackage[]) => void,
   options?: { status?: BundleStatus }
 ): () => void {
-  if (!db) return () => {};
+  getBundles(options).then(callback);
 
-  const colRef = collection(db, BUNDLES_COLLECTION);
-  const constraints: any[] = [];
-  if (options?.status) {
-    constraints.push(where('status', '==', options.status));
-  }
+  const channel = supabase
+    .channel('bundles_realtime')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'bundles' },
+      () => {
+        getBundles(options).then(callback);
+      }
+    )
+    .subscribe();
 
-  const q = query(colRef, ...constraints);
-  return onSnapshot(
-    q,
-    (snapshot) => {
-      const bundles = snapshot.docs.map(mapDocToBundle);
-      callback(bundles);
-    },
-    (err) => {
-      console.warn('subscribeBundles error:', err);
-    }
-  );
+  return () => {
+    supabase.removeChannel(channel);
+  };
 }

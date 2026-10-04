@@ -1,70 +1,53 @@
-import {
-  collection,
-  doc,
-  getDocs,
-  getDoc,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  query,
-  where,
-  orderBy,
-  limit,
-  serverTimestamp,
-  Timestamp,
-  onSnapshot,
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase/client';
+import { supabase } from '@/lib/supabase/client';
 import { Product, ProductFormData, ProductStatus } from '@/types/product';
 import { deleteProductImage } from '@/lib/storage/upload';
 
-const PRODUCTS_COLLECTION = 'products';
+// Helper to convert Supabase row to Product
+function mapRowToProduct(row: any): Product {
+  const images = Array.isArray(row.images)
+    ? row.images
+    : typeof row.images === 'string'
+    ? JSON.parse(row.images || '[]')
+    : [];
 
-// Helper to convert Firestore doc to Product
-function mapDocToProduct(docSnap: { id: string; data: () => Record<string, unknown> }): Product {
-  const data = docSnap.data();
-  
-  // Format createdAt and updatedAt to ISO strings
-  let createdAt = new Date().toISOString();
-  if (data.createdAt instanceof Timestamp) {
-    createdAt = data.createdAt.toDate().toISOString();
-  } else if (typeof data.createdAt === 'string') {
-    createdAt = data.createdAt;
-  }
+  const tags = Array.isArray(row.tags)
+    ? row.tags
+    : typeof row.tags === 'string'
+    ? JSON.parse(row.tags || '[]')
+    : [];
 
-  let updatedAt = new Date().toISOString();
-  if (data.updatedAt instanceof Timestamp) {
-    updatedAt = data.updatedAt.toDate().toISOString();
-  } else if (typeof data.updatedAt === 'string') {
-    updatedAt = data.updatedAt;
-  }
+  const specs = typeof row.specs === 'object' && row.specs !== null
+    ? row.specs
+    : typeof row.specs === 'string'
+    ? JSON.parse(row.specs || '{}')
+    : {};
+
+  const rawRating = Number(row.rating) || 5.0;
+  const rating = rawRating > 5 ? Number((rawRating / 2).toFixed(1)) : rawRating;
 
   return {
-    id: docSnap.id,
-    name: (data.name as string) || '',
-    slug: (data.slug as string) || '',
-    description: (data.description as string) || '',
-    price: Number(data.price) || 0,
-    comparePrice: data.comparePrice !== undefined ? Number(data.comparePrice) : undefined,
-    image: (data.image as string) || '/logo.png',
-    images: Array.isArray(data.images) ? data.images : [],
-    category: (data.category as string) || 'ทั่วไป',
-    stock: Number(data.stock) || 0,
-    status: (data.status as ProductStatus) || 'active',
-    featured: Boolean(data.featured),
-    tags: Array.isArray(data.tags) ? data.tags : [],
-    specs: (data.specs as Record<string, string>) || {},
-    rating: (() => {
-      const raw = data.rating !== undefined ? Number(data.rating) : 5.0;
-      return raw > 5 ? Number((raw / 2).toFixed(1)) : raw;
-    })(),
-    reviewCount: data.reviewCount !== undefined ? Number(data.reviewCount) : 0,
-    showcaseUrl: (data.showcaseUrl as string) || undefined,
-    downloadUrl: (data.downloadUrl as string) || undefined,
-    deliveryNote: (data.deliveryNote as string) || undefined,
-    deliveryType: (data.deliveryType as any) || undefined,
-    createdAt,
-    updatedAt,
+    id: row.id,
+    name: row.name || '',
+    slug: row.slug || '',
+    description: row.description || '',
+    price: Number(row.price) || 0,
+    comparePrice: row.compare_price !== null && row.compare_price !== undefined ? Number(row.compare_price) : undefined,
+    image: row.image || '/logo.png',
+    images,
+    category: row.category || 'ซอฟต์แวร์ Discord',
+    stock: Number(row.stock) || 0,
+    status: (row.status as ProductStatus) || 'active',
+    featured: Boolean(row.featured),
+    tags,
+    specs,
+    rating,
+    reviewCount: Number(row.review_count) || 0,
+    showcaseUrl: row.showcase_url || undefined,
+    downloadUrl: row.download_url || undefined,
+    deliveryNote: row.delivery_note || undefined,
+    deliveryType: row.delivery_type || undefined,
+    createdAt: row.created_at || new Date().toISOString(),
+    updatedAt: row.updated_at || new Date().toISOString(),
   };
 }
 
@@ -81,39 +64,34 @@ export interface GetProductsFilter {
  * Fetch products list with optional filtering and sorting
  */
 export async function getProducts(filter: GetProductsFilter = {}): Promise<Product[]> {
-  if (!db) {
-    console.warn('Firestore is not initialized.');
-    return [];
-  }
-
   try {
-    const colRef = collection(db, PRODUCTS_COLLECTION);
-    let q = query(colRef);
+    let query = supabase.from('products').select('*');
 
-    // Apply status filter
     if (filter.status && filter.status !== 'all') {
-      q = query(q, where('status', '==', filter.status));
+      query = query.eq('status', filter.status);
     }
 
-    // Apply category filter
     if (filter.category && filter.category !== 'all' && filter.category !== 'ทั้งหมด') {
-      q = query(q, where('category', '==', filter.category));
+      query = query.eq('category', filter.category);
     }
 
-    // Apply featured filter
     if (filter.featured !== undefined) {
-      q = query(q, where('featured', '==', filter.featured));
+      query = query.eq('featured', filter.featured);
     }
 
-    // Apply limit if specified
     if (filter.limitCount && filter.limitCount > 0) {
-      q = query(q, limit(filter.limitCount));
+      query = query.limit(filter.limitCount);
     }
 
-    const snapshot = await getDocs(q);
-    let products = snapshot.docs.map(mapDocToProduct);
+    const { data, error } = await query;
+    if (error) {
+      console.error('Error fetching products from Supabase:', error.message);
+      return [];
+    }
 
-    // Client-side text search (Firestore does not support full-text search natively)
+    let products = (data || []).map(mapRowToProduct);
+
+    // Client-side text search
     if (filter.search && filter.search.trim().length > 0) {
       const term = filter.search.toLowerCase().trim();
       products = products.filter(
@@ -145,7 +123,7 @@ export async function getProducts(filter: GetProductsFilter = {}): Promise<Produ
 
     return products;
   } catch (error) {
-    console.error('Error fetching products from Firestore:', error);
+    console.error('Error fetching products:', error);
     return [];
   }
 }
@@ -154,31 +132,23 @@ export async function getProducts(filter: GetProductsFilter = {}): Promise<Produ
  * Get single product by Slug
  */
 export async function getProductBySlug(slug: string): Promise<Product | null> {
-  if (!db || !slug) return null;
+  if (!slug) return null;
 
   try {
-    const colRef = collection(db, PRODUCTS_COLLECTION);
-    // First query with active status for public access
-    let q = query(colRef, where('slug', '==', slug), where('status', '==', 'active'), limit(1));
-    let snapshot = await getDocs(q);
+    // 1. Try match by slug (active first)
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('slug', slug)
+      .limit(1)
+      .maybeSingle();
 
-    if (snapshot.empty) {
-      // Try query without status filter (for admin preview or draft)
-      try {
-        const qAll = query(colRef, where('slug', '==', slug), limit(1));
-        const allSnap = await getDocs(qAll);
-        if (!allSnap.empty) {
-          return mapDocToProduct(allSnap.docs[0]);
-        }
-      } catch {
-        // Ignored if permissions restrict non-active
-      }
-
-      // Also try fallback by ID if slug not found
-      return await getProductById(slug);
+    if (data) {
+      return mapRowToProduct(data);
     }
 
-    return mapDocToProduct(snapshot.docs[0]);
+    // 2. Try match by ID fallback
+    return await getProductById(slug);
   } catch (error) {
     console.error('Error getting product by slug:', error);
     return null;
@@ -186,124 +156,146 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
 }
 
 /**
- * Get single product by Firestore Document ID
+ * Get single product by ID
  */
 export async function getProductById(id: string): Promise<Product | null> {
-  if (!db || !id) return null;
+  if (!id) return null;
 
   try {
-    const docRef = doc(db, PRODUCTS_COLLECTION, id);
-    const docSnap = await getDoc(docRef);
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('id', id)
+      .limit(1)
+      .maybeSingle();
 
-    if (!docSnap.exists()) {
-      return null;
-    }
-
-    return mapDocToProduct(docSnap);
+    if (error || !data) return null;
+    return mapRowToProduct(data);
   } catch (error) {
     console.error('Error getting product by ID:', error);
     return null;
   }
 }
 
-function removeUndefinedDeep<T>(obj: T): T {
-  if (obj === null || obj === undefined) return obj;
-  if (Array.isArray(obj)) return obj.map((it) => removeUndefinedDeep(it)) as unknown as T;
-  if (typeof obj === 'object') {
-    if (obj instanceof Date || (obj as any)._methodName || (obj as any).toMillis) return obj;
-    const clean: Record<string, any> = {};
-    for (const [key, val] of Object.entries(obj)) {
-      if (val !== undefined) clean[key] = removeUndefinedDeep(val);
-    }
-    return clean as T;
-  }
-  return obj;
-}
-
 /**
- * Create a new product in Firestore
+ * Create a new product in Supabase
  */
 export async function createProduct(formData: ProductFormData): Promise<string> {
-  if (!db) {
-    throw new Error('Firestore is not initialized.');
-  }
+  const newId = `prod_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const slug =
+    formData.slug?.trim() ||
+    formData.name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\u0E00-\u0E7F]+/g, '-')
+      .replace(/^-+|-+$/g, '') ||
+    newId;
 
-  const cleanData = removeUndefinedDeep(formData);
-  const newDoc = {
-    ...cleanData,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
+  const row = {
+    id: newId,
+    name: formData.name.trim(),
+    slug,
+    description: formData.description || '',
+    price: Number(formData.price) || 0,
+    compare_price: formData.comparePrice !== undefined ? Number(formData.comparePrice) : null,
+    image: formData.image || '/logo.png',
+    images: formData.images || [formData.image || '/logo.png'],
+    category: formData.category || 'ซอฟต์แวร์ Discord',
+    stock: Number(formData.stock) || 0,
+    status: formData.status || 'active',
+    featured: Boolean(formData.featured),
+    tags: formData.tags || [],
+    specs: formData.specs || {},
+    showcase_url: formData.showcaseUrl || null,
+    download_url: formData.downloadUrl || null,
+    delivery_note: formData.deliveryNote || null,
+    delivery_type: formData.deliveryType || 'both',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
   };
 
-  const docRef = await addDoc(collection(db, PRODUCTS_COLLECTION), newDoc);
-  return docRef.id;
+  const { error } = await supabase.from('products').insert([row]);
+  if (error) {
+    throw new Error(`Failed to create product in Supabase: ${error.message}`);
+  }
+
+  return newId;
 }
 
 /**
  * Update an existing product
  */
 export async function updateProduct(id: string, formData: Partial<ProductFormData>): Promise<void> {
-  if (!db) {
-    throw new Error('Firestore is not initialized.');
-  }
+  const updates: Record<string, any> = {
+    updated_at: new Date().toISOString(),
+  };
 
-  const cleanData = removeUndefinedDeep(formData);
-  const docRef = doc(db, PRODUCTS_COLLECTION, id);
-  await updateDoc(docRef, {
-    ...cleanData,
-    updatedAt: serverTimestamp(),
-  });
+  if (formData.name !== undefined) updates.name = formData.name.trim();
+  if (formData.slug !== undefined) updates.slug = formData.slug.trim();
+  if (formData.description !== undefined) updates.description = formData.description;
+  if (formData.price !== undefined) updates.price = Number(formData.price);
+  if (formData.comparePrice !== undefined) updates.compare_price = formData.comparePrice;
+  if (formData.image !== undefined) updates.image = formData.image;
+  if (formData.images !== undefined) updates.images = formData.images;
+  if (formData.category !== undefined) updates.category = formData.category;
+  if (formData.stock !== undefined) updates.stock = Number(formData.stock);
+  if (formData.status !== undefined) updates.status = formData.status;
+  if (formData.featured !== undefined) updates.featured = Boolean(formData.featured);
+  if (formData.tags !== undefined) updates.tags = formData.tags;
+  if (formData.specs !== undefined) updates.specs = formData.specs;
+  if (formData.showcaseUrl !== undefined) updates.showcase_url = formData.showcaseUrl;
+  if (formData.downloadUrl !== undefined) updates.download_url = formData.downloadUrl;
+  if (formData.deliveryNote !== undefined) updates.delivery_note = formData.deliveryNote;
+  if (formData.deliveryType !== undefined) updates.delivery_type = formData.deliveryType;
+
+  const { error } = await supabase.from('products').update(updates).eq('id', id);
+  if (error) {
+    throw new Error(`Failed to update product in Supabase: ${error.message}`);
+  }
 }
 
 /**
- * Delete a product and its associated Firebase Storage image
+ * Delete a product and its associated storage image
  */
 export async function deleteProduct(id: string): Promise<void> {
-  if (!db) {
-    throw new Error('Firestore is not initialized.');
-  }
-
-  // First fetch the product to clean up images
   const product = await getProductById(id);
   if (product) {
-    if (product.image && product.image.includes('firebasestorage')) {
-      await deleteProductImage(product.image);
-    }
+    if (product.image) await deleteProductImage(product.image);
     if (product.images && product.images.length > 0) {
       for (const img of product.images) {
-        if (img.includes('firebasestorage')) {
-          await deleteProductImage(img);
-        }
+        await deleteProductImage(img);
       }
     }
   }
 
-  const docRef = doc(db, PRODUCTS_COLLECTION, id);
-  await deleteDoc(docRef);
+  const { error } = await supabase.from('products').delete().eq('id', id);
+  if (error) {
+    throw new Error(`Failed to delete product in Supabase: ${error.message}`);
+  }
 }
 
 /**
- * Quick toggle status (active, draft, out_of_stock)
+ * Quick toggle status
  */
 export async function toggleProductStatus(id: string, newStatus: ProductStatus): Promise<void> {
-  if (!db) throw new Error('Firestore is not initialized.');
-  const docRef = doc(db, PRODUCTS_COLLECTION, id);
-  await updateDoc(docRef, {
-    status: newStatus,
-    updatedAt: serverTimestamp(),
-  });
+  const { error } = await supabase
+    .from('products')
+    .update({ status: newStatus, updated_at: new Date().toISOString() })
+    .eq('id', id);
+
+  if (error) throw new Error(error.message);
 }
 
 /**
  * Quick toggle featured status
  */
 export async function toggleProductFeatured(id: string, featured: boolean): Promise<void> {
-  if (!db) throw new Error('Firestore is not initialized.');
-  const docRef = doc(db, PRODUCTS_COLLECTION, id);
-  await updateDoc(docRef, {
-    featured,
-    updatedAt: serverTimestamp(),
-  });
+  const { error } = await supabase
+    .from('products')
+    .update({ featured, updated_at: new Date().toISOString() })
+    .eq('id', id);
+
+  if (error) throw new Error(error.message);
 }
 
 /**
@@ -327,26 +319,21 @@ export function subscribeProducts(
   callback: (products: Product[]) => void,
   options?: { status?: ProductStatus; category?: string }
 ): () => void {
-  if (!db) return () => {};
+  // Initial fetch
+  getProducts(options).then(callback);
 
-  const colRef = collection(db, PRODUCTS_COLLECTION);
-  const constraints: any[] = [];
-  if (options?.status) {
-    constraints.push(where('status', '==', options.status));
-  }
-  if (options?.category && options.category !== 'all') {
-    constraints.push(where('category', '==', options.category));
-  }
+  const channel = supabase
+    .channel('products_realtime')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'products' },
+      () => {
+        getProducts(options).then(callback);
+      }
+    )
+    .subscribe();
 
-  const q = query(colRef, ...constraints);
-  return onSnapshot(
-    q,
-    (snapshot) => {
-      const products = snapshot.docs.map(mapDocToProduct);
-      callback(products);
-    },
-    (err) => {
-      console.warn('subscribeProducts error:', err);
-    }
-  );
+  return () => {
+    supabase.removeChannel(channel);
+  };
 }
