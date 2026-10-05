@@ -44,7 +44,7 @@ export async function requestAccountDeletion(params: {
     updated_at: new Date().toISOString(),
   };
 
-  const { error } = await supabaseAdmin.from('deletion_requests').upsert([row]);
+  const { error } = await supabase.from('deletion_requests').upsert([row]);
   if (error) {
     throw new Error(`Failed to request account deletion in Supabase: ${error.message}`);
   }
@@ -59,7 +59,7 @@ export async function getUserDeletionRequest(userId: string): Promise<DeletionRe
   if (!userId) return null;
 
   try {
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('deletion_requests')
       .select('*')
       .or(`id.eq.${userId},user_id.eq.${userId}`)
@@ -79,7 +79,7 @@ export async function getUserDeletionRequest(userId: string): Promise<DeletionRe
  */
 export async function getAllDeletionRequests(): Promise<DeletionRequest[]> {
   try {
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('deletion_requests')
       .select('*')
       .order('created_at', { ascending: false });
@@ -104,7 +104,7 @@ export async function approveAccountDeletion(requestId: string, userId: string, 
   await deleteUserDoc(userId);
 
   // 2. Mark deletion request as approved
-  const { error } = await supabaseAdmin
+  const { error } = await supabase
     .from('deletion_requests')
     .update({
       status: 'approved',
@@ -121,7 +121,7 @@ export async function approveAccountDeletion(requestId: string, userId: string, 
  * Admin action: Reject account deletion request
  */
 export async function rejectAccountDeletion(requestId: string, adminNote?: string): Promise<void> {
-  const { error } = await supabaseAdmin
+  const { error } = await supabase
     .from('deletion_requests')
     .update({
       status: 'rejected',
@@ -138,7 +138,7 @@ export async function rejectAccountDeletion(requestId: string, adminNote?: strin
  * User action: Cancel own pending deletion request
  */
 export async function cancelAccountDeletion(userId: string): Promise<void> {
-  const { error } = await supabaseAdmin
+  const { error } = await supabase
     .from('deletion_requests')
     .update({
       status: 'cancelled',
@@ -155,7 +155,7 @@ export async function cancelAccountDeletion(userId: string): Promise<void> {
 export async function clearOrArchiveDeletionRequest(userId: string): Promise<void> {
   if (!userId) return;
   try {
-    await supabaseAdmin
+    await supabase
       .from('deletion_requests')
       .delete()
       .or(`id.eq.${userId},user_id.eq.${userId}`);

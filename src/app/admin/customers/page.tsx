@@ -480,7 +480,7 @@ export default function AdminCustomersPage() {
                           </td>
 
                           {/* Date */}
-                          <td className="py-3 px-4 whitespace-nowrap text-slate-400 text-xs">
+                          <td suppressHydrationWarning className="py-3 px-4 whitespace-nowrap text-slate-400 text-xs">
                             {formatDate(customer.createdAt)}
                           </td>
 
@@ -592,7 +592,7 @@ export default function AdminCustomersPage() {
                             )}
                           </td>
 
-                          <td className="py-3 px-4 whitespace-nowrap text-slate-400 text-xs">
+                          <td suppressHydrationWarning className="py-3 px-4 whitespace-nowrap text-slate-400 text-xs">
                             {formatDate(req.createdAt)}
                           </td>
 

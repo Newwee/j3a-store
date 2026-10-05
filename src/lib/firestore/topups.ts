@@ -82,8 +82,31 @@ export async function getUserTopups(userId: string): Promise<TopupRequest[]> {
  * Admin: Fetch all top-up requests
  */
 export async function getAllTopups(filterStatus?: TopupStatus | 'all'): Promise<TopupRequest[]> {
+  // 1. Try secure Admin API Route first
   try {
-    let query = supabaseAdmin.from('topups').select('*');
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (token) {
+      const url = filterStatus && filterStatus !== 'all'
+        ? `/api/admin/topups/list?status=${encodeURIComponent(filterStatus)}`
+        : '/api/admin/topups/list';
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.ok && Array.isArray(json.data)) {
+          return json.data.map(mapRowToTopup);
+        }
+      }
+    }
+  } catch (apiErr) {
+    console.warn('API list fallback to direct supabase client:', apiErr);
+  }
+
+  // 2. Fallback to direct supabase client (authenticated with admin JWT)
+  try {
+    let query = supabase.from('topups').select('*');
 
     if (filterStatus && filterStatus !== 'all') {
       query = query.eq('status', filterStatus);
@@ -106,7 +129,34 @@ export async function getAllTopups(filterStatus?: TopupStatus | 'all'): Promise<
  * Admin Action: Approve top-up request and credit amount to User's Wallet balance
  */
 export async function approveTopup(topupId: string): Promise<{ success: boolean; newCredits: number }> {
-  const { data: topupRow, error: topupErr } = await supabaseAdmin
+  // 1. Try secure Admin API Route first
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (token) {
+      const res = await fetch('/api/admin/topups/action', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ topupId, action: 'approve' }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        throw new Error(json.error || 'Failed to approve topup via admin API');
+      }
+      return { success: true, newCredits: json.newCredits };
+    }
+  } catch (apiErr: any) {
+    console.warn('API approve fallback to direct supabase client:', apiErr);
+    if (apiErr?.message && !apiErr.message.includes('fetch')) {
+      throw apiErr;
+    }
+  }
+
+  // 2. Direct authenticated supabase client fallback
+  const { data: topupRow, error: topupErr } = await supabase
     .from('topups')
     .select('*')
     .eq('id', topupId)
@@ -133,7 +183,7 @@ export async function approveTopup(topupId: string): Promise<{ success: boolean;
   await updateUserCredits(userId, newCredits);
 
   // 3. Mark top-up as approved
-  const { error: updateErr } = await supabaseAdmin
+  const { error: updateErr } = await supabase
     .from('topups')
     .update({
       status: 'approved',
@@ -150,7 +200,34 @@ export async function approveTopup(topupId: string): Promise<{ success: boolean;
  * Admin Action: Reject top-up request with optional reason
  */
 export async function rejectTopup(topupId: string, reason?: string): Promise<void> {
-  const { error } = await supabaseAdmin
+  // 1. Try secure Admin API Route first
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (token) {
+      const res = await fetch('/api/admin/topups/action', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ topupId, action: 'reject', adminNote: reason }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        throw new Error(json.error || 'Failed to reject topup via admin API');
+      }
+      return;
+    }
+  } catch (apiErr: any) {
+    console.warn('API reject fallback to direct supabase client:', apiErr);
+    if (apiErr?.message && !apiErr.message.includes('fetch')) {
+      throw apiErr;
+    }
+  }
+
+  // 2. Direct authenticated supabase client fallback
+  const { error } = await supabase
     .from('topups')
     .update({
       status: 'rejected',

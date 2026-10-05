@@ -248,7 +248,7 @@ export default function AdminTopupsPage() {
                       </td>
 
                       {/* Date */}
-                      <td className="py-4 px-4 whitespace-nowrap text-xs text-slate-400">
+                      <td suppressHydrationWarning className="py-4 px-4 whitespace-nowrap text-xs text-slate-400">
                         {formatDate(topup.createdAt)}
                       </td>
 

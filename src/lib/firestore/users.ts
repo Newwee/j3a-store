@@ -173,7 +173,30 @@ export async function getAllUsers(limitCount: number = 50): Promise<UserProfile[
  * Admin action: Update role of a user
  */
 export async function updateUserRole(uid: string, role: UserRole): Promise<void> {
-  const { error } = await supabaseAdmin
+  // 1. Try secure Admin API Route first
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (token) {
+      const res = await fetch('/api/admin/users/role', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ userId: uid, role }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.ok) return;
+      }
+    }
+  } catch (apiErr) {
+    console.warn('API role update fallback to direct supabase client:', apiErr);
+  }
+
+  // 2. Direct authenticated supabase client update
+  const { error } = await supabase
     .from('profiles')
     .update({ role, updated_at: new Date().toISOString() })
     .eq('id', uid);
@@ -185,9 +208,34 @@ export async function updateUserRole(uid: string, role: UserRole): Promise<void>
  * Update user wallet credits
  */
 export async function updateUserCredits(uid: string, amount: number): Promise<void> {
-  const { error } = await supabaseAdmin
+  const cleanCredits = Math.max(0, Number(amount) || 0);
+
+  // 1. Try secure Admin API Route first
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (token) {
+      const res = await fetch('/api/admin/users/credits', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ userId: uid, credits: cleanCredits }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.ok) return;
+      }
+    }
+  } catch (apiErr) {
+    console.warn('API credit update fallback to direct supabase client:', apiErr);
+  }
+
+  // 2. Direct authenticated supabase client update
+  const { error } = await supabase
     .from('profiles')
-    .update({ credits: Math.max(0, amount), updated_at: new Date().toISOString() })
+    .update({ credits: cleanCredits, updated_at: new Date().toISOString() })
     .eq('id', uid);
 
   if (error) throw new Error(error.message);
@@ -213,7 +261,30 @@ export async function deductUserCredits(uid: string, amountToDeduct: number): Pr
  * Permanently delete user profile (Admin action)
  */
 export async function deleteUserDoc(uid: string): Promise<void> {
-  const { error } = await supabaseAdmin.from('profiles').delete().eq('id', uid);
+  // 1. Try secure Admin API Route first
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (token) {
+      const res = await fetch('/api/admin/users/delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ userId: uid }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.ok) return;
+      }
+    }
+  } catch (apiErr) {
+    console.warn('API user delete fallback to direct supabase client:', apiErr);
+  }
+
+  // 2. Direct authenticated supabase client delete
+  const { error } = await supabase.from('profiles').delete().eq('id', uid);
   if (error) throw new Error(error.message);
 }
 
