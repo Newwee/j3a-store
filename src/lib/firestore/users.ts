@@ -1,5 +1,4 @@
 import { supabase } from '@/lib/supabase/client';
-import { supabaseAdmin } from '@/lib/supabase/admin';
 import { UserProfile, UserRole, UserTier } from '@/types/user';
 import { clearOrArchiveDeletionRequest } from './deletionRequests';
 
@@ -120,8 +119,7 @@ export async function createUserProfile(
 
   const { error } = await supabase.from('profiles').upsert([newRow]);
   if (error) {
-    console.warn('Could not upsert profile directly, attempting admin client:', error.message);
-    await supabaseAdmin.from('profiles').upsert([newRow]);
+    console.warn('Profile upsert warning:', error.message);
   }
 
   return mapRowToUserProfile(newRow);

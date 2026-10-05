@@ -1,5 +1,4 @@
 import { supabase } from '@/lib/supabase/client';
-import { supabaseAdmin } from '@/lib/supabase/admin';
 import { TopupRequest, CreateTopupInput, TopupStatus } from '@/types/topup';
 import { getUserProfile, updateUserCredits } from './users';
 

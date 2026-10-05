@@ -322,7 +322,7 @@ export default function AdminCodesPage() {
                         </button>
                       </td>
 
-                      <td className="py-3.5 px-4 text-xs text-slate-400">
+                      <td suppressHydrationWarning className="py-3.5 px-4 text-xs text-slate-400">
                         {item.createdAt ? new Date(item.createdAt).toLocaleDateString('th-TH') : '-'}
                       </td>
 

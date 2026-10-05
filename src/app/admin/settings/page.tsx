@@ -81,7 +81,7 @@ export default function AdminSettingsPage() {
       <div className="p-4 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs sm:text-sm flex items-center gap-3">
         <Sparkles className="w-5 h-5 shrink-0 text-cyan-400" />
         <span>
-          <strong>ระบบเชื่อมต่อแบบ Real-time:</strong> เมื่อคุณแก้ไขเบอร์พร้อมเพย์หรือชื่อร้านที่นี่ แล้วกด <strong>"บันทึกการตั้งค่า"</strong> ระบบจะอัปเดตลงฐานข้อมูล Firestore และหน้าเติมเงินของลูกค้า (`/profile`) รวมถึงหน้าชำระเงิน (`/checkout`) จะเปลี่ยน QR Code เป็นเบอร์ใหม่ทันที
+          <strong>ระบบเชื่อมต่อแบบ Real-time:</strong> เมื่อคุณแก้ไขเบอร์พร้อมเพย์หรือชื่อร้านที่นี่ แล้วกด <strong>"บันทึกการตั้งค่า"</strong> ระบบจะอัปเดตลงฐานข้อมูลระบบ และหน้าเติมเงินของลูกค้า (`/profile`) รวมถึงหน้าชำระเงิน (`/checkout`) จะเปลี่ยน QR Code เป็นเบอร์ใหม่ทันที
         </span>
       </div>
 

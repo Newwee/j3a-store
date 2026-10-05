@@ -1,5 +1,4 @@
 import { supabase } from '@/lib/supabase/client';
-import { supabaseAdmin } from '@/lib/supabase/admin';
 
 export interface RedeemCode {
   id: string;
@@ -44,7 +43,7 @@ function mapRowToRedeemCode(row: any): RedeemCode {
 }
 
 /**
- * Redeem a code for the specified user
+ * Redeem a code for the specified user (Calls secure API)
  */
 export async function redeemCodeForUser(codeStr: string, userId: string): Promise<RedeemResult> {
   if (!userId) {
@@ -56,9 +55,37 @@ export async function redeemCodeForUser(codeStr: string, userId: string): Promis
     return { success: false, message: 'กรุณากรอกโค้ดของขวัญ' };
   }
 
+  // 1. Try secure API route first
   try {
-    // 1. Fetch code
-    const { data: codeRow, error: codeErr } = await supabaseAdmin
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (token) {
+      const res = await fetch('/api/redeem', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ code: cleanCode }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        return { success: false, message: json.error || 'ไม่สามารถแลกโค้ดได้' };
+      }
+      return {
+        success: true,
+        message: json.message || `แลกโค้ดสำเร็จ! คุณได้รับเครดิต ${json.amount} บาท`,
+        amount: json.amount,
+        usedCount: json.usedCount,
+      };
+    }
+  } catch (apiErr) {
+    console.warn('API redeem fallback to direct client:', apiErr);
+  }
+
+  // 2. Direct authenticated supabase client fallback
+  try {
+    const { data: codeRow, error: codeErr } = await supabase
       .from('redeem_codes')
       .select('*')
       .eq('code', cleanCode)
@@ -89,8 +116,7 @@ export async function redeemCodeForUser(codeStr: string, userId: string): Promis
       return { success: false, message: 'สิทธิ์การใช้งานโค้ดนี้เต็มแล้ว' };
     }
 
-    // 2. Fetch user profile
-    const { data: userProfile, error: userErr } = await supabaseAdmin
+    const { data: userProfile, error: userErr } = await supabase
       .from('profiles')
       .select('credits')
       .eq('id', userId)
@@ -107,8 +133,7 @@ export async function redeemCodeForUser(codeStr: string, userId: string): Promis
     const newUsedCount = currentUsed + 1;
     const newUsedBy = [...usedBy, userId];
 
-    // 3. Update code and profile atomically
-    const { error: updateCodeErr } = await supabaseAdmin
+    await supabase
       .from('redeem_codes')
       .update({
         used_count: newUsedCount,
@@ -117,21 +142,13 @@ export async function redeemCodeForUser(codeStr: string, userId: string): Promis
       })
       .eq('id', codeRow.id);
 
-    if (updateCodeErr) {
-      throw new Error(`Failed to update code: ${updateCodeErr.message}`);
-    }
-
-    const { error: updateProfileErr } = await supabaseAdmin
+    await supabase
       .from('profiles')
       .update({
         credits: newCredits,
         updated_at: new Date().toISOString(),
       })
       .eq('id', userId);
-
-    if (updateProfileErr) {
-      throw new Error(`Failed to update user credits: ${updateProfileErr.message}`);
-    }
 
     return {
       success: true,
@@ -149,8 +166,28 @@ export async function redeemCodeForUser(codeStr: string, userId: string): Promis
  * Get all redeem codes (Admin)
  */
 export async function getAllRedeemCodes(): Promise<RedeemCode[]> {
+  // 1. Try secure Admin API Route first
   try {
-    const { data, error } = await supabaseAdmin
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (token) {
+      const res = await fetch('/api/admin/codes', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.ok && Array.isArray(json.codes)) {
+          return json.codes.map(mapRowToRedeemCode);
+        }
+      }
+    }
+  } catch (apiErr) {
+    console.warn('API get codes fallback to direct client:', apiErr);
+  }
+
+  // 2. Direct authenticated supabase client fallback
+  try {
+    const { data, error } = await supabase
       .from('redeem_codes')
       .select('*')
       .order('created_at', { ascending: false });
@@ -182,6 +219,39 @@ export async function createRedeemCode(input: CreateRedeemCodeInput): Promise<Re
   if (!cleanCode) throw new Error('กรุณากรอกรหัสโค้ด');
   if (input.amount <= 0) throw new Error('จำนวนเครดิตต้องมากกว่า 0');
 
+  // 1. Try secure Admin API Route first
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (token) {
+      const res = await fetch('/api/admin/codes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          action: 'create',
+          code: cleanCode,
+          amount: input.amount,
+          maxUses: input.maxUses || 0,
+          isActive: input.isActive ?? true,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        throw new Error(json.error || 'Failed to create code via admin API');
+      }
+      return mapRowToRedeemCode(json.code);
+    }
+  } catch (apiErr: any) {
+    console.warn('API create code fallback to direct client:', apiErr);
+    if (apiErr?.message && !apiErr.message.includes('fetch')) {
+      throw apiErr;
+    }
+  }
+
+  // 2. Direct authenticated supabase client fallback
   const id = `code_${Date.now()}`;
   const row = {
     id,
@@ -195,7 +265,7 @@ export async function createRedeemCode(input: CreateRedeemCodeInput): Promise<Re
     updated_at: new Date().toISOString(),
   };
 
-  const { error } = await supabaseAdmin.from('redeem_codes').insert([row]);
+  const { error } = await supabase.from('redeem_codes').insert([row]);
   if (error) {
     throw new Error(`Failed to create redeem code in Supabase: ${error.message}`);
   }
@@ -210,6 +280,37 @@ export async function updateRedeemCode(
   codeId: string,
   data: Partial<CreateRedeemCodeInput>
 ): Promise<void> {
+  // 1. Try secure Admin API Route first
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (token) {
+      const res = await fetch('/api/admin/codes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          action: 'update',
+          codeId,
+          data,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        throw new Error(json.error || 'Failed to update code via admin API');
+      }
+      return;
+    }
+  } catch (apiErr: any) {
+    console.warn('API update code fallback to direct client:', apiErr);
+    if (apiErr?.message && !apiErr.message.includes('fetch')) {
+      throw apiErr;
+    }
+  }
+
+  // 2. Direct authenticated supabase client fallback
   const updates: Record<string, any> = {
     updated_at: new Date().toISOString(),
   };
@@ -218,7 +319,7 @@ export async function updateRedeemCode(
   if (data.maxUses !== undefined) updates.max_uses = Number(data.maxUses);
   if (data.isActive !== undefined) updates.is_active = Boolean(data.isActive);
 
-  const { error } = await supabaseAdmin
+  const { error } = await supabase
     .from('redeem_codes')
     .update(updates)
     .or(`id.eq.${codeId},code.eq.${codeId.toUpperCase()}`);
@@ -230,7 +331,37 @@ export async function updateRedeemCode(
  * Delete a redeem code (Admin)
  */
 export async function deleteRedeemCode(codeId: string): Promise<void> {
-  const { error } = await supabaseAdmin
+  // 1. Try secure Admin API Route first
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (token) {
+      const res = await fetch('/api/admin/codes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          action: 'delete',
+          codeId,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        throw new Error(json.error || 'Failed to delete code via admin API');
+      }
+      return;
+    }
+  } catch (apiErr: any) {
+    console.warn('API delete code fallback to direct client:', apiErr);
+    if (apiErr?.message && !apiErr.message.includes('fetch')) {
+      throw apiErr;
+    }
+  }
+
+  // 2. Direct authenticated supabase client fallback
+  const { error } = await supabase
     .from('redeem_codes')
     .delete()
     .or(`id.eq.${codeId},code.eq.${codeId.toUpperCase()}`);
@@ -243,7 +374,21 @@ export async function deleteRedeemCode(codeId: string): Promise<void> {
  */
 export async function seedOpeningCodeIfNotExists(): Promise<void> {
   try {
-    const { data } = await supabaseAdmin
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (token) {
+      await fetch('/api/admin/codes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ action: 'seed' }),
+      });
+      return;
+    }
+
+    const { data } = await supabase
       .from('redeem_codes')
       .select('id')
       .eq('code', 'J3AOPENING')
@@ -251,7 +396,7 @@ export async function seedOpeningCodeIfNotExists(): Promise<void> {
       .maybeSingle();
 
     if (!data) {
-      await supabaseAdmin.from('redeem_codes').insert([
+      await supabase.from('redeem_codes').insert([
         {
           id: 'code_j3a_opening',
           code: 'J3AOPENING',

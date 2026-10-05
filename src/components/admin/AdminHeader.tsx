@@ -70,8 +70,8 @@ export function AdminHeader({
           )}
 
           {/* Admin profile pill */}
-          <div className="flex items-center gap-2 pl-2 border-l border-slate-800">
-            <div className="relative w-8 h-8 rounded-full overflow-hidden border border-amber-400/50 bg-slate-800 flex items-center justify-center">
+          <div suppressHydrationWarning className="flex items-center gap-2 pl-2 border-l border-slate-800">
+            <div suppressHydrationWarning className="relative w-8 h-8 rounded-full overflow-hidden border border-amber-400/50 bg-slate-800 flex items-center justify-center">
               {profile?.photoURL || user?.photoURL ? (
                 <Image
                   src={profile?.photoURL || user?.photoURL || ''}
@@ -80,13 +80,13 @@ export function AdminHeader({
                   className="object-cover"
                 />
               ) : (
-                <span className="text-xs font-bold text-amber-400">
+                <span suppressHydrationWarning className="text-xs font-bold text-amber-400">
                   {displayName.charAt(0).toUpperCase()}
                 </span>
               )}
             </div>
-            <div className="hidden xl:flex flex-col text-left leading-tight">
-              <span className="text-xs font-bold text-white max-w-[110px] truncate">
+            <div suppressHydrationWarning className="hidden xl:flex flex-col text-left leading-tight">
+              <span suppressHydrationWarning className="text-xs font-bold text-white max-w-[110px] truncate">
                 {displayName}
               </span>
               <span className="text-[10px] font-semibold text-amber-400">

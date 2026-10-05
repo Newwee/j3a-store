@@ -1,5 +1,4 @@
 import { supabase } from '@/lib/supabase/client';
-import { supabaseAdmin } from '@/lib/supabase/admin';
 import { Order, CreateOrderInput, OrderStatus } from '@/types/order';
 import { generateOrderNumber } from '@/lib/utils/formatters';
 

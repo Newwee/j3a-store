@@ -1,5 +1,4 @@
 import { supabase } from '@/lib/supabase/client';
-import { supabaseAdmin } from '@/lib/supabase/admin';
 import { StoreSettings } from '@/types/settings';
 
 const STORE_DOC_ID = 'store';
@@ -50,6 +49,33 @@ export async function getStoreSettings(): Promise<StoreSettings> {
  * Update store settings in Supabase (Admin only)
  */
 export async function updateStoreSettings(settings: Partial<StoreSettings>): Promise<void> {
+  // 1. Try secure Admin API Route first
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (token) {
+      const res = await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(settings),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        throw new Error(json.error || 'Failed to update settings via admin API');
+      }
+      return;
+    }
+  } catch (apiErr: any) {
+    console.warn('API settings fallback to direct supabase client:', apiErr);
+    if (apiErr?.message && !apiErr.message.includes('fetch')) {
+      throw apiErr;
+    }
+  }
+
+  // 2. Direct authenticated supabase client fallback
   const updates: Record<string, any> = {
     updated_at: new Date().toISOString(),
   };
@@ -62,7 +88,7 @@ export async function updateStoreSettings(settings: Partial<StoreSettings>): Pro
   if (settings.shippingFee !== undefined) updates.shipping_fee = Number(settings.shippingFee);
   if (settings.freeShippingThreshold !== undefined) updates.free_shipping_threshold = Number(settings.freeShippingThreshold);
 
-  const { error } = await supabaseAdmin
+  const { error } = await supabase
     .from('settings')
     .upsert([{ id: STORE_DOC_ID, ...updates }]);
 

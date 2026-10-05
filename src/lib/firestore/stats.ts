@@ -1,5 +1,4 @@
 import { supabase } from '@/lib/supabase/client';
-import { supabaseAdmin } from '@/lib/supabase/admin';
 import { Order } from '@/types/order';
 import { Product } from '@/types/product';
 import { getProducts } from './products';
@@ -73,7 +72,7 @@ export async function getStoreDashboardStats(isAdmin = false): Promise<StoreStat
       } catch {}
 
       try {
-        const { count } = await supabaseAdmin
+        const { count } = await supabase
           .from('topups')
           .select('*', { count: 'exact', head: true })
           .eq('status', 'pending');

@@ -1,5 +1,4 @@
 import { supabase } from '@/lib/supabase/client';
-import { supabaseAdmin } from '@/lib/supabase/admin';
 import { DeletionRequest, DeletionRequestStatus } from '@/types/user';
 import { deleteUserDoc } from '@/lib/firestore/users';
 

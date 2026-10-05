@@ -1,5 +1,4 @@
 import { supabase } from '@/lib/supabase/client';
-import { supabaseAdmin } from '@/lib/supabase/admin';
 import { Review, ReviewEligibility } from '@/types/review';
 import { Order } from '@/types/order';
 
