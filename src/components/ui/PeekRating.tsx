@@ -20,7 +20,7 @@ export interface PeekRatingProps {
 export default function PeekRating({
   value = 0,
   onChange,
-  count = 10,
+  count = 5,
   activeColor = '#779bff',
   inactiveColor = 'rgba(255, 255, 255, 0.18)',
   tipTextColor = '#7C3AED',

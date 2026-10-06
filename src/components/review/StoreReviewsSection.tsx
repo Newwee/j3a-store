@@ -30,7 +30,7 @@ export function StoreReviewsSection() {
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedRating, setSelectedRating] = useState(10);
+  const [selectedRating, setSelectedRating] = useState(5);
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -196,9 +196,25 @@ export function StoreReviewsSection() {
                   </div>
 
                   {/* Rating Stars */}
-                  <div className="flex items-center gap-0.5">
-                    <span className="text-xs font-bold text-amber-400 mr-1">{rev.rating}/10</span>
-                    <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                  <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-0.5">
+                      {[1, 2, 3, 4, 5].map((s) => {
+                        const starVal = rev.rating > 5 ? Math.round(rev.rating / 2) : rev.rating;
+                        return (
+                          <Star
+                            key={s}
+                            className={`w-3.5 h-3.5 ${
+                              s <= starVal
+                                ? 'fill-amber-400 text-amber-400'
+                                : 'text-slate-700'
+                            }`}
+                          />
+                        );
+                      })}
+                    </div>
+                    <span className="text-xs font-bold text-amber-400 ml-1">
+                      {rev.rating > 5 ? (rev.rating / 2).toFixed(1) : rev.rating} / 5
+                    </span>
                   </div>
                 </div>
 
@@ -266,18 +282,18 @@ export function StoreReviewsSection() {
                 {/* Disabled PeekRating Preview */}
                 <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80 text-center space-y-2 opacity-50 pointer-events-none">
                   <span className="text-xs font-semibold text-slate-400 block">
-                    ตัวอย่างระบบให้คะแนน (1 - 10 ดาว):
+                    ตัวอย่างระบบให้คะแนน (1 - 5 ดาว):
                   </span>
                   <PeekRating
-                    count={10}
+                    count={5}
                     activeColor="#779bff"
                     tipTextColor="#7C3AED"
-                    size={32}
+                    size={38}
                     riseDuration={310}
                     magnify={1.17}
                     showLabels={false}
                     disabled={true}
-                    value={10}
+                    value={5}
                   />
                 </div>
 
@@ -295,17 +311,17 @@ export function StoreReviewsSection() {
               </div>
             ) : (
               <form onSubmit={handleSubmitReview} className="space-y-4">
-                {/* PeekRating Selector with 10 stars */}
+                {/* PeekRating Selector with 5 stars */}
                 <div className="space-y-2 text-center p-4 rounded-2xl bg-slate-950/60 border border-slate-800">
                   <span className="text-xs font-semibold text-slate-300 block mb-2">
-                    ระดับความประทับใจโดยรวม (1 - 10 คะแนน):
+                    ระดับความประทับใจโดยรวม (1 - 5 คะแนน):
                   </span>
                   <div className="flex justify-center py-2 overflow-x-auto">
                     <PeekRating
-                      count={10}
+                      count={5}
                       activeColor="#779bff"
                       tipTextColor="#7C3AED"
-                      size={36}
+                      size={42}
                       riseDuration={310}
                       magnify={1.17}
                       showLabels={false}
@@ -314,7 +330,7 @@ export function StoreReviewsSection() {
                     />
                   </div>
                   <span className="text-xs font-bold text-indigo-400 block mt-1">
-                    คะแนนที่เลือก: {selectedRating} / 10 คะแนน
+                    คะแนนที่เลือก: {selectedRating} / 5 คะแนน
                   </span>
                 </div>
 

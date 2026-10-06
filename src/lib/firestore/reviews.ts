@@ -63,10 +63,13 @@ export async function checkReviewEligibility(
 
   try {
     // 1. Fetch user orders
-    const { data: userOrders, error: orderErr } = await supabase
-      .from('orders')
-      .select('*')
-      .eq('user_id', userId);
+    let query = supabase.from('orders').select('*');
+    if (userEmail) {
+      query = query.or(`user_id.eq.${userId},customer_email.eq.${userEmail}`);
+    } else {
+      query = query.eq('user_id', userId);
+    }
+    const { data: userOrders, error: orderErr } = await query;
 
     if (orderErr || !userOrders) {
       return {
@@ -160,8 +163,8 @@ export async function checkReviewEligibility(
       };
     }
 
-    // 2. Check if any order is approved / completed
-    const completedOrders = candidateOrders.filter((ord) => ord.status === 'completed');
+    // 2. Check if any order is approved / completed / paid
+    const completedOrders = candidateOrders.filter((ord) => ord.status === 'completed' || ord.status === 'paid');
 
     if (completedOrders.length === 0) {
       return {
@@ -215,7 +218,7 @@ export async function checkReviewEligibility(
 }
 
 /**
- * Submit a verified buyer review
+ * Submit a verified buyer review (5-star max)
  */
 export async function submitProductReview(data: {
   productId: string;
@@ -228,7 +231,42 @@ export async function submitProductReview(data: {
   rating: number;
   comment: string;
 }): Promise<Review> {
-  const star = Math.max(1, Math.min(10, Math.round(data.rating)));
+  const star = Math.max(1, Math.min(5, Math.round(data.rating)));
+
+  // 1. Try secure Server API first (guarantees product average rating update)
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (token) {
+      const res = await fetch('/api/reviews/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          ...data,
+          rating: star,
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || 'Failed to submit review via server API');
+      }
+
+      if (json.review) {
+        return mapRowToReview(json.review);
+      }
+    }
+  } catch (apiErr: any) {
+    console.warn('API review submit fallback to client insert:', apiErr);
+    if (apiErr?.message && !apiErr.message.includes('fetch')) {
+      throw apiErr;
+    }
+  }
+
+  // 2. Direct authenticated supabase client fallback
   const id = `rev_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.userId || '');
@@ -255,7 +293,7 @@ export async function submitProductReview(data: {
     throw new Error(`Failed to submit review: ${error.message}`);
   }
 
-  // Recalculate average rating
+  // Recalculate average rating on 5-star scale
   try {
     const allReviews = await getProductReviews(data.productId);
     const totalCount = allReviews.length;
@@ -263,7 +301,7 @@ export async function submitProductReview(data: {
       const r = curr.rating > 5 ? curr.rating / 2 : curr.rating;
       return acc + r;
     }, 0);
-    const avg = totalCount > 0 ? Number((sum / totalCount).toFixed(1)) : (star > 5 ? Number((star / 2).toFixed(1)) : star);
+    const avg = totalCount > 0 ? Number((sum / totalCount).toFixed(1)) : star;
 
     if (data.productId.startsWith('bundle_')) {
       const cleanBundleId = data.productId.replace(/^bundle_/, '');
@@ -366,7 +404,7 @@ export async function getStoreReviews(): Promise<Review[]> {
 }
 
 /**
- * Submit overall store review
+ * Submit overall store review (5-star max)
  */
 export async function submitStoreReview(data: {
   userId: string;
@@ -376,7 +414,48 @@ export async function submitStoreReview(data: {
   rating: number;
   comment: string;
 }): Promise<Review> {
-  const star = Math.max(1, Math.min(10, Math.round(data.rating)));
+  const star = Math.max(1, Math.min(5, Math.round(data.rating)));
+
+  // 1. Try secure Server API first
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (token) {
+      const res = await fetch('/api/reviews/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          productId: 'store_overall',
+          productSlug: 'store',
+          productName: 'J3A STORE (ร้านค้าโดยรวม)',
+          orderId: data.orderId,
+          rating: star,
+          comment: data.comment.trim(),
+          userName: data.userName,
+          userPhoto: data.userPhoto,
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || 'Failed to submit store review');
+      }
+
+      if (json.review) {
+        return mapRowToReview(json.review);
+      }
+    }
+  } catch (apiErr: any) {
+    console.warn('API store review fallback to client insert:', apiErr);
+    if (apiErr?.message && !apiErr.message.includes('fetch')) {
+      throw apiErr;
+    }
+  }
+
+  // 2. Direct authenticated supabase client fallback
   const id = `rev_store_${Date.now()}`;
 
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.userId || '');

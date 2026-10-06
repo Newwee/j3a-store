@@ -54,7 +54,7 @@ export default function OrderDetailPage({
     slug?: string;
     name: string;
   } | null>(null);
-  const [reviewRating, setReviewRating] = useState(10);
+  const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewedItemIds, setReviewedItemIds] = useState<Set<string>>(new Set());
@@ -301,7 +301,7 @@ export default function OrderDetailPage({
                                   slug: item.slug,
                                   name: item.name,
                                 });
-                                setReviewRating(10);
+                                setReviewRating(5);
                                 setReviewComment('');
                               }}
                               className="text-xs text-amber-300 border-amber-500/30 hover:bg-amber-500/10 hover:border-amber-400 font-bold shadow-[0_0_12px_rgba(245,158,11,0.15)]"
@@ -456,13 +456,13 @@ export default function OrderDetailPage({
                 ระดับคะแนนความพึงพอใจ:
               </label>
               <span className="text-xs font-bold text-amber-400">
-                {reviewRating} / 10 ดาว
+                {reviewRating} / 5 ดาว
               </span>
             </div>
             <div className="flex items-center justify-center p-3 rounded-2xl bg-slate-950/80 border border-slate-800">
               <PeekRating
                 value={reviewRating}
-                count={10}
+                count={5}
                 onChange={(val) => setReviewRating(val)}
               />
             </div>
