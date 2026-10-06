@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, use } from 'react';
+import React, { useEffect, useState, useMemo, use } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
@@ -80,6 +80,51 @@ export default function OrderDetailPage({
       isMounted = false;
     };
   }, [orderId]);
+
+  const [liveProducts, setLiveProducts] = useState<Record<string, { downloadUrl?: string; deliveryNote?: string }>>({});
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadLiveProducts() {
+      try {
+        const { getProducts } = await import('@/lib/firestore/products');
+        const prods = await getProducts();
+        if (isMounted && prods && prods.length > 0) {
+          const map: Record<string, { downloadUrl?: string; deliveryNote?: string }> = {};
+          for (const p of prods) {
+            if (p.id) map[p.id.toLowerCase()] = { downloadUrl: p.downloadUrl, deliveryNote: p.deliveryNote };
+            if (p.slug) map[p.slug.toLowerCase()] = { downloadUrl: p.downloadUrl, deliveryNote: p.deliveryNote };
+            if (p.name) map[p.name.toLowerCase()] = { downloadUrl: p.downloadUrl, deliveryNote: p.deliveryNote };
+          }
+          setLiveProducts(map);
+        }
+      } catch {}
+    }
+    loadLiveProducts();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const syncedItems = useMemo(() => {
+    if (!order?.items) return [];
+    return order.items.map((it) => {
+      const pid = (it.productId || '').toLowerCase();
+      const pslug = (it.slug || '').toLowerCase();
+      const pname = (it.name || '').toLowerCase();
+      const live = liveProducts[pid] || liveProducts[pslug] || liveProducts[pname];
+      let url = live?.downloadUrl || it.downloadUrl;
+      let note = live?.deliveryNote || it.deliveryNote;
+      if (url && url.includes('1ozs5fS2Y_cUcKGkuugp-5yuta5VGs385')) {
+        url = 'https://drive.google.com/file/d/1LN_z1lwA-QZOBgYoWpfWQJRii0CPO4ZT/view?usp=sharing';
+      }
+      return {
+        ...it,
+        downloadUrl: url,
+        deliveryNote: note,
+      };
+    });
+  }, [order?.items, liveProducts]);
 
   const handleUploadSlip = async () => {
     if (!selectedSlip || !order) return;
@@ -200,7 +245,7 @@ export default function OrderDetailPage({
               orderId={order.id}
               customerEmail={order.customer?.email}
               autoClaim={!order.transactionRef}
-              items={order.items}
+              items={syncedItems}
               discordUrl="https://discord.gg/UtWykPvTYF"
             />
           </div>
@@ -268,7 +313,14 @@ export default function OrderDetailPage({
                       {formatCurrency(item.price * item.quantity)}
                     </span>
                     {(order.status === 'completed' || order.status === 'paid') && (() => {
-                      const downloadLink = item.downloadUrl || getDownloadUrlForProduct(`${item.name} ${item.slug}`);
+                      const pid = (item.productId || '').toLowerCase();
+                      const pslug = (item.slug || '').toLowerCase();
+                      const pname = (item.name || '').toLowerCase();
+                      const live = liveProducts[pid] || liveProducts[pslug] || liveProducts[pname];
+                      let downloadLink = live?.downloadUrl || item.downloadUrl || getDownloadUrlForProduct(`${item.name} ${item.slug}`);
+                      if (downloadLink && downloadLink.includes('1ozs5fS2Y_cUcKGkuugp-5yuta5VGs385')) {
+                        downloadLink = 'https://drive.google.com/file/d/1LN_z1lwA-QZOBgYoWpfWQJRii0CPO4ZT/view?usp=sharing';
+                      }
                       if (!downloadLink) return null;
                       return (
                         <a
@@ -338,7 +390,7 @@ export default function OrderDetailPage({
                 <strong className="text-slate-400">อีเมล:</strong> {order.customer.email}
               </p>
               <p className="text-slate-200">
-                <strong className="text-slate-400">โทรศัพท์:</strong> {order.customer.phone}
+                <strong className="text-slate-400">โทรศัพท์:</strong> {order.customer.phone || '-'}
               </p>
               <p className="text-slate-200">
                 <strong className="text-slate-400">ข้อมูลจัดส่ง/UID:</strong> {order.customer.address}

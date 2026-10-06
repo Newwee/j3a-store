@@ -13,6 +13,8 @@ import {
   ThumbsUp,
   X,
   Loader2,
+  Eye,
+  ExternalLink,
 } from 'lucide-react';
 import { Review, ReviewEligibility } from '@/types/review';
 import {
@@ -24,6 +26,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { Button } from '@/components/ui/Button';
 import PeekRating from '@/components/ui/PeekRating';
+import { PublicProfileModal } from '@/components/profile/PublicProfileModal';
 
 interface ProductReviewsSectionProps {
   productId: string;
@@ -54,6 +57,11 @@ export function ProductReviewsSection({
   const [selectedRating, setSelectedRating] = useState(5);
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [selectedProfileUser, setSelectedProfileUser] = useState<{
+    userId: string;
+    name?: string;
+    photo?: string;
+  } | null>(null);
 
   const loadData = async () => {
     try {
@@ -232,48 +240,81 @@ export function ProductReviewsSection({
                   className="p-4 sm:p-5 rounded-xl bg-slate-900/50 border border-slate-800/80 hover:border-slate-700 transition-colors space-y-2.5"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-xs font-bold text-white shadow-sm">
-                        {rev.userName ? rev.userName.charAt(0).toUpperCase() : 'U'}
+                    <Link
+                      href={rev.userId ? `/profile/${rev.userId}` : '#'}
+                      className="flex items-center gap-3 text-left group cursor-pointer p-1 -m-1 rounded-xl hover:bg-slate-800/40 transition-colors"
+                      title={rev.userId ? `คลิกเพื่อส่องโปรไฟล์ของ ${rev.userName}` : undefined}
+                    >
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-xs font-bold text-white shadow-sm overflow-hidden ring-2 ring-cyan-500/30 group-hover:ring-cyan-400 group-hover:scale-105 transition-all shrink-0">
+                        {rev.userPhoto ? (
+                          <img src={rev.userPhoto} alt={rev.userName} className="w-full h-full object-cover" />
+                        ) : (
+                          rev.userName ? rev.userName.charAt(0).toUpperCase() : 'U'
+                        )}
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-white">{rev.userName}</span>
+                          <span className="text-xs sm:text-sm font-bold text-white group-hover:text-cyan-400 transition-colors flex items-center gap-1">
+                            <span>{rev.userName}</span>
+                          </span>
                           <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
                             <CheckCircle2 className="w-2.5 h-2.5" />
                             ผู้ซื้อที่ยืนยันแล้ว
                           </span>
                         </div>
-                        <span className="text-[10px] text-slate-500">
-                          {new Date(rev.createdAt).toLocaleDateString('th-TH', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[11px] text-slate-500">
+                            {new Date(rev.createdAt).toLocaleDateString('th-TH', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                            })}
+                          </span>
+                          {rev.userId && (
+                            <span className="inline-flex items-center gap-1 text-[11px] text-cyan-400 group-hover:text-cyan-300 font-semibold underline decoration-cyan-500/40 underline-offset-2">
+                              <Eye className="w-3 h-3" />
+                              <span>ส่องโปรไฟล์</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </Link>
+
+                    {/* Right side: Action button & Stars */}
+                    <div className="flex items-center gap-3">
+                      {rev.userId && (
+                        <Link
+                          href={`/profile/${rev.userId}`}
+                          className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 hover:border-cyan-400 text-cyan-300 hover:text-white transition-all text-xs font-semibold group shadow-sm hover:shadow-[0_0_15px_rgba(6,182,212,0.25)] cursor-pointer"
+                          title={`ส่องโปรไฟล์ของ ${rev.userName}`}
+                        >
+                          <Eye className="w-3.5 h-3.5 text-cyan-400 group-hover:scale-110 transition-transform" />
+                          <span>ส่องโปรไฟล์</span>
+                          <ExternalLink className="w-3 h-3 text-cyan-500/70 group-hover:text-cyan-300" />
+                        </Link>
+                      )}
+
+                      {/* Stars */}
+                      <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-0.5">
+                          {[1, 2, 3, 4, 5].map((s) => {
+                            const starVal = rev.rating > 5 ? Math.round(rev.rating / 2) : rev.rating;
+                            return (
+                              <Star
+                                key={s}
+                                className={`w-3.5 h-3.5 ${
+                                  s <= starVal
+                                    ? 'fill-amber-400 text-amber-400'
+                                    : 'text-slate-700'
+                                }`}
+                              />
+                            );
                           })}
+                        </div>
+                        <span className="text-[11px] font-bold text-amber-400 ml-1">
+                          {rev.rating > 5 ? (rev.rating / 2).toFixed(1) : rev.rating} / 5
                         </span>
                       </div>
-                    </div>
-
-                    {/* Stars */}
-                    <div className="flex items-center gap-1">
-                      <div className="flex items-center gap-0.5">
-                        {[1, 2, 3, 4, 5].map((s) => {
-                          const starVal = rev.rating > 5 ? Math.round(rev.rating / 2) : rev.rating;
-                          return (
-                            <Star
-                              key={s}
-                              className={`w-3.5 h-3.5 ${
-                                s <= starVal
-                                  ? 'fill-amber-400 text-amber-400'
-                                  : 'text-slate-700'
-                              }`}
-                            />
-                          );
-                        })}
-                      </div>
-                      <span className="text-[11px] font-bold text-amber-400 ml-1">
-                        {rev.rating > 5 ? (rev.rating / 2).toFixed(1) : rev.rating} / 5
-                      </span>
                     </div>
                   </div>
 
@@ -436,6 +477,14 @@ export function ProductReviewsSection({
           </div>
         </div>
       )}
+
+      <PublicProfileModal
+        userId={selectedProfileUser?.userId || null}
+        initialName={selectedProfileUser?.name}
+        initialPhoto={selectedProfileUser?.photo}
+        isOpen={!!selectedProfileUser}
+        onClose={() => setSelectedProfileUser(null)}
+      />
     </section>
   );
 }

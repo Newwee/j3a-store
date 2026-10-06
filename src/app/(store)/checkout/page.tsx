@@ -142,7 +142,6 @@ export default function CheckoutPage() {
     const errs: Record<string, string> = {};
     if (!name.trim()) errs.name = 'กรุณาระบุชื่อ-นามสกุล';
     if (!email.trim() || !email.includes('@')) errs.email = 'กรุณาระบุอีเมลที่ถูกต้อง';
-    if (!phone.trim()) errs.phone = 'กรุณาระบุเบอร์โทรศัพท์สำหรับรับ SMS/ติดต่อ';
     if (!address.trim()) errs.address = 'กรุณาระบุข้อมูลการจัดส่ง';
 
     if (paymentMethod === 'wallet' && !canPayWithWallet) {
@@ -233,6 +232,35 @@ export default function CheckoutPage() {
       }
 
       // 4. Prepare Order Payload
+      const resolvedItems = await Promise.all(
+        items.map(async (item) => {
+          let latestUrl = item.product.downloadUrl;
+          let latestNote = item.product.deliveryNote;
+          let latestType = item.product.deliveryType;
+          try {
+            const { getProductById, getProductBySlug } = await import('@/lib/firestore/products');
+            const live = (await getProductById(item.product.id)) || (await getProductBySlug(item.product.slug));
+            if (live?.downloadUrl) latestUrl = live.downloadUrl;
+            if (live?.deliveryNote) latestNote = live.deliveryNote;
+            if (live?.deliveryType) latestType = live.deliveryType;
+          } catch {}
+          if (latestUrl && latestUrl.includes('1ozs5fS2Y_cUcKGkuugp-5yuta5VGs385')) {
+            latestUrl = 'https://drive.google.com/file/d/1LN_z1lwA-QZOBgYoWpfWQJRii0CPO4ZT/view?usp=sharing';
+          }
+          return {
+            productId: item.product.id,
+            name: item.product.name,
+            slug: item.product.slug,
+            price: item.product.price,
+            quantity: item.quantity,
+            image: item.product.image,
+            ...(latestUrl ? { downloadUrl: latestUrl } : {}),
+            ...(latestNote ? { deliveryNote: latestNote } : {}),
+            ...(latestType ? { deliveryType: latestType } : {}),
+          };
+        })
+      );
+
       const orderData: any = {
         userId: user ? user.uid : 'guest',
         customer: {
@@ -242,17 +270,7 @@ export default function CheckoutPage() {
           address: address.trim(),
           ...(notes.trim() ? { notes: notes.trim() } : {}),
         },
-        items: items.map((item) => ({
-          productId: item.product.id,
-          name: item.product.name,
-          slug: item.product.slug,
-          price: item.product.price,
-          quantity: item.quantity,
-          image: item.product.image,
-          ...(item.product.downloadUrl ? { downloadUrl: item.product.downloadUrl } : {}),
-          ...(item.product.deliveryNote ? { deliveryNote: item.product.deliveryNote } : {}),
-          ...(item.product.deliveryType ? { deliveryType: item.product.deliveryType } : {}),
-        })),
+        items: resolvedItems,
         subtotal,
         shipping,
         discount: 0,
@@ -331,13 +349,12 @@ export default function CheckoutPage() {
                     required
                   />
                   <Input
-                    label="เบอร์โทรศัพท์ *"
+                    label="เบอร์โทรศัพท์ (ไม่บังคับ)"
                     type="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    placeholder="0812345678"
+                    placeholder="0812345678 (เว้นว่างได้)"
                     error={formErrors.phone}
-                    required
                   />
                 </div>
 

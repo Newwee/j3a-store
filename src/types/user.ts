@@ -31,3 +31,25 @@ export interface DeletionRequest {
   approvedAt?: string;
   rejectedAt?: string;
 }
+
+export interface PublicUserReview {
+  id: string;
+  productId: string;
+  productName: string;
+  productSlug?: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
+}
+
+export interface PublicUserProfile {
+  uid: string;
+  displayName: string;
+  photoURL: string | null;
+  role: UserRole;
+  tier: UserTier;
+  createdAt: string;
+  reviewCount: number;
+  averageRating: number;
+  reviews: PublicUserReview[];
+}

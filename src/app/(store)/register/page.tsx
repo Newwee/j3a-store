@@ -3,16 +3,18 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Lock, Mail, User, ArrowRight, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 
-export default function RegisterPage() {
+function RegisterFormContent() {
   const router = useRouter();
-  const { register, loginWithGoogle, isFirebaseReady } = useAuth();
+  const searchParams = useSearchParams();
+  const redirectUrl = searchParams.get('redirect') || '/';
+  const { user, register, loginWithGoogle, isFirebaseReady } = useAuth();
   const { success, error } = useToast();
 
   const [name, setName] = useState('');
@@ -23,13 +25,20 @@ export default function RegisterPage() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // If already logged in, redirect immediately
+  React.useEffect(() => {
+    if (user) {
+      router.replace(redirectUrl);
+    }
+  }, [user, redirectUrl, router]);
+
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
     setErrorMessage('');
     try {
       await loginWithGoogle();
       success('เข้าสู่ระบบด้วย Google สำเร็จ ยินดีต้อนรับสู่ J3A STORE!');
-      router.push('/');
+      router.push(redirectUrl);
       router.refresh();
     } catch (err: any) {
       console.error('Google Sign-in error:', err);
@@ -68,7 +77,7 @@ export default function RegisterPage() {
     try {
       await register(email.trim(), password, name.trim());
       success('สมัครสมาชิกสำเร็จแล้ว! ยินดีต้อนรับสู่ J3A STORE');
-      router.push('/');
+      router.push(redirectUrl);
       router.refresh();
     } catch (err: any) {
       console.error('Registration error:', err);
@@ -216,12 +225,29 @@ export default function RegisterPage() {
           {/* Footer Navigation */}
           <div className="pt-4 border-t border-slate-800 text-center text-xs text-slate-400">
             มีบัญชีสมาชิกอยู่แล้ว?{' '}
-            <Link href="/login" className="font-bold text-cyan-400 hover:underline">
+            <Link
+              href={`/login${redirectUrl !== '/' ? `?redirect=${encodeURIComponent(redirectUrl)}` : ''}`}
+              className="font-bold text-cyan-400 hover:underline"
+            >
               เข้าสู่ระบบที่นี่
             </Link>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="py-24 flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-cyan-400" />
+        </div>
+      }
+    >
+      <RegisterFormContent />
+    </React.Suspense>
   );
 }

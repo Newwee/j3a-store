@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Star, ShieldCheck, CheckCircle2, Lock, X, Loader2, MessageSquareText } from 'lucide-react';
+import { Star, ShieldCheck, CheckCircle2, Lock, X, Loader2, MessageSquareText, Eye, ExternalLink } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { Button } from '@/components/ui/Button';
 import PeekRating from '@/components/ui/PeekRating';
+import { PublicProfileModal } from '@/components/profile/PublicProfileModal';
 import { Review, ReviewEligibility } from '@/types/review';
 import {
   getStoreReviews,
@@ -33,6 +34,11 @@ export function StoreReviewsSection() {
   const [selectedRating, setSelectedRating] = useState(5);
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [selectedProfileUser, setSelectedProfileUser] = useState<{
+    userId: string;
+    name?: string;
+    photo?: string;
+  } | null>(null);
 
   const loadData = async () => {
     try {
@@ -176,24 +182,42 @@ export function StoreReviewsSection() {
                 className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700 transition-all space-y-3"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-xs font-bold text-white shadow-sm">
-                      {rev.userName ? rev.userName.charAt(0).toUpperCase() : 'U'}
+                  <Link
+                    href={rev.userId ? `/profile/${rev.userId}` : '#'}
+                    className="flex items-center gap-2.5 text-left group cursor-pointer p-1 -m-1 rounded-xl hover:bg-slate-800/40 transition-colors"
+                    title={rev.userId ? `คลิกเพื่อส่องโปรไฟล์ของ ${rev.userName}` : undefined}
+                  >
+                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-xs font-bold text-white shadow-sm overflow-hidden ring-2 ring-indigo-500/30 group-hover:ring-indigo-400 group-hover:scale-105 transition-all shrink-0">
+                      {rev.userPhoto ? (
+                        <img src={rev.userPhoto} alt={rev.userName} className="w-full h-full object-cover" />
+                      ) : (
+                        rev.userName ? rev.userName.charAt(0).toUpperCase() : 'U'
+                      )}
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-bold text-white">{rev.userName}</span>
+                        <span className="text-xs font-bold text-white group-hover:text-indigo-300 transition-colors flex items-center gap-1">
+                          <span>{rev.userName}</span>
+                        </span>
                         <CheckCircle2 className="w-3 h-3 text-emerald-400" />
                       </div>
-                      <span className="text-[10px] text-slate-500">
-                        {new Date(rev.createdAt).toLocaleDateString('th-TH', {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric',
-                        })}
-                      </span>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-[10px] text-slate-500">
+                          {new Date(rev.createdAt).toLocaleDateString('th-TH', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </span>
+                        {rev.userId && (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-indigo-400 group-hover:text-indigo-300 font-semibold underline decoration-indigo-500/40 underline-offset-2">
+                            <Eye className="w-2.5 h-2.5" />
+                            <span>ส่องโปรไฟล์</span>
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  </Link>
 
                   {/* Rating Stars */}
                   <div className="flex items-center gap-1">
@@ -376,6 +400,14 @@ export function StoreReviewsSection() {
           </div>
         </div>
       )}
+
+      <PublicProfileModal
+        userId={selectedProfileUser?.userId || null}
+        initialName={selectedProfileUser?.name}
+        initialPhoto={selectedProfileUser?.photo}
+        isOpen={!!selectedProfileUser}
+        onClose={() => setSelectedProfileUser(null)}
+      />
     </section>
   );
 }

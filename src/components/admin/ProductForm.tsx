@@ -515,7 +515,7 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
                   <button
                     type="button"
                     onClick={() => {
-                      setDownloadUrl('https://drive.google.com/file/d/1ozs5fS2Y_cUcKGkuugp-5yuta5VGs385/view?usp=sharing');
+                      setDownloadUrl('https://drive.google.com/file/d/1LN_z1lwA-QZOBgYoWpfWQJRii0CPO4ZT/view?usp=sharing');
                       setDeliveryNote('💡 หมายเหตุ: ไฟล์ zip มีขนาดประมาณ 20-35 MB หากดาวน์โหลดเสร็จแล้วให้แตกไฟล์ (Extract Here) ก่อนเปิดโปรแกรม');
                     }}
                     className="text-[10px] text-[#7c5cff] hover:text-[#9980ff] bg-[#7c5cff]/10 hover:bg-[#7c5cff]/20 px-2 py-0.5 rounded border border-[#7c5cff]/30 transition-all cursor-pointer font-medium"

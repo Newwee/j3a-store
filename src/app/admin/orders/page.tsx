@@ -62,7 +62,7 @@ export default function AdminOrdersPage() {
         o.orderNumber.toLowerCase().includes(term) ||
         o.customer.name.toLowerCase().includes(term) ||
         o.customer.email.toLowerCase().includes(term) ||
-        o.customer.phone.includes(term)
+        (o.customer?.phone || '').includes(term)
       );
     });
   }, [orders, search]);
@@ -176,7 +176,7 @@ export default function AdminOrdersPage() {
                     <td className="py-4 px-4 max-w-xs">
                       <p className="font-semibold text-white">{order.customer.name}</p>
                       <p className="text-[11px] text-slate-400 truncate">{order.customer.email}</p>
-                      <p className="text-[11px] text-slate-500">{order.customer.phone}</p>
+                      <p className="text-[11px] text-slate-500">{order.customer.phone || '-'}</p>
                     </td>
 
                     {/* Items */}

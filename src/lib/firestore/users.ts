@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase/client';
-import { UserProfile, UserRole, UserTier } from '@/types/user';
+import { UserProfile, UserRole, UserTier, PublicUserProfile } from '@/types/user';
 import { clearOrArchiveDeletionRequest } from './deletionRequests';
 
 function getAdminEmails(): string[] {
@@ -316,4 +316,34 @@ export function subscribeUserProfile(
   return () => {
     supabase.removeChannel(channel);
   };
+}
+
+export async function getPublicUserProfile(userId: string): Promise<PublicUserProfile | null> {
+  if (!userId) return null;
+
+  try {
+    const res = await fetch(`/api/users/public-profile?userId=${encodeURIComponent(userId)}`);
+    const data = await res.json();
+    if (data.ok && data.profile) {
+      return data.profile;
+    }
+  } catch {}
+
+  try {
+    const p = await getUserProfile(userId);
+    if (!p) return null;
+    return {
+      uid: p.uid,
+      displayName: p.displayName || 'ลูกค้าผู้ใช้งานจริง',
+      photoURL: p.photoURL,
+      role: p.role,
+      tier: p.tier,
+      createdAt: p.createdAt,
+      reviewCount: 0,
+      averageRating: 5.0,
+      reviews: [],
+    };
+  } catch {
+    return null;
+  }
 }

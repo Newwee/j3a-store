@@ -41,7 +41,7 @@ export const SOFTWARE_DOWNLOADS: Record<'DISCORD_MANAGER' | 'DISCORD_PROFILE', S
     id: 'discord-profile',
     name: 'J3A Discord Profile',
     shortName: 'J3A Discord Profile',
-    downloadUrl: 'https://drive.google.com/file/d/1ozs5fS2Y_cUcKGkuugp-5yuta5VGs385/view?usp=sharing',
+    downloadUrl: 'https://drive.google.com/file/d/1LN_z1lwA-QZOBgYoWpfWQJRii0CPO4ZT/view?usp=sharing',
     zipFileName: 'J3ADiscordProfile.zip',
     exeFileName: 'J3ADiscordProfile.exe',
     guideStep3: '💡 หมายเหตุ: ไฟล์ zip มีขนาดประมาณ 20-35 MB หากดาวน์โหลดเสร็จแล้วให้แตกไฟล์ (Extract Here) ก่อนเปิดโปรแกรม',
@@ -112,8 +112,32 @@ export function LicenseKeyDelivery({
   const [hasCopied, setHasCopied] = useState<boolean>(false);
 
   // Detect which software(s) were purchased based on items / product name / downloadUrl
+  const [liveProducts, setLiveProducts] = useState<Record<string, { downloadUrl?: string; deliveryNote?: string }>>({});
+
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchLiveProducts() {
+      try {
+        const { getProducts } = await import('@/lib/firestore/products');
+        const prods = await getProducts();
+        if (isMounted && prods && prods.length > 0) {
+          const map: Record<string, { downloadUrl?: string; deliveryNote?: string }> = {};
+          for (const p of prods) {
+            if (p.id) map[p.id.toLowerCase()] = { downloadUrl: p.downloadUrl, deliveryNote: p.deliveryNote };
+            if (p.slug) map[p.slug.toLowerCase()] = { downloadUrl: p.downloadUrl, deliveryNote: p.deliveryNote };
+            if (p.name) map[p.name.toLowerCase()] = { downloadUrl: p.downloadUrl, deliveryNote: p.deliveryNote };
+          }
+          setLiveProducts(map);
+        }
+      } catch {}
+    }
+    fetchLiveProducts();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const purchasedSoftware = useMemo<SoftwareDownloadItem[]>(() => {
-    // If a custom downloadUrl was provided directly and is not the old dummy zip
     if (downloadUrl && !downloadUrl.includes('/downloads/J3ADiscordProfile.zip')) {
       if (downloadUrl === SOFTWARE_DOWNLOADS.DISCORD_MANAGER.downloadUrl) {
         return [SOFTWARE_DOWNLOADS.DISCORD_MANAGER];
@@ -126,7 +150,9 @@ export function LicenseKeyDelivery({
           id: 'custom-download',
           name: productName || 'ซอฟต์แวร์ J3A',
           shortName: productName || 'ซอฟต์แวร์ J3A',
-          downloadUrl,
+          downloadUrl: downloadUrl.includes('1ozs5fS2Y_cUcKGkuugp-5yuta5VGs385')
+            ? SOFTWARE_DOWNLOADS.DISCORD_PROFILE.downloadUrl
+            : downloadUrl,
           zipFileName: 'program.zip',
           exeFileName: 'program.exe',
           guideStep3: '💡 หมายเหตุ: ไฟล์ zip มีขนาดประมาณ 20-35 MB หากดาวน์โหลดเสร็จแล้วให้แตกไฟล์ (Extract Here) ก่อนเปิดโปรแกรม',
@@ -136,7 +162,6 @@ export function LicenseKeyDelivery({
 
     const matches: SoftwareDownloadItem[] = [];
 
-    // 1. Check if any items have explicit downloadUrl configured by Admin
     if (items && items.length > 0) {
       for (const it of items) {
         if (it.downloadUrl && !it.downloadUrl.includes('/downloads/J3ADiscordProfile.zip')) {
@@ -155,7 +180,6 @@ export function LicenseKeyDelivery({
       }
     }
 
-    // 2. Fallback to product name matching if no explicit links were found
     if (matches.length === 0) {
       const checkMatches = (text: string) => {
         const s = text.toLowerCase();
@@ -207,13 +231,36 @@ export function LicenseKeyDelivery({
       }
     }
 
-    // Default fallback if no specific match was identified
     if (matches.length === 0) {
       matches.push(SOFTWARE_DOWNLOADS.DISCORD_PROFILE);
     }
 
-    return matches;
-  }, [items, productName, downloadUrl]);
+    return matches.map((item) => {
+      let resolvedUrl = item.downloadUrl;
+      let resolvedNote = item.guideStep3;
+
+      if (resolvedUrl && resolvedUrl.includes('1ozs5fS2Y_cUcKGkuugp-5yuta5VGs385')) {
+        resolvedUrl = SOFTWARE_DOWNLOADS.DISCORD_PROFILE.downloadUrl;
+      }
+
+      const keyById = (item.id || '').toLowerCase();
+      const keyByName = (item.name || '').toLowerCase();
+      const live = liveProducts[keyById] || liveProducts[keyByName];
+
+      if (live?.downloadUrl) {
+        resolvedUrl = live.downloadUrl;
+      }
+      if (live?.deliveryNote) {
+        resolvedNote = live.deliveryNote;
+      }
+
+      return {
+        ...item,
+        downloadUrl: resolvedUrl,
+        guideStep3: resolvedNote,
+      };
+    });
+  }, [items, productName, downloadUrl, liveProducts]);
 
   const isMultiple = purchasedSoftware.length > 1;
   const isManagerOnly = purchasedSoftware.length === 1 && purchasedSoftware[0].id === 'discord-manager';

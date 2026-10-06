@@ -17,11 +17,15 @@ import {
   Sparkles,
   Star,
   ExternalLink,
+  Lock,
+  ArrowRight,
 } from 'lucide-react';
 import { Product } from '@/types/product';
 import { getProductBySlug } from '@/lib/firestore/products';
 import { getBundleBySlug, getBundleById, bundleToProduct } from '@/lib/firestore/bundles';
 import { formatCurrency } from '@/lib/utils/formatters';
+import { supabase } from '@/lib/supabase/client';
+import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/context/CartContext';
 import { useToast } from '@/context/ToastContext';
 import { ImageGallery } from '@/components/product/ImageGallery';
@@ -39,6 +43,7 @@ export default function ProductDetailPage({
   const slug = resolvedParams.slug;
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user, loading: authLoading } = useAuth();
   const { addItem, setIsCartOpen } = useCart();
   const { success, error } = useToast();
 
@@ -70,12 +75,33 @@ export default function ProductDetailPage({
       }
     }
     loadProduct();
+
+    const channelName = `product_detail_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'products' },
+        () => {
+          loadProduct();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'bundles' },
+        () => {
+          loadProduct();
+        }
+      )
+      .subscribe();
+
     return () => {
       isMounted = false;
+      supabase.removeChannel(channel);
     };
   }, [slug]);
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 animate-pulse">
@@ -85,6 +111,91 @@ export default function ProductDetailPage({
             <div className="h-10 w-3/4 bg-slate-900 rounded" />
             <div className="h-8 w-40 bg-slate-900 rounded" />
             <div className="h-24 w-full bg-slate-900 rounded" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Gate: Non-authenticated visitors must login/register before viewing product details
+  if (!authLoading && !user) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center py-12 sm:py-16 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-lg w-full bg-slate-900/80 border border-slate-800/90 rounded-3xl p-7 sm:p-10 backdrop-blur-xl shadow-2xl text-center space-y-6 relative overflow-hidden">
+          {/* Ambient Cyber Glow */}
+          <div className="absolute -top-24 -left-24 w-48 h-48 bg-cyan-500/15 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none" />
+
+          {/* Animated Lock Icon */}
+          <div className="relative mx-auto w-20 h-20 rounded-3xl bg-gradient-to-br from-cyan-500/20 via-blue-500/10 to-indigo-500/20 border border-cyan-500/30 flex items-center justify-center shadow-[0_0_30px_rgba(6,182,212,0.25)]">
+            <Lock className="w-10 h-10 text-cyan-400" />
+            <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-400 rounded-full animate-ping opacity-75" />
+            <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-400 rounded-full flex items-center justify-center text-[9px] font-black text-slate-950">!</div>
+          </div>
+
+          <div className="space-y-2.5">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs font-bold uppercase tracking-wider">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              เฉพาะสมาชิก (Members Only)
+            </span>
+            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+              เข้าสู่ระบบก่อนดูสินค้า
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-md mx-auto">
+              เพื่อความปลอดภัยและการเข้าถึงรายละเอียดสินค้า โปรโมชั่นพิเศษ และระบบการสั่งซื้ออัตโนมัติ กรุณาเข้าสู่ระบบบัญชีของคุณ หรือสมัครสมาชิกใหม่
+            </p>
+          </div>
+
+          {/* Quick Perks */}
+          <div className="grid grid-cols-2 gap-2.5 text-left py-1">
+            <div className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 flex items-center gap-2.5">
+              <Zap className="w-4 h-4 text-cyan-400 shrink-0" />
+              <span className="text-xs text-slate-300 font-medium">จัดส่งอัตโนมัติ 24 ชม.</span>
+            </div>
+            <div className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 flex items-center gap-2.5">
+              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span className="text-xs text-slate-300 font-medium">รับประกันสินค้าแท้</span>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="space-y-3 pt-2">
+            <Link
+              href={`/login?redirect=${encodeURIComponent(`/products/${slug}`)}`}
+              className="block w-full"
+            >
+              <Button
+                variant="primary"
+                size="lg"
+                className="w-full text-sm font-bold shadow-[0_0_25px_rgba(6,182,212,0.4)] flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>เข้าสู่ระบบ (Sign In)</span>
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+            </Link>
+
+            <Link
+              href={`/register?redirect=${encodeURIComponent(`/products/${slug}`)}`}
+              className="block w-full"
+            >
+              <Button
+                variant="secondary"
+                size="lg"
+                className="w-full text-sm font-bold flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>สมัครสมาชิกใหม่ (Register)</span>
+              </Button>
+            </Link>
+
+            <div>
+              <Link
+                href="/shop"
+                className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-cyan-400 transition-colors pt-2"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>กลับสู่หน้าร้านค้า</span>
+              </Link>
+            </div>
           </div>
         </div>
       </div>
