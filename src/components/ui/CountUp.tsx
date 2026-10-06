@@ -1,80 +1,118 @@
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
+import { useInView, useMotionValue, useSpring } from 'motion/react';
+import { useCallback, useEffect, useRef } from 'react';
 
-interface CountUpProps {
+export interface CountUpProps {
   to: number;
   from?: number;
+  direction?: 'up' | 'down';
+  delay?: number;
   duration?: number;
   className?: string;
+  startWhen?: boolean;
   separator?: string;
+  onStart?: () => void;
+  onEnd?: () => void;
 }
 
-export function CountUp({
+export default function CountUp({
   to,
   from = 0,
-  duration = 1.5,
+  direction = 'up',
+  delay = 0,
+  duration = 2,
   className = '',
-  separator = ',',
+  startWhen = true,
+  separator = '',
+  onStart,
+  onEnd
 }: CountUpProps) {
-  const [count, setCount] = useState(from);
   const ref = useRef<HTMLSpanElement>(null);
-  const [hasStarted, setHasStarted] = useState(false);
+  const motionValue = useMotionValue(direction === 'down' ? to : from);
 
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          setHasStarted(true);
-          observer.disconnect();
-        }
-      },
-      { threshold: 0.1 }
-    );
+  const damping = 20 + 40 * (1 / duration);
+  const stiffness = 100 * (1 / duration);
 
-    if (ref.current) {
-      observer.observe(ref.current);
-    }
+  const springValue = useSpring(motionValue, {
+    damping,
+    stiffness
+  });
 
-    return () => observer.disconnect();
-  }, []);
+  const isInView = useInView(ref, { once: true, margin: '0px' });
 
-  useEffect(() => {
-    if (!hasStarted) return;
+  const getDecimalPlaces = (num: number) => {
+    const str = (num ?? 0).toString();
 
-    let start = from;
-    const end = to;
-    if (start === end) {
-      setCount(end);
-      return;
-    }
+    if (str.includes('.')) {
+      const decimals = str.split('.')[1];
 
-    const totalFrames = Math.max(1, Math.round(duration * 60));
-    let frame = 0;
-
-    const timer = setInterval(() => {
-      frame++;
-      const progress = frame / totalFrames;
-      // easeOutExpo
-      const ease = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
-      const current = Math.round(start + (end - start) * ease);
-
-      setCount(current);
-
-      if (frame >= totalFrames) {
-        clearInterval(timer);
-        setCount(end);
+      if (parseInt(decimals) !== 0) {
+        return decimals.length;
       }
-    }, 1000 / 60);
+    }
 
-    return () => clearInterval(timer);
-  }, [hasStarted, to, from, duration]);
+    return 0;
+  };
 
-  const formatted = count.toLocaleString('en-US').replace(/,/g, separator);
+  const maxDecimals = Math.max(getDecimalPlaces(from), getDecimalPlaces(to));
 
-  return (
-    <span ref={ref} className={className}>
-      {formatted}
-    </span>
+  const formatValue = useCallback(
+    (latest: number) => {
+      const hasDecimals = maxDecimals > 0;
+
+      const options: Intl.NumberFormatOptions = {
+        useGrouping: !!separator,
+        minimumFractionDigits: hasDecimals ? maxDecimals : 0,
+        maximumFractionDigits: hasDecimals ? maxDecimals : 0
+      };
+
+      const formattedNumber = Intl.NumberFormat('en-US', options).format(latest);
+
+      return separator ? formattedNumber.replace(/,/g, separator) : formattedNumber;
+    },
+    [maxDecimals, separator]
   );
+
+  useEffect(() => {
+    if (ref.current) {
+      ref.current.textContent = formatValue(direction === 'down' ? to : from);
+    }
+  }, [from, to, direction, formatValue]);
+
+  useEffect(() => {
+    if (isInView && startWhen) {
+      if (typeof onStart === 'function') onStart();
+
+      const timeoutId = setTimeout(() => {
+        motionValue.set(direction === 'down' ? from : to);
+      }, delay * 1000);
+
+      const durationTimeoutId = setTimeout(
+        () => {
+          if (typeof onEnd === 'function') onEnd();
+        },
+        delay * 1000 + duration * 1000
+      );
+
+      return () => {
+        clearTimeout(timeoutId);
+        clearTimeout(durationTimeoutId);
+      };
+    }
+  }, [isInView, startWhen, motionValue, direction, from, to, delay, onStart, onEnd, duration]);
+
+  useEffect(() => {
+    const unsubscribe = springValue.on('change', (latest: number) => {
+      if (ref.current) {
+        ref.current.textContent = formatValue(latest);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [springValue, formatValue]);
+
+  return <span className={className} ref={ref} />;
 }
+
+export { CountUp };

@@ -44,26 +44,50 @@ export async function getStoreDashboardStats(isAdmin = false): Promise<StoreStat
     let recentOrders: Order[] = [];
     let recentProducts: Product[] = [];
 
-    // 1. Products
-    const products = await getProducts({ status: 'active', limitCount: 8, sortBy: 'newest' });
-    recentProducts = products;
-    totalProducts = products.length;
-
-    // 2. Members count
+    // 1. Fetch live consolidated stats from store_stats (maintained by DB trigger)
     try {
-      const { count } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
-      totalCustomers = count !== null && count !== undefined ? Math.max(1, count) : 1;
-    } catch {
-      totalCustomers = 1;
+      const { data: liveRow } = await supabase
+        .from('store_stats')
+        .select('*')
+        .eq('id', 'live')
+        .maybeSingle();
+
+      if (liveRow) {
+        totalCustomers = Number(liveRow.members) || 1;
+        totalOrders = Number(liveRow.orders) || 0;
+        totalProducts = Number(liveRow.products) || 0;
+      }
+    } catch (e) {
+      console.warn('Could not read from store_stats table, falling back to direct queries:', e);
     }
 
-    // 3. Admin stats
+    // 2. Products fallback/recent
+    const products = await getProducts({ status: 'active', limitCount: 8, sortBy: 'newest' });
+    recentProducts = products;
+    if (totalProducts === 0) {
+      totalProducts = products.length;
+    }
+
+    // 3. Members count fallback
+    if (totalCustomers <= 1) {
+      try {
+        const { count } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
+        totalCustomers = count !== null && count !== undefined ? Math.max(1, count) : 1;
+      } catch {
+        totalCustomers = 1;
+      }
+    }
+
+    // 4. Admin stats (orders list, revenue, pending topups)
     if (isAdmin) {
       try {
         const orders = await getOrders({ limitCount: 50 });
         recentOrders = orders;
-        totalOrders = orders.length;
-        totalRevenue = orders.reduce((sum, ord) => {
+        const validOrders = orders.filter((ord) => ord.status !== 'cancelled');
+        if (totalOrders === 0) {
+          totalOrders = validOrders.length;
+        }
+        totalRevenue = validOrders.reduce((sum, ord) => {
           if (ord.status === 'paid' || ord.status === 'completed' || ord.status === 'processing') {
             return sum + (ord.total || 0);
           }

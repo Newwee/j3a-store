@@ -7,7 +7,7 @@ import { ArrowRight, ShieldCheck, Zap, Sparkles, Flame, Star } from 'lucide-reac
 import { Button } from '@/components/ui/Button';
 import dynamic from 'next/dynamic';
 
-const ParticleText = dynamic(() => import('@/components/ui/ParticleText'), {
+const ASCIIText = dynamic(() => import('@/components/ui/ASCIIText'), {
   ssr: false,
   loading: () => (
     <div className="w-full h-full flex items-center justify-center lg:justify-start">
@@ -55,17 +55,12 @@ export function HeroSection() {
               <span>เวอร์ชันใหม่เปิดให้บริการแล้ว! ระบบอัตโนมัติ 24 ชม.</span>
             </div>
 
-            {/* Main Headline with ParticleText */}
-            <div className="w-full h-36 sm:h-44 lg:h-52 relative flex items-center justify-center lg:justify-start -my-2">
-              <ParticleText
+            {/* Main Headline with ASCIIText */}
+            <div className="w-full h-36 sm:h-44 lg:h-52 relative flex items-center justify-center lg:justify-start -my-2 overflow-hidden">
+              <ASCIIText
                 text="J3A STORE"
-                fontSize="clamp(3.6rem, 8vw, 6.2rem)"
-                color="#00e5ff"
-                highlightColor="#c084fc"
-                particleSize={2.8}
-                density={2.5}
-                scatter={160}
-                glow={true}
+                enableWaves={false}
+                asciiFontSize={6}
               />
             </div>
 

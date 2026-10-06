@@ -6,6 +6,7 @@ import { formatNumber } from '@/lib/utils/formatters';
 import { getStoreDashboardStats } from '@/lib/firestore/stats';
 
 import { CountUp } from '@/components/ui/CountUp';
+import { supabase } from '@/lib/supabase/client';
 
 export function LiveStatsSection() {
   const [stats, setStats] = useState({
@@ -40,8 +41,34 @@ export function LiveStatsSection() {
       }
     }
     loadStats();
+
+    // Realtime channel subscription to live store_stats
+    const channel = supabase
+      .channel('realtime:store_stats')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'store_stats' },
+        (payload) => {
+          if (payload.new && typeof payload.new === 'object') {
+            const data = payload.new as any;
+            if (isMounted) {
+              setStats((prev) => ({
+                ...prev,
+                members: data.members !== undefined ? Number(data.members) : prev.members,
+                orders: data.orders !== undefined ? Number(data.orders) : prev.orders,
+                products: data.products !== undefined ? Number(data.products) : prev.products,
+                rating: data.rating !== undefined ? Number(data.rating) : prev.rating,
+                totalReviews: data.total_reviews !== undefined ? Number(data.total_reviews) : prev.totalReviews,
+              }));
+            }
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
       isMounted = false;
+      supabase.removeChannel(channel);
     };
   }, []);
 
@@ -90,7 +117,7 @@ export function LiveStatsSection() {
               </div>
               <div className="text-right">
                 <span className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                  <CountUp to={stats.members} />
+                  <CountUp to={stats.members} duration={1} separator="," />
                 </span>
                 <span className="text-xs text-slate-400 ml-1.5 font-medium">คน</span>
               </div>
@@ -111,7 +138,7 @@ export function LiveStatsSection() {
               </div>
               <div className="text-right">
                 <span className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                  <CountUp to={stats.orders} />
+                  <CountUp to={stats.orders} duration={1} separator="," />
                 </span>
                 <span className="text-xs text-slate-400 ml-1.5 font-medium">รายการ</span>
               </div>
@@ -132,7 +159,7 @@ export function LiveStatsSection() {
               </div>
               <div className="text-right">
                 <span className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                  <CountUp to={stats.products} />
+                  <CountUp to={stats.products} duration={1} separator="," />
                 </span>
                 <span className="text-xs text-slate-400 ml-1.5 font-medium">รายการ</span>
               </div>
@@ -155,7 +182,7 @@ export function LiveStatsSection() {
               </div>
               <div className="text-right">
                 <span className="text-2xl sm:text-3xl font-black text-amber-400 tracking-tight">
-                  {stats.rating.toFixed(1)}
+                  <CountUp to={Number(stats.rating)} duration={1} separator="," />
                 </span>
                 <span className="text-xs text-slate-400 ml-1.5 font-medium">/ 5.0</span>
               </div>
