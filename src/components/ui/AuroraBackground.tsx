@@ -15,11 +15,11 @@ export const AuroraBackground = memo(function AuroraBackground({
 }: AuroraBackgroundProps) {
   return (
     <div
-      className={`fixed inset-0 pointer-events-none z-0 overflow-hidden bg-[#09080e] ${className}`}
+      className={`aurora-bg fixed inset-0 pointer-events-none z-0 overflow-hidden bg-[#09080e] transition-colors duration-500 ${className}`}
       aria-hidden="true"
     >
       {/* Aurora Ambient Glow Blobs (GPU-accelerated, soft & non-distracting) */}
-      <div className="absolute inset-0 opacity-40 dark:opacity-35 transition-opacity duration-1000">
+      <div className="aurora-blobs-layer absolute inset-0 opacity-40 dark:opacity-35 transition-opacity duration-1000">
         {/* Blob 1: Cyan Ambient Top-Left */}
         <div
           className="absolute -top-[10%] -left-[10%] w-[55vw] h-[55vw] max-w-[700px] max-h-[700px] rounded-full bg-gradient-to-tr from-cyan-500/20 via-sky-500/15 to-transparent blur-[120px] will-change-transform animate-[aurora-drift-1_22s_ease-in-out_infinite_alternate]"
@@ -40,7 +40,7 @@ export const AuroraBackground = memo(function AuroraBackground({
 
         {/* Soft Center Vignette */}
         {showRadialGradient && (
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,transparent_0%,rgba(9,8,14,0.65)_70%,rgba(9,8,14,0.95)_100%)]" />
+          <div className="aurora-vignette absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,transparent_0%,rgba(9,8,14,0.65)_70%,rgba(9,8,14,0.95)_100%)] transition-all duration-500" />
         )}
       </div>
 

@@ -308,3 +308,79 @@ html.light .rb-pill {
   border-color: rgba(226, 232, 240, 0.9) !important;
   color: #0f172a !important;
 }
+
+/* Aurora background adaptations in Light mode */
+html.light .aurora-bg {
+  background-color: #f8fafc !important;
+}
+
+html.light .aurora-vignette {
+  background: radial-gradient(circle at 50% 40%, transparent 0%, rgba(248, 250, 252, 0.65) 70%, rgba(248, 250, 252, 0.95) 100%) !important;
+}
+
+html.light .aurora-blobs-layer {
+  opacity: 0.18 !important;
+}
+
+/* License Agreement Card in Light mode */
+html.light .license-agreement-card {
+  background: linear-gradient(180deg, rgba(254, 243, 199, 0.45) 0%, rgba(255, 255, 255, 0.98) 100%) !important;
+  border-color: rgba(245, 158, 11, 0.5) !important;
+  box-shadow: 0 8px 30px -4px rgba(245, 158, 11, 0.12) !important;
+}
+
+html.light .license-agreement-card h3 {
+  color: #b45309 !important;
+}
+
+html.light .license-agreement-card p {
+  color: #92400e !important;
+}
+
+html.light .license-agreement-card .text-slate-200 {
+  color: #334155 !important;
+}
+
+html.light .license-agreement-card label {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.light .license-agreement-card label:hover {
+  border-color: #f59e0b !important;
+}
+
+html.light .license-agreement-card label.bg-emerald-950\/30,
+html.light .license-agreement-card label:has(input:checked) {
+  background-color: #ecfdf5 !important;
+  border-color: #10b981 !important;
+}
+
+html.light .license-agreement-card label:has(input:checked) span {
+  color: #065f46 !important;
+}
+
+/* Dropdown and hover styles in Light mode */
+html.light .bg-slate-900\/90,
+html.light .bg-slate-900\/95,
+html.light .bg-slate-950\/95 {
+  background-color: rgba(255, 255, 255, 0.98) !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.08) !important;
+}
+
+html.light .bg-slate-800\/50,
+html.light .bg-slate-800\/60,
+html.light .bg-slate-800\/80 {
+  background-color: #f1f5f9 !important;
+  color: #1e293b !important;
+}
+
+html.light .hover\:bg-slate-800\/60:hover,
+html.light .hover\:bg-slate-800\/80:hover,
+html.light .hover\:bg-slate-800:hover,
+html.light .hover\:bg-slate-700\/60:hover,
+html.light .hover\:bg-slate-700\/70:hover {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}

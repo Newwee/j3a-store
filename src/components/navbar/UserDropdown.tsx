@@ -16,16 +16,20 @@ import {
   ShieldCheck,
   CreditCard,
   Moon,
+  Sun,
+  Laptop,
   Globe,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
+import { useTheme, Theme } from '@/context/ThemeContext';
 import { TierBadge } from '@/components/ui/Badge';
 import { formatCurrency } from '@/lib/utils/formatters';
 
 export function UserDropdown() {
   const { user, profile, isAdmin, logout } = useAuth();
-  const { success, error } = useToast();
+  const { success, error, toast } = useToast();
+  const { theme, resolvedTheme, setTheme } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -214,16 +218,57 @@ export function UserDropdown() {
             </Link>
           </div>
 
-          {/* Quick preference badges */}
+          {/* Quick preference badges - interactive theme & language */}
           <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-slate-800/80 text-[11px] text-slate-400">
-            <div className="flex items-center justify-center gap-1.5 py-1 px-2 rounded-lg bg-slate-800/50">
-              <Moon className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Dark Theme</span>
-            </div>
-            <div className="flex items-center justify-center gap-1.5 py-1 px-2 rounded-lg bg-slate-800/50">
-              <Globe className="w-3.5 h-3.5 text-slate-400" />
-              <span>Thai (TH)</span>
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                let next: Theme = 'dark';
+                if (theme === 'dark') next = 'light';
+                else if (theme === 'light') next = 'system';
+                else next = 'dark';
+
+                setTheme(next);
+                toast(
+                  next === 'dark'
+                    ? '🌙 เปลี่ยนเป็นโหมดมืด (Dark Theme)'
+                    : next === 'light'
+                    ? '☀️ เปลี่ยนเป็นโหมดสว่าง (Light Theme)'
+                    : '💻 ปรับตามระบบเครื่อง (System Theme)',
+                  'info',
+                  2500
+                );
+              }}
+              className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-slate-800/60 hover:bg-slate-700/70 hover:text-white border border-slate-700/50 transition-all cursor-pointer select-none active:scale-95 group shadow-sm"
+              title="คลิกเพื่อสลับธีม: Dark / Light / System"
+            >
+              {theme === 'system' ? (
+                <Laptop className="w-3.5 h-3.5 text-cyan-400 group-hover:scale-110 transition-transform" />
+              ) : resolvedTheme === 'dark' ? (
+                <Moon className="w-3.5 h-3.5 text-cyan-400 group-hover:scale-110 transition-transform" />
+              ) : (
+                <Sun className="w-3.5 h-3.5 text-amber-400 group-hover:scale-110 transition-transform" />
+              )}
+              <span className="font-semibold text-slate-200 truncate">
+                {theme === 'system'
+                  ? `System (${resolvedTheme === 'dark' ? 'Dark' : 'Light'})`
+                  : theme === 'dark'
+                  ? 'Dark Theme'
+                  : 'Light Theme'}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                toast('🌐 ปัจจุบันระบบตั้งค่าเริ่มต้นเป็นภาษาไทย (TH)', 'info', 2000);
+              }}
+              className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-slate-800/60 hover:bg-slate-700/70 hover:text-white border border-slate-700/50 transition-all cursor-pointer select-none active:scale-95 group shadow-sm"
+              title="ภาษาไทย (TH)"
+            >
+              <Globe className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform" />
+              <span className="font-semibold text-slate-200">Thai (TH)</span>
+            </button>
           </div>
 
           {/* Logout button */}

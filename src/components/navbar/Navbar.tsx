@@ -14,15 +14,20 @@ import {
   Layers,
   Store,
   Home,
+  Moon,
+  Sun,
+  Laptop,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/context/CartContext';
+import { useTheme } from '@/context/ThemeContext';
 import { UserDropdown } from './UserDropdown';
 import { CartDrawer } from '@/components/cart/CartDrawer';
 
 export function Navbar() {
   const { isAdmin } = useAuth();
   const { totalItems, setIsCartOpen } = useCart();
+  const { theme, resolvedTheme, toggleTheme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const router = useRouter();
@@ -127,8 +132,25 @@ export function Navbar() {
               </div>
             </form>
 
-            {/* 3. Actions (Cart & User) */}
-            <div className="flex items-center gap-3">
+            {/* 3. Actions (Theme, Cart & User) */}
+            <div className="flex items-center gap-2.5">
+              {/* Theme Toggle Button (Desktop & Mobile) */}
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="p-2.5 rounded-full bg-slate-900 border border-slate-700/80 hover:border-cyan-500/50 hover:bg-slate-800 transition-all text-slate-200 hover:text-white cursor-pointer group shadow-sm active:scale-95"
+                title={`ธีม: ${theme === 'system' ? `ตามระบบ (${resolvedTheme === 'dark' ? 'มืด' : 'สว่าง'})` : theme === 'dark' ? 'โหมดมืด' : 'โหมดสว่าง'} (คลิกเพื่อสลับ)`}
+                aria-label="Toggle theme"
+              >
+                {theme === 'system' ? (
+                  <Laptop className="w-5 h-5 text-cyan-400 group-hover:scale-110 transition-transform" />
+                ) : resolvedTheme === 'dark' ? (
+                  <Moon className="w-5 h-5 text-cyan-400 group-hover:scale-110 transition-transform" />
+                ) : (
+                  <Sun className="w-5 h-5 text-amber-400 group-hover:scale-110 transition-transform" />
+                )}
+              </button>
+
               {/* Cart Button */}
               <button
                 onClick={() => setIsCartOpen(true)}

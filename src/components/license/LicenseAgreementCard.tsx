@@ -23,7 +23,7 @@ export function LicenseAgreementCard({
 }: LicenseAgreementCardProps) {
   return (
     <div
-      className={`rounded-2xl p-5 sm:p-6 bg-gradient-to-b from-amber-950/30 via-slate-950/80 to-slate-950/90 border-2 border-amber-500/40 shadow-[0_0_25px_rgba(245,158,11,0.15)] space-y-4 backdrop-blur-md ${className}`}
+      className={`license-agreement-card rounded-2xl p-5 sm:p-6 bg-gradient-to-b from-amber-950/30 via-slate-950/80 to-slate-950/90 border-2 border-amber-500/40 shadow-[0_0_25px_rgba(245,158,11,0.15)] space-y-4 backdrop-blur-md ${className}`}
     >
       {/* Alert Header Box */}
       <div className="flex items-center gap-3 pb-3 border-b border-amber-500/20">
