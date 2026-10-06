@@ -539,11 +539,94 @@ export async function getAllReviews(limitCount = 100): Promise<Review[]> {
 }
 
 /**
- * Delete a review (Admin moderation)
+ * Fetch all reviews by a specific user (to check existing reviews per order item)
+ */
+export async function getUserReviews(userId: string): Promise<Review[]> {
+  if (!userId) return [];
+  try {
+    const { data, error } = await supabase
+      .from('reviews')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error || !data) return [];
+    return data.map(mapRowToReview);
+  } catch (err) {
+    console.error('Error fetching user reviews:', err);
+    return [];
+  }
+}
+
+/**
+ * Update an existing review (user edit or admin edit)
+ */
+export async function updateProductReview(data: {
+  reviewId: string;
+  rating: number;
+  comment: string;
+}): Promise<Review> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData?.session?.access_token;
+
+  if (!token) {
+    throw new Error('กรุณาเข้าสู่ระบบก่อนแก้ไขรีวิว');
+  }
+
+  const res = await fetch('/api/reviews/update', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      reviewId: data.reviewId,
+      rating: data.rating,
+      comment: data.comment,
+    }),
+  });
+
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.error || 'ไม่สามารถแก้ไขรีวิวได้');
+  }
+
+  return mapRowToReview(json.review);
+}
+
+/**
+ * Delete a review (User self-deletion or Admin moderation)
  */
 export async function deleteReview(reviewId: string, productId?: string): Promise<void> {
   if (!reviewId) return;
 
+  // 1. Try secure Server API first (handles ownership check & rating recalculation)
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (token) {
+      const res = await fetch('/api/reviews/delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ reviewId }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || 'ไม่สามารถลบรีวิวได้');
+      }
+      return;
+    }
+  } catch (apiErr: any) {
+    if (apiErr?.message && !apiErr.message.includes('fetch')) {
+      throw apiErr;
+    }
+  }
+
+  // 2. Direct client fallback
   const { error } = await supabase.from('reviews').delete().eq('id', reviewId);
   if (error) throw new Error(error.message);
 
@@ -564,3 +647,4 @@ export async function deleteReview(reviewId: string, productId?: string): Promis
     } catch {}
   }
 }
+

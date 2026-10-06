@@ -11,6 +11,8 @@ export interface UserProfile {
   credits: number; // Balance in THB
   tier: UserTier;
   phone?: string;
+  reviewBannedUntil?: string | null;
+  reviewBanReason?: string | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -252,6 +252,32 @@ export async function updateProduct(id: string, formData: Partial<ProductFormDat
   if (error) {
     throw new Error(`Failed to update product in Supabase: ${error.message}`);
   }
+
+  // Automatically sync all past customer orders with the new download link & delivery note
+  if (formData.downloadUrl !== undefined || formData.deliveryNote !== undefined) {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (token) {
+        fetch('/api/admin/products/sync-orders', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            productId: id,
+            slug: formData.slug,
+            name: formData.name,
+            downloadUrl: formData.downloadUrl,
+            deliveryNote: formData.deliveryNote,
+          }),
+        }).catch((e) => console.warn('Background sync-orders error:', e));
+      }
+    } catch (syncErr) {
+      console.warn('Could not trigger sync-orders API:', syncErr);
+    }
+  }
 }
 
 /**

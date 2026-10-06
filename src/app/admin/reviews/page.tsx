@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Review } from '@/types/review';
 import { getAllReviews, deleteReview } from '@/lib/firestore/reviews';
+import { unbanUserReviews } from '@/lib/firestore/users';
 import { AdminHeader } from '@/components/admin/AdminHeader';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/context/ToastContext';
@@ -30,6 +31,7 @@ export default function AdminReviewsPage() {
   const [ratingFilter, setRatingFilter] = useState<number | 'all'>('all');
   const [typeFilter, setTypeFilter] = useState<'all' | 'store' | 'product'>('all');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [unbanningId, setUnbanningId] = useState<string | null>(null);
 
   const fetchReviews = async () => {
     setLoading(true);
@@ -61,6 +63,19 @@ export default function AdminReviewsPage() {
       error(`เกิดข้อผิดพลาดในการลบรีวิว: ${err.message || 'กรุณาลองใหม่อีกครั้ง'}`);
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleUnban = async (userId: string) => {
+    if (!userId) return;
+    setUnbanningId(userId);
+    try {
+      await unbanUserReviews(userId);
+      success('ปลดแบนสิทธิ์การเขียนรีวิวของผู้ใช้เรียบร้อยแล้ว');
+    } catch (err: any) {
+      error(err.message || 'เกิดข้อผิดพลาดในการปลดแบน');
+    } finally {
+      setUnbanningId(null);
     }
   };
 
@@ -357,6 +372,18 @@ export default function AdminReviewsPage() {
                     >
                       ลบรีวิว
                     </Button>
+                    {rev.userId && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        disabled={unbanningId === rev.userId}
+                        onClick={() => handleUnban(rev.userId)}
+                        className="text-[11px] text-amber-300 border-amber-500/30 hover:bg-amber-500/10 hover:border-amber-400 py-1"
+                        title="ปลดแบนสิทธิ์การเขียนรีวิวของผู้ใช้นี้ (หากถูกแบนโดยคำไม่สุภาพ)"
+                      >
+                        {unbanningId === rev.userId ? 'กำลังปลด...' : '🔓 ปลดแบนรีวิว'}
+                      </Button>
+                    )}
                   </div>
                 </div>
               );

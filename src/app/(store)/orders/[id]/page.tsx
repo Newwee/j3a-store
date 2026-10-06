@@ -18,6 +18,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { Order } from '@/types/order';
+import { Review } from '@/types/review';
 import { getOrderById, updatePaymentProof } from '@/lib/firestore/orders';
 import { uploadProductImage } from '@/lib/storage/upload';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
@@ -30,7 +31,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useLoading } from '@/context/LoadingContext';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LicenseKeyDelivery, getDownloadUrlForProduct } from '@/components/license/LicenseKeyDelivery';
-import { submitProductReview } from '@/lib/firestore/reviews';
+import { submitProductReview, updateProductReview, deleteReview, getUserReviews } from '@/lib/firestore/reviews';
 
 export default function OrderDetailPage({
   params,
@@ -56,8 +57,11 @@ export default function OrderDetailPage({
   } | null>(null);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
+  const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
+  const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
   const [submittingReview, setSubmittingReview] = useState(false);
-  const [reviewedItemIds, setReviewedItemIds] = useState<Set<string>>(new Set());
+  const [userReviewsMap, setUserReviewsMap] = useState<Record<string, Review>>({});
+
 
   useEffect(() => {
     let isMounted = true;
@@ -144,6 +148,31 @@ export default function OrderDetailPage({
     }
   };
 
+  useEffect(() => {
+    let isMounted = true;
+    async function loadUserReviews() {
+      if (!user?.uid) return;
+      try {
+        const revs = await getUserReviews(user.uid);
+        if (isMounted && revs) {
+          const map: Record<string, Review> = {};
+          for (const r of revs) {
+            if (r.productId) map[r.productId.toLowerCase()] = r;
+            if (r.productSlug) map[r.productSlug.toLowerCase()] = r;
+            if (r.productName) map[r.productName.toLowerCase()] = r;
+          }
+          setUserReviewsMap(map);
+        }
+      } catch (err) {
+        console.warn('Could not load user reviews:', err);
+      }
+    }
+    loadUserReviews();
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.uid]);
+
   const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!reviewItem || !order || !user) {
@@ -156,29 +185,109 @@ export default function OrderDetailPage({
     }
 
     setSubmittingReview(true);
-    try {
-      await submitProductReview({
-        productId: reviewItem.productId || reviewItem.slug || 'product',
-        productSlug: reviewItem.slug,
-        productName: reviewItem.name,
-        orderId: order.id,
-        userId: user.uid,
-        userName: user.displayName || user.email?.split('@')[0] || 'ผู้ซื้อที่ผ่านการยืนยัน',
-        userPhoto: user.photoURL || undefined,
-        rating: reviewRating,
-        comment: reviewComment.trim(),
-      });
+    const pid = (reviewItem.productId || reviewItem.slug || 'product').toLowerCase();
+    const pslug = (reviewItem.slug || '').toLowerCase();
+    const pname = (reviewItem.name || '').toLowerCase();
 
-      success(`บันทึกคะแนนและรีวิวสินค้า "${reviewItem.name}" เรียบร้อยแล้ว ขอบคุณมากครับ!`);
-      const key = reviewItem.productId || reviewItem.slug || reviewItem.name;
-      setReviewedItemIds((prev) => new Set([...prev, key]));
-      setReviewItem(null);
-      setReviewComment('');
+    try {
+      if (editingReviewId) {
+        // Edit existing review
+        const updated = await updateProductReview({
+          reviewId: editingReviewId,
+          rating: reviewRating,
+          comment: reviewComment.trim(),
+        });
+        success(`แก้ไขคะแนนและรีวิวสินค้า "${reviewItem.name}" เรียบร้อยแล้ว ขอบคุณมากครับ!`);
+        setUserReviewsMap((prev) => ({
+          ...prev,
+          [pid]: updated,
+          ...(pslug ? { [pslug]: updated } : {}),
+          ...(pname ? { [pname]: updated } : {}),
+        }));
+        setReviewItem(null);
+        setEditingReviewId(null);
+        setReviewComment('');
+      } else {
+        // Submit new review
+        const created = await submitProductReview({
+          productId: reviewItem.productId || reviewItem.slug || 'product',
+          productSlug: reviewItem.slug,
+          productName: reviewItem.name,
+          orderId: order.id,
+          userId: user.uid,
+          userName: user.displayName || user.email?.split('@')[0] || 'ผู้ซื้อที่ผ่านการยืนยัน',
+          userPhoto: user.photoURL || undefined,
+          rating: reviewRating,
+          comment: reviewComment.trim(),
+        });
+        success(`บันทึกคะแนนและรีวิวสินค้า "${reviewItem.name}" เรียบร้อยแล้ว ขอบคุณมากครับ!`);
+        setUserReviewsMap((prev) => ({
+          ...prev,
+          [pid]: created,
+          ...(pslug ? { [pslug]: created } : {}),
+          ...(pname ? { [pname]: created } : {}),
+        }));
+        setReviewItem(null);
+        setEditingReviewId(null);
+        setReviewComment('');
+      }
     } catch (err: any) {
-      console.error('Error submitting review:', err);
-      error(err.message || 'เกิดข้อผิดพลาดในการบันทึกรีวิว');
+      console.error('Error submitting/updating review:', err);
+      const errMsg = err.message || 'เกิดข้อผิดพลาดในการบันทึกรีวิว';
+      error(errMsg);
+
+      // If user already reviewed, close create modal and refresh review list so they see the review!
+      if (errMsg.includes('คุณได้ให้คะแนนสินค้านี้เรียบร้อยแล้ว')) {
+        setReviewItem(null);
+        setEditingReviewId(null);
+        if (user?.uid) {
+          getUserReviews(user.uid).then((revs) => {
+            const map: Record<string, Review> = {};
+            for (const r of revs) {
+              if (r.productId) map[r.productId.toLowerCase()] = r;
+              if (r.productSlug) map[r.productSlug.toLowerCase()] = r;
+              if (r.productName) map[r.productName.toLowerCase()] = r;
+            }
+            setUserReviewsMap(map);
+          });
+        }
+      } else if (errMsg.includes('ระงับสิทธิ์') || errMsg.includes('ไม่สุภาพ')) {
+        // Profanity or Ban: close modal so they can't spam
+        setReviewItem(null);
+        setEditingReviewId(null);
+      }
     } finally {
       setSubmittingReview(false);
+    }
+  };
+
+  const handleDeleteReview = async (reviewId: string, item: any) => {
+    if (!reviewId || !user) return;
+    const confirmed = window.confirm(`คุณต้องการลบรีวิวสำหรับสินค้า "${item.name}" ใช่หรือไม่? เมื่อลบแล้วคุณจะสามารถเขียนรีวิวใหม่ได้`);
+    if (!confirmed) return;
+
+    const pid = (item.productId || item.slug || '').toLowerCase();
+    const pslug = (item.slug || '').toLowerCase();
+    const pname = (item.name || '').toLowerCase();
+
+    setDeletingReviewId(reviewId);
+    showLoading('กำลังลบรีวิวของคุณ...');
+    try {
+      await deleteReview(reviewId, item.productId);
+      success(`ลบรีวิวสินค้า "${item.name}" เรียบร้อยแล้ว คุณสามารถเขียนรีวิวใหม่ได้ทันที`);
+      setUserReviewsMap((prev) => {
+        const next = { ...prev };
+        delete next[pid];
+        if (pslug) delete next[pslug];
+        if (pname) delete next[pname];
+        return next;
+      });
+    } catch (delErr: any) {
+      console.error('Error deleting review:', delErr);
+      error(delErr.message || 'เกิดข้อผิดพลาดในการลบรีวิว');
+    } finally {
+      setDeletingReviewId(null);
+      hideLoading();
     }
   };
 
@@ -286,10 +395,10 @@ export default function OrderDetailPage({
           {/* Items breakdown */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              รายการสินค้า ({order.items.length} รายการ)
+              รายการสินค้า ({syncedItems.length} รายการ)
             </h3>
             <div className="divide-y divide-slate-800/80 bg-slate-950/60 rounded-2xl border border-slate-800 p-4">
-              {order.items.map((item, idx) => (
+              {syncedItems.map((item, idx) => (
                 <div key={idx} className="py-3 flex items-center justify-between gap-4 first:pt-0 last:pb-0">
                   <div className="flex items-center gap-3">
                     <div className="relative w-12 h-12 rounded-lg bg-slate-900 border border-slate-700 overflow-hidden shrink-0">
@@ -313,11 +422,7 @@ export default function OrderDetailPage({
                       {formatCurrency(item.price * item.quantity)}
                     </span>
                     {(order.status === 'completed' || order.status === 'paid') && (() => {
-                      const pid = (item.productId || '').toLowerCase();
-                      const pslug = (item.slug || '').toLowerCase();
-                      const pname = (item.name || '').toLowerCase();
-                      const live = liveProducts[pid] || liveProducts[pslug] || liveProducts[pname];
-                      let downloadLink = live?.downloadUrl || item.downloadUrl || getDownloadUrlForProduct(`${item.name} ${item.slug}`);
+                      let downloadLink = item.downloadUrl || getDownloadUrlForProduct(`${item.name} ${item.slug}`);
                       if (downloadLink && downloadLink.includes('1ozs5fS2Y_cUcKGkuugp-5yuta5VGs385')) {
                         downloadLink = 'https://drive.google.com/file/d/1LN_z1lwA-QZOBgYoWpfWQJRii0CPO4ZT/view?usp=sharing';
                       }
@@ -335,14 +440,48 @@ export default function OrderDetailPage({
                       );
                     })()}
                     {order.status === 'completed' && (() => {
-                      const itemKey = item.productId || item.slug || item.name;
-                      const isReviewed = reviewedItemIds.has(itemKey);
+                      const pid = (item.productId || '').toLowerCase();
+                      const pslug = (item.slug || '').toLowerCase();
+                      const pname = (item.name || '').toLowerCase();
+                      const existingReview = userReviewsMap[pid] || userReviewsMap[pslug] || userReviewsMap[pname];
+
                       return (
-                        <div className="flex items-center gap-1.5">
-                          {isReviewed ? (
-                            <span className="text-xs text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1 rounded-xl">
-                              ✓ ให้คะแนนแล้ว
-                            </span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {existingReview ? (
+                            <div className="flex items-center gap-1.5 bg-slate-900/80 border border-emerald-500/30 rounded-xl p-1 px-2.5 shadow-sm">
+                              <span className="text-xs text-emerald-400 font-bold flex items-center gap-1">
+                                <span>⭐</span>
+                                <span>รีวิวแล้ว ({existingReview.rating} ดาว)</span>
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setReviewItem({
+                                    productId: item.productId,
+                                    slug: item.slug,
+                                    name: item.name,
+                                  });
+                                  setEditingReviewId(existingReview.id);
+                                  setReviewRating(existingReview.rating);
+                                  setReviewComment(existingReview.comment);
+                                }}
+                                className="h-6 px-2 text-[11px] text-cyan-300 hover:text-white hover:bg-cyan-500/20 rounded-lg font-medium"
+                                title="แก้ไขรีวิวนี้"
+                              >
+                                ✏️ แก้ไข
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={deletingReviewId === existingReview.id}
+                                onClick={() => handleDeleteReview(existingReview.id, item)}
+                                className="h-6 px-2 text-[11px] text-rose-400 hover:text-white hover:bg-rose-500/20 rounded-lg font-medium"
+                                title="ลบรีวิวนี้"
+                              >
+                                {deletingReviewId === existingReview.id ? '...' : '🗑️ ลบ'}
+                              </Button>
+                            </div>
                           ) : (
                             <Button
                               variant="secondary"
@@ -353,6 +492,7 @@ export default function OrderDetailPage({
                                   slug: item.slug,
                                   name: item.name,
                                 });
+                                setEditingReviewId(null);
                                 setReviewRating(5);
                                 setReviewComment('');
                               }}
@@ -497,8 +637,11 @@ export default function OrderDetailPage({
       {/* Quick In-Place Review Modal */}
       <Modal
         isOpen={Boolean(reviewItem)}
-        onClose={() => setReviewItem(null)}
-        title="⭐ ให้คะแนนและเขียนรีวิวสินค้า"
+        onClose={() => {
+          setReviewItem(null);
+          setEditingReviewId(null);
+        }}
+        title={editingReviewId ? "✏️ แก้ไขคะแนนและรีวิวสินค้า" : "⭐ ให้คะแนนและเขียนรีวิวสินค้า"}
         description={reviewItem?.name}
       >
         <form onSubmit={handleReviewSubmit} className="space-y-4 pt-2">
@@ -539,7 +682,10 @@ export default function OrderDetailPage({
               <Link
                 href={`/products/${reviewItem.slug}?openReview=true`}
                 className="text-[11px] text-slate-400 hover:text-cyan-400 flex items-center gap-1 transition-colors"
-                onClick={() => setReviewItem(null)}
+                onClick={() => {
+                  setReviewItem(null);
+                  setEditingReviewId(null);
+                }}
               >
                 <span>ดูหน้ารายละเอียดแบบเต็ม</span>
                 <ExternalLink className="w-3 h-3" />
@@ -550,7 +696,10 @@ export default function OrderDetailPage({
                 type="button"
                 variant="ghost"
                 size="sm"
-                onClick={() => setReviewItem(null)}
+                onClick={() => {
+                  setReviewItem(null);
+                  setEditingReviewId(null);
+                }}
               >
                 ยกเลิก
               </Button>
@@ -560,7 +709,11 @@ export default function OrderDetailPage({
                 size="sm"
                 disabled={submittingReview || !reviewComment.trim()}
               >
-                {submittingReview ? 'กำลังบันทึก...' : `ส่งรีวิว (${reviewRating} ดาว)`}
+                {submittingReview
+                  ? 'กำลังบันทึก...'
+                  : editingReviewId
+                  ? `บันทึกการแก้ไข (${reviewRating} ดาว)`
+                  : `ส่งรีวิว (${reviewRating} ดาว)`}
               </Button>
             </div>
           </div>

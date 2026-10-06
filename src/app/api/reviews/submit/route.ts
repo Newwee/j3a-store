@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { checkProfanity } from '@/lib/utils/profanityFilter';
 
 const ADMIN_EMAILS = [
   'pongpataradanai@gmail.com',
@@ -38,9 +39,64 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'ข้อมูลไม่ครบถ้วน กรุณากรอกข้อความรีวิว' }, { status: 400 });
     }
 
+    // 0. Check if user is currently banned from reviewing
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('review_banned_until, review_ban_reason')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (profile?.review_banned_until) {
+      const bannedUntilTime = new Date(profile.review_banned_until).getTime();
+      const now = Date.now();
+      if (bannedUntilTime > now) {
+        const remainingMinutes = Math.ceil((bannedUntilTime - now) / (60 * 1000));
+        const untilStr = new Date(bannedUntilTime).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+        return NextResponse.json(
+          {
+            error: `คุณถูกระงับสิทธิ์การเขียนรีวิวชั่วคราวเนื่องจากใช้คำไม่สุภาพ กรุณารออีก ${remainingMinutes} นาที (จนถึง ${untilStr}) หรือติดต่อผู้ดูแลระบบ`,
+            isBanned: true,
+            remainingMinutes,
+            bannedUntil: profile.review_banned_until,
+          },
+          { status: 403 }
+        );
+      }
+    }
+
+    const cleanComment = comment.trim();
+
+    // 0.1 Check Profanity & moderate content
+    const profanityResult = checkProfanity(cleanComment);
+    if (profanityResult.hasProfanity) {
+      const banUntil = new Date(Date.now() + 30 * 60 * 1000);
+      const untilStr = banUntil.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+      const matchedTerm = profanityResult.matchedWord || 'คำไม่สุภาพ';
+      const banReason = `พบคำไม่สุภาพในรีวิว: ${matchedTerm}`;
+
+      await supabaseAdmin
+        .from('profiles')
+        .update({
+          review_banned_until: banUntil.toISOString(),
+          review_ban_reason: banReason,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', user.id);
+
+      return NextResponse.json(
+        {
+          error: `ระบบตรวจพบข้อความหรือคำไม่สุภาพในรีวิว ("${matchedTerm}") จึงไม่อนุญาตให้ส่งรีวิว และบัญชีของคุณถูกจำกัดสิทธิ์การเขียนรีวิวเป็นเวลา 30 นาที (จนถึง ${untilStr})`,
+          isBanned: true,
+          remainingMinutes: 30,
+          bannedUntil: banUntil.toISOString(),
+        },
+        { status: 403 }
+      );
+    }
+
     // Clamp rating between 1 and 5 (Max 5 stars)
     const star = Math.max(1, Math.min(5, Math.round(Number(rating) || 5)));
-    const cleanComment = comment.trim();
+
 
     const isMasterAdmin = Boolean(
       user.email && ADMIN_EMAILS.includes(user.email.toLowerCase())

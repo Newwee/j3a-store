@@ -32,6 +32,7 @@ import {
   updateUserCredits,
   updateUserProfile,
   deleteUserDoc,
+  unbanUserReviews,
 } from '@/lib/firestore/users';
 import {
   getAllDeletionRequests,
@@ -60,6 +61,28 @@ export default function AdminCustomersPage() {
   const [customers, setCustomers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+
+  const handleUnbanReview = async (userId: string) => {
+    try {
+      showLoading('กำลังปลดแบนการเขียนรีวิว...');
+      await unbanUserReviews(userId);
+      success('ปลดแบนสิทธิ์การเขียนรีวิวของผู้ใช้เรียบร้อยแล้ว');
+      setCustomers((prev) =>
+        prev.map((c) =>
+          c.uid === userId ? { ...c, reviewBannedUntil: null, reviewBanReason: null } : c
+        )
+      );
+      if (editingCustomer && editingCustomer.uid === userId) {
+        setEditingCustomer((prev) =>
+          prev ? { ...prev, reviewBannedUntil: null, reviewBanReason: null } : null
+        );
+      }
+    } catch (err: any) {
+      error(err.message || 'ไม่สามารถปลดแบนได้');
+    } finally {
+      hideLoading();
+    }
+  };
 
   // Deletion Requests State
   const [deletionRequests, setDeletionRequests] = useState<DeletionRequest[]>([]);
@@ -427,6 +450,11 @@ export default function AdminCustomersPage() {
                                       ⚠️ รอลบบัญชี
                                     </span>
                                   )}
+                                  {customer.reviewBannedUntil && new Date(customer.reviewBannedUntil).getTime() > Date.now() && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse" title={`ระงับสิทธิ์รีวิวจนถึง: ${customer.reviewBannedUntil}\nเหตุผล: ${customer.reviewBanReason || '-'}`}>
+                                      🚫 แบนรีวิว
+                                    </span>
+                                  )}
                                 </div>
                                 {customer.phone && (
                                   <span className="text-[10px] text-slate-500 font-mono">
@@ -487,6 +515,17 @@ export default function AdminCustomersPage() {
                           {/* Actions */}
                           <td className="py-3 px-4 sm:px-6 whitespace-nowrap text-right">
                             <div className="flex items-center justify-end gap-2">
+                              {customer.reviewBannedUntil && new Date(customer.reviewBannedUntil).getTime() > Date.now() && (
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={() => handleUnbanReview(customer.uid)}
+                                  className="text-xs text-amber-300 border-amber-500/30 hover:bg-amber-500/10 hover:border-amber-400"
+                                  title="ปลดแบนสิทธิ์การเขียนรีวิว"
+                                >
+                                  🔓 ปลดแบนรีวิว
+                                </Button>
+                              )}
                               <Button
                                 variant="secondary"
                                 size="sm"
@@ -779,6 +818,28 @@ export default function AdminCustomersPage() {
                 </div>
               </div>
             </div>
+
+            {editingCustomer?.reviewBannedUntil && new Date(editingCustomer.reviewBannedUntil).getTime() > Date.now() && (
+              <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <span className="text-xs font-bold text-amber-300 block">
+                    🚫 ผู้ใช้นี้ถูกระงับสิทธิ์การเขียนรีวิวชั่วคราว (30 นาที)
+                  </span>
+                  <span className="text-[11px] text-slate-400 block">
+                    สิ้นสุด: {new Date(editingCustomer.reviewBannedUntil).toLocaleTimeString('th-TH')} | {editingCustomer.reviewBanReason || 'พบคำไม่สุภาพ'}
+                  </span>
+                </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => handleUnbanReview(editingCustomer.uid)}
+                  className="text-xs font-bold text-amber-300 border-amber-500/40 hover:bg-amber-500/20 shrink-0"
+                >
+                  🔓 ปลดแบนรีวิว
+                </Button>
+              </div>
+            )}
 
             <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-800">
               <Button

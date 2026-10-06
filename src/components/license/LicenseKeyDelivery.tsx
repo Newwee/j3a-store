@@ -164,18 +164,29 @@ export function LicenseKeyDelivery({
 
     if (items && items.length > 0) {
       for (const it of items) {
-        if (it.downloadUrl && !it.downloadUrl.includes('/downloads/J3ADiscordProfile.zip')) {
-          if (!matches.some((m) => m.downloadUrl === it.downloadUrl)) {
-            matches.push({
-              id: it.productId || it.slug || `item-${matches.length}`,
-              name: it.name || 'ซอฟต์แวร์ J3A',
-              shortName: it.name || 'ซอฟต์แวร์ J3A',
-              downloadUrl: it.downloadUrl,
-              zipFileName: `${(it.name || 'software').replace(/\s+/g, '')}.zip`,
-              exeFileName: `${(it.name || 'software').replace(/\s+/g, '')}.exe`,
-              guideStep3: it.deliveryNote || '💡 หมายเหตุ: ไฟล์ zip มีขนาดประมาณ 20-35 MB หากดาวน์โหลดเสร็จแล้วให้แตกไฟล์ (Extract Here) ก่อนเปิดโปรแกรม',
-            });
-          }
+        const pid = (it.productId || it.slug || '').toLowerCase();
+        const pname = (it.name || '').toLowerCase();
+        const pslug = (it.slug || '').toLowerCase();
+        const live = liveProducts[pid] || liveProducts[pslug] || liveProducts[pname];
+
+        let effectiveUrl = live?.downloadUrl || it.downloadUrl || getDownloadUrlForProduct(`${it.name} ${it.slug}`);
+        let effectiveNote = live?.deliveryNote || it.deliveryNote;
+
+        if (effectiveUrl && effectiveUrl.includes('/downloads/J3ADiscordProfile.zip')) {
+          effectiveUrl = SOFTWARE_DOWNLOADS.DISCORD_PROFILE.downloadUrl;
+        }
+
+        const itemId = it.productId || it.slug || `item-${matches.length}`;
+        if (!matches.some((m) => m.id === itemId)) {
+          matches.push({
+            id: itemId,
+            name: it.name || 'ซอฟต์แวร์ J3A',
+            shortName: it.name || 'ซอฟต์แวร์ J3A',
+            downloadUrl: effectiveUrl || SOFTWARE_DOWNLOADS.DISCORD_PROFILE.downloadUrl,
+            zipFileName: `${(it.name || 'software').replace(/\s+/g, '')}.zip`,
+            exeFileName: `${(it.name || 'software').replace(/\s+/g, '')}.exe`,
+            guideStep3: effectiveNote || '💡 หมายเหตุ: ไฟล์ zip มีขนาดประมาณ 20-35 MB หากดาวน์โหลดเสร็จแล้วให้แตกไฟล์ (Extract Here) ก่อนเปิดโปรแกรม',
+          });
         }
       }
     }

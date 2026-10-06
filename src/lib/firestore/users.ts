@@ -29,6 +29,8 @@ function mapRowToUserProfile(row: any): UserProfile {
     role: isMasterAdmin ? 'admin' : ((row.role as UserRole) || 'customer'),
     credits: Number(row.credits) || 0,
     tier: (row.tier as UserTier) || (isMasterAdmin ? 'VIP' : 'Bronze'),
+    reviewBannedUntil: row.review_banned_until || null,
+    reviewBanReason: row.review_ban_reason || null,
     createdAt: row.created_at || new Date().toISOString(),
     updatedAt: row.updated_at || new Date().toISOString(),
   };
@@ -347,3 +349,27 @@ export async function getPublicUserProfile(userId: string): Promise<PublicUserPr
     return null;
   }
 }
+
+/**
+ * Unban a user from reviews (Admin action)
+ */
+export async function unbanUserReviews(userId: string): Promise<void> {
+  if (!userId) return;
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData?.session?.access_token;
+
+  if (!token) throw new Error('กรุณาเข้าสู่ระบบก่อนดำเนินการ');
+
+  const res = await fetch('/api/admin/reviews/unban', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ userId }),
+  });
+
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Failed to unban user');
+}
+

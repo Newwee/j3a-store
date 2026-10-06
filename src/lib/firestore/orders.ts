@@ -92,7 +92,61 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
 }
 
 /**
- * Get single order by ID
+ * Enrich orders with live catalog download URLs
+ */
+async function enrichOrdersWithLiveCatalog(orders: Order[]): Promise<Order[]> {
+  if (!orders || orders.length === 0) return orders;
+
+  try {
+    const { data: prods } = await supabase
+      .from('products')
+      .select('id, slug, name, download_url, delivery_note');
+
+    if (!prods || prods.length === 0) return orders;
+
+    const map: Record<string, { download_url?: string; delivery_note?: string }> = {};
+    for (const p of prods) {
+      if (p.id) map[p.id.toLowerCase()] = p;
+      if (p.slug) map[p.slug.toLowerCase()] = p;
+      if (p.name) map[p.name.toLowerCase()] = p;
+    }
+
+    return orders.map((order) => {
+      if (!Array.isArray(order.items)) return order;
+
+      const updatedItems = order.items.map((it: any) => {
+        const pid = (it.productId || it.id || '').toLowerCase();
+        const pslug = (it.slug || '').toLowerCase();
+        const pname = (it.name || '').toLowerCase();
+        const live = map[pid] || map[pslug] || map[pname];
+
+        let downloadUrl = live?.download_url || it.downloadUrl;
+        let deliveryNote = live?.delivery_note || it.deliveryNote;
+
+        if (downloadUrl && downloadUrl.includes('1ozs5fS2Y_cUcKGkuugp-5yuta5VGs385')) {
+          downloadUrl = 'https://drive.google.com/file/d/1LN_z1lwA-QZOBgYoWpfWQJRii0CPO4ZT/view?usp=sharing';
+        }
+
+        return {
+          ...it,
+          downloadUrl,
+          deliveryNote,
+        };
+      });
+
+      return {
+        ...order,
+        items: updatedItems,
+      };
+    });
+  } catch (err) {
+    console.warn('Could not enrich orders with live product catalog:', err);
+    return orders;
+  }
+}
+
+/**
+ * Get single order by ID (Always resolves latest download link from catalog)
  */
 export async function getOrderById(id: string): Promise<Order | null> {
   if (!id) return null;
@@ -106,7 +160,9 @@ export async function getOrderById(id: string): Promise<Order | null> {
       .maybeSingle();
 
     if (error || !data) return null;
-    return mapRowToOrder(data);
+    const order = mapRowToOrder(data);
+    const enriched = await enrichOrdersWithLiveCatalog([order]);
+    return enriched[0] || order;
   } catch (error) {
     console.error('Error fetching order by ID:', error);
     return null;
@@ -114,7 +170,7 @@ export async function getOrderById(id: string): Promise<Order | null> {
 }
 
 /**
- * Fetch orders list with optional filters
+ * Fetch orders list with optional filters (Always resolves latest download links)
  */
 export async function getOrders(filter: GetOrdersFilter = {}): Promise<Order[]> {
   try {
@@ -140,7 +196,7 @@ export async function getOrders(filter: GetOrdersFilter = {}): Promise<Order[]> 
 
     const orders = (data || []).map(mapRowToOrder);
     orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    return orders;
+    return await enrichOrdersWithLiveCatalog(orders);
   } catch (error) {
     console.error('Error fetching orders:', error);
     return [];

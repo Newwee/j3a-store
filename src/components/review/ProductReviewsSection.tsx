@@ -15,12 +15,16 @@ import {
   Loader2,
   Eye,
   ExternalLink,
+  Edit3,
+  Trash2,
 } from 'lucide-react';
 import { Review, ReviewEligibility } from '@/types/review';
 import {
   getProductReviews,
   checkReviewEligibility,
   submitProductReview,
+  updateProductReview,
+  deleteReview,
 } from '@/lib/firestore/reviews';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
@@ -57,6 +61,8 @@ export function ProductReviewsSection({
   const [selectedRating, setSelectedRating] = useState(5);
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
+  const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
   const [selectedProfileUser, setSelectedProfileUser] = useState<{
     userId: string;
     name?: string;
@@ -86,10 +92,38 @@ export function ProductReviewsSection({
     loadData();
   }, [productId, user]);
 
+  const handleOpenEditReview = (rev: Review) => {
+    setEditingReviewId(rev.id);
+    setSelectedRating(rev.rating > 5 ? Math.round(rev.rating / 2) : rev.rating);
+    setComment(rev.comment);
+    setIsModalOpen(true);
+  };
+
+  const handleDeleteReview = async (reviewId: string) => {
+    if (!reviewId || !user) return;
+    const confirmed = window.confirm('คุณต้องการลบรีวิวนี้ใช่หรือไม่? เมื่อลบแล้วคุณจะสามารถเขียนรีวิวใหม่ได้');
+    if (!confirmed) return;
+
+    setDeletingReviewId(reviewId);
+    try {
+      await deleteReview(reviewId, productId);
+      success('ลบรีวิวของคุณเรียบร้อยแล้ว คุณสามารถเขียนรีวิวใหม่ได้ทันที');
+      setIsModalOpen(false);
+      setEditingReviewId(null);
+      setComment('');
+      loadData();
+    } catch (delErr: any) {
+      console.error('Error deleting review:', delErr);
+      toastError(delErr.message || 'ไม่สามารถลบรีวิวได้');
+    } finally {
+      setDeletingReviewId(null);
+    }
+  };
+
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!eligibility.canReview || !eligibility.orderId || !user) {
-      toastError('คุณไม่ได้รับสิทธิ์ให้คะแนนสินค้านี้');
+    if (!user) {
+      toastError('กรุณาเข้าสู่ระบบก่อนดำเนินการ');
       return;
     }
     if (!comment.trim()) {
@@ -99,26 +133,50 @@ export function ProductReviewsSection({
 
     setSubmitting(true);
     try {
-      await submitProductReview({
-        productId,
-        productSlug,
-        productName,
-        orderId: eligibility.orderId,
-        userId: user.uid,
-        userName: user.displayName || user.email?.split('@')[0] || 'ผู้ซื้อที่ผ่านการยืนยัน',
-        userPhoto: user.photoURL || undefined,
-        rating: selectedRating,
-        comment: comment.trim(),
-      });
+      if (editingReviewId) {
+        await updateProductReview({
+          reviewId: editingReviewId,
+          rating: selectedRating,
+          comment: comment.trim(),
+        });
 
-      success('บันทึกคะแนนและรีวิวสินค้าของคุณสำเร็จแล้ว ขอบคุณมากครับ!');
-      setIsModalOpen(false);
-      setComment('');
-      // Reload reviews and eligibility
-      loadData();
+        success('แก้ไขคะแนนและรีวิวสินค้าของคุณสำเร็จแล้ว ขอบคุณมากครับ!');
+        setIsModalOpen(false);
+        setEditingReviewId(null);
+        setComment('');
+        loadData();
+      } else {
+        if (!eligibility.canReview || !eligibility.orderId) {
+          toastError('คุณไม่ได้รับสิทธิ์ให้คะแนนสินค้านี้');
+          return;
+        }
+
+        await submitProductReview({
+          productId,
+          productSlug,
+          productName,
+          orderId: eligibility.orderId,
+          userId: user.uid,
+          userName: user.displayName || user.email?.split('@')[0] || 'ผู้ซื้อที่ผ่านการยืนยัน',
+          userPhoto: user.photoURL || undefined,
+          rating: selectedRating,
+          comment: comment.trim(),
+        });
+
+        success('บันทึกคะแนนและรีวิวสินค้าของคุณสำเร็จแล้ว ขอบคุณมากครับ!');
+        setIsModalOpen(false);
+        setComment('');
+        loadData();
+      }
     } catch (err: any) {
-      console.error('Error submitting review:', err);
-      toastError(err.message || 'เกิดข้อผิดพลาดในการบันทึกรีวิว');
+      console.error('Error submitting/editing review:', err);
+      const msg = err.message || 'เกิดข้อผิดพลาดในการบันทึกรีวิว';
+      toastError(msg);
+      if (msg.includes('คุณได้ให้คะแนนสินค้านี้เรียบร้อยแล้ว') || msg.includes('ระงับสิทธิ์') || msg.includes('ไม่สุภาพ')) {
+        setIsModalOpen(false);
+        setEditingReviewId(null);
+        loadData();
+      }
     } finally {
       setSubmitting(false);
     }
@@ -157,17 +215,34 @@ export function ProductReviewsSection({
             </p>
           </div>
 
-          {/* Action / Eligibility Button - Always openable as requested */}
+          {/* Action / Eligibility Button */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-            <Button
-              variant="primary"
-              size="md"
-              onClick={() => setIsModalOpen(true)}
-              leftIcon={<Star className="w-4 h-4 fill-amber-300 text-amber-300" />}
-              className="shadow-[0_0_25px_rgba(245,158,11,0.45)] bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black cursor-target"
-            >
-              ⭐ ให้คะแนนและรีวิวสินค้า
-            </Button>
+            {eligibility.existingReview ? (
+              <Button
+                variant="secondary"
+                size="md"
+                onClick={() => handleOpenEditReview(eligibility.existingReview!)}
+                leftIcon={<Edit3 className="w-4 h-4 text-cyan-400" />}
+                className="bg-cyan-500/15 border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/25 font-bold cursor-target"
+              >
+                ✏️ คุณได้รีวิวแล้ว (คลิกเพื่อแก้ไข/ลบ)
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                size="md"
+                onClick={() => {
+                  setEditingReviewId(null);
+                  setSelectedRating(5);
+                  setComment('');
+                  setIsModalOpen(true);
+                }}
+                leftIcon={<Star className="w-4 h-4 fill-amber-300 text-amber-300" />}
+                className="shadow-[0_0_25px_rgba(245,158,11,0.45)] bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black cursor-target"
+              >
+                ⭐ ให้คะแนนและรีวิวสินค้า
+              </Button>
+            )}
           </div>
         </div>
 
@@ -210,6 +285,21 @@ export function ProductReviewsSection({
               <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 shrink-0 text-cyan-400" />
                 <span>คำสั่งซื้อของคุณได้รับการยืนยันแล้ว สามารถกดปุ่ม <strong>"ให้คะแนนสินค้านี้"</strong> ได้เลย!</span>
+              </div>
+            )}
+            {eligibility.existingReview && (
+              <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                  <span>คุณได้ให้คะแนนสินค้านี้แล้ว ({eligibility.existingReview.rating} ดาว)</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleOpenEditReview(eligibility.existingReview!)}
+                  className="text-xs font-bold text-cyan-400 hover:underline"
+                >
+                  แก้ไขรีวิว
+                </button>
               </div>
             )}
           </div>
@@ -315,6 +405,29 @@ export function ProductReviewsSection({
                           {rev.rating > 5 ? (rev.rating / 2).toFixed(1) : rev.rating} / 5
                         </span>
                       </div>
+
+                      {/* User's own review edit/delete controls */}
+                      {user && rev.userId === user.uid && (
+                        <div className="flex items-center gap-1 ml-1 pl-2 border-l border-slate-800">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditReview(rev)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-400 hover:bg-slate-800 transition-colors"
+                            title="แก้ไขรีวิวนี้"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={deletingReviewId === rev.id}
+                            onClick={() => handleDeleteReview(rev.id)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors"
+                            title="ลบรีวิวนี้"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -333,7 +446,10 @@ export function ProductReviewsSection({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-7 max-w-lg w-full shadow-2xl relative space-y-5">
             <button
-              onClick={() => setIsModalOpen(false)}
+              onClick={() => {
+                setIsModalOpen(false);
+                setEditingReviewId(null);
+              }}
               className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-target"
             >
               <X className="w-5 h-5" />
@@ -342,15 +458,15 @@ export function ProductReviewsSection({
             {/* Modal Title */}
             <div>
               <span className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider block">
-                {eligibility.canReview ? 'ยืนยันการซื้อขายเรียบร้อยแล้ว' : 'ตรวจสอบสิทธิ์การรีวิว'}
+                {editingReviewId ? 'แก้ไขข้อมูลรีวิวของคุณ' : eligibility.canReview ? 'ยืนยันการซื้อขายเรียบร้อยแล้ว' : 'ตรวจสอบสิทธิ์การรีวิว'}
               </span>
               <h3 className="text-lg font-black text-white tracking-tight mt-0.5">
-                ให้คะแนนและรีวิว: {productName}
+                {editingReviewId ? `แก้ไขรีวิว: ${productName}` : `ให้คะแนนและรีวิว: ${productName}`}
               </h3>
             </div>
 
             {/* Check Review Gating */}
-            {!eligibility.canReview ? (
+            {!eligibility.canReview && !editingReviewId ? (
               <div className="space-y-4 py-2">
                 <div className="p-5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-center space-y-3">
                   <div className="w-12 h-12 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto shadow-[0_0_20px_rgba(244,63,94,0.3)]">
@@ -358,20 +474,33 @@ export function ProductReviewsSection({
                   </div>
                   <div>
                     <h4 className="text-base font-bold text-rose-300">
-                      ไม่สามารถรีวิวได้เนื่องจากยังไม่ซื้อสินค้า
+                      {eligibility.reason === 'already_reviewed'
+                        ? 'คุณได้ให้คะแนนสินค้านี้เรียบร้อยแล้ว'
+                        : 'ไม่สามารถรีวิวได้เนื่องจากยังไม่ซื้อสินค้า'}
                     </h4>
                     <p className="text-xs text-slate-300 max-w-sm mx-auto mt-1 leading-relaxed">
                       {eligibility.message ||
                         'ระบบเปิดให้เฉพาะผู้ที่สั่งซื้อสินค้านี้จริงและได้รับการอนุมัติคำสั่งซื้อเรียบร้อยแล้วเท่านั้น จึงจะสามารถให้คะแนนและเขียนรีวิวได้'}
                     </p>
                   </div>
-                  {!user ? (
+                  {eligibility.existingReview && (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => handleOpenEditReview(eligibility.existingReview!)}
+                      className="mt-2 cursor-target"
+                    >
+                      ✏️ แก้ไขรีวิวเดิมของคุณ
+                    </Button>
+                  )}
+                  {!user && (
                     <Link href={`/login?redirect=/products/${productSlug || productId}`}>
                       <Button variant="primary" size="sm" className="mt-2 cursor-target">
                         เข้าสู่ระบบบัญชีของคุณ
                       </Button>
                     </Link>
-                  ) : (
+                  )}
+                  {user && !eligibility.existingReview && (
                     <Link href={`/products/${productSlug || productId}`}>
                       <Button variant="secondary" size="sm" className="mt-2 cursor-target">
                         สั่งซื้อสินค้านี้เพื่อปลดล็อกสิทธิ์
@@ -403,7 +532,10 @@ export function ProductReviewsSection({
                     type="button"
                     variant="ghost"
                     size="md"
-                    onClick={() => setIsModalOpen(false)}
+                    onClick={() => {
+                      setIsModalOpen(false);
+                      setEditingReviewId(null);
+                    }}
                     className="cursor-target"
                   >
                     ปิดหน้าต่าง
@@ -451,26 +583,43 @@ export function ProductReviewsSection({
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex items-center justify-end gap-3 pt-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="md"
-                    onClick={() => setIsModalOpen(false)}
-                    disabled={submitting}
-                    className="cursor-target"
-                  >
-                    ยกเลิก
-                  </Button>
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    size="md"
-                    isLoading={submitting}
-                    className="font-bold shadow-[0_0_20px_rgba(6,182,212,0.35)] cursor-target"
-                  >
-                    บันทึกรีวิว (Submit Review)
-                  </Button>
+                <div className="flex items-center justify-between gap-3 pt-2">
+                  {editingReviewId ? (
+                    <button
+                      type="button"
+                      disabled={deletingReviewId === editingReviewId}
+                      onClick={() => handleDeleteReview(editingReviewId)}
+                      className="text-xs font-bold text-rose-400 hover:text-rose-300 hover:underline flex items-center gap-1"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>{deletingReviewId === editingReviewId ? 'กำลังลบ...' : 'ลบรีวิวนี้'}</span>
+                    </button>
+                  ) : <div />}
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="md"
+                      onClick={() => {
+                        setIsModalOpen(false);
+                        setEditingReviewId(null);
+                      }}
+                      disabled={submitting}
+                      className="cursor-target"
+                    >
+                      ยกเลิก
+                    </Button>
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      size="md"
+                      isLoading={submitting}
+                      className="font-bold shadow-[0_0_20px_rgba(6,182,212,0.35)] cursor-target"
+                    >
+                      {editingReviewId ? 'บันทึกการแก้ไข' : 'บันทึกรีวิว (Submit Review)'}
+                    </Button>
+                  </div>
                 </div>
               </form>
             )}
