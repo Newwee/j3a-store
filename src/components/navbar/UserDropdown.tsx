@@ -23,6 +23,7 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { useTheme, Theme } from '@/context/ThemeContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { TierBadge } from '@/components/ui/Badge';
 import { formatCurrency } from '@/lib/utils/formatters';
 
@@ -30,6 +31,7 @@ export function UserDropdown() {
   const { user, profile, isAdmin, logout } = useAuth();
   const { success, error, toast } = useToast();
   const { theme, resolvedTheme, setTheme } = useTheme();
+  const { language, setLanguage, t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -63,13 +65,13 @@ export function UserDropdown() {
           href="/login"
           className="text-xs sm:text-sm font-semibold text-slate-300 hover:text-white px-3 py-2 rounded-xl hover:bg-slate-800/60 transition-all"
         >
-          เข้าสู่ระบบ
+          {t('nav_login', 'เข้าสู่ระบบ')}
         </Link>
         <Link
           href="/register"
           className="text-xs sm:text-sm font-semibold bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white px-3.5 py-2 rounded-xl shadow-[0_0_15px_rgba(6,182,212,0.3)] transition-all"
         >
-          สมัครสมาชิก
+          {t('nav_register', 'สมัครสมาชิก')}
         </Link>
       </div>
     );
@@ -152,7 +154,7 @@ export function UserDropdown() {
           <div className="my-2.5 p-3 rounded-xl bg-slate-800/80 border border-slate-700/60 flex items-center justify-between">
             <div className="flex items-center gap-2 text-slate-300">
               <Wallet className="w-4 h-4 text-cyan-400" />
-              <span className="text-xs font-medium">เครดิตคงเหลือ</span>
+              <span className="text-xs font-medium">{t('user_balance', 'เครดิตคงเหลือ')}</span>
             </div>
             <span className="text-sm font-extrabold text-cyan-400">
               {formatCurrency(credits)}
@@ -168,7 +170,7 @@ export function UserDropdown() {
                 className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-cyan-300 bg-cyan-950/40 hover:bg-cyan-900/50 border border-cyan-500/30 transition-colors"
               >
                 <ShieldCheck className="w-4 h-4 text-cyan-400" />
-                <span>Admin Dashboard</span>
+                <span>{t('user_admin_dashboard', 'Admin Dashboard')}</span>
               </Link>
             )}
 
@@ -178,7 +180,7 @@ export function UserDropdown() {
               className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-slate-800/80 hover:text-white transition-colors"
             >
               <LayoutDashboard className="w-4 h-4 text-slate-400" />
-              <span>ภาพรวมบัญชี</span>
+              <span>{t('user_account_overview', 'ภาพรวมบัญชี')}</span>
             </Link>
 
             <Link
@@ -187,7 +189,7 @@ export function UserDropdown() {
               className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-slate-800/80 hover:text-white transition-colors"
             >
               <CreditCard className="w-4 h-4 text-slate-400" />
-              <span>เติมเงิน</span>
+              <span>{t('user_topup', 'เติมเงิน')}</span>
             </Link>
 
             <Link
@@ -196,7 +198,7 @@ export function UserDropdown() {
               className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-slate-800/80 hover:text-white transition-colors"
             >
               <ShoppingBag className="w-4 h-4 text-slate-400" />
-              <span>ประวัติการทำรายการ</span>
+              <span>{t('user_order_history', 'ประวัติการทำรายการ')}</span>
             </Link>
 
             <Link
@@ -205,7 +207,7 @@ export function UserDropdown() {
               className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-slate-800/80 hover:text-white transition-colors"
             >
               <Settings className="w-4 h-4 text-slate-400" />
-              <span>ตั้งค่าบัญชี</span>
+              <span>{t('user_account_settings', 'ตั้งค่าบัญชี')}</span>
             </Link>
 
             <Link
@@ -214,7 +216,7 @@ export function UserDropdown() {
               className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-slate-800/80 hover:text-white transition-colors"
             >
               <HelpCircle className="w-4 h-4 text-slate-400" />
-              <span>ช่วยเหลือ</span>
+              <span>{t('user_help', 'ช่วยเหลือ')}</span>
             </Link>
           </div>
 
@@ -231,10 +233,10 @@ export function UserDropdown() {
                 setTheme(next);
                 toast(
                   next === 'dark'
-                    ? '🌙 เปลี่ยนเป็นโหมดมืด (Dark Theme)'
+                    ? '🌙 ' + t('toast_theme_dark', 'เปลี่ยนเป็น Dark Theme (โหมดมืด)')
                     : next === 'light'
-                    ? '☀️ เปลี่ยนเป็นโหมดสว่าง (Light Theme)'
-                    : '💻 ปรับตามระบบเครื่อง (System Theme)',
+                    ? '☀️ ' + t('toast_theme_light', 'เปลี่ยนเป็น Light Theme (โหมดสว่าง)')
+                    : '💻 ' + t('toast_theme_system', 'ปรับตามระบบเครื่อง (System Theme)'),
                   'info',
                   2500
                 );
@@ -253,21 +255,31 @@ export function UserDropdown() {
                 {theme === 'system'
                   ? `System (${resolvedTheme === 'dark' ? 'Dark' : 'Light'})`
                   : theme === 'dark'
-                  ? 'Dark Theme'
-                  : 'Light Theme'}
+                  ? t('user_theme_dark', 'Dark Theme')
+                  : t('user_theme_light', 'Light Theme')}
               </span>
             </button>
 
             <button
               type="button"
               onClick={() => {
-                toast('🌐 ปัจจุบันระบบตั้งค่าเริ่มต้นเป็นภาษาไทย (TH)', 'info', 2000);
+                const nextLang = language === 'th' ? 'en' : 'th';
+                setLanguage(nextLang);
+                toast(
+                  nextLang === 'en'
+                    ? '🇺🇸 Switched language to English (EN)'
+                    : '🇹🇭 เปลี่ยนภาษาเป็น ภาษาไทย (TH) แล้ว',
+                  'info',
+                  2500
+                );
               }}
               className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-slate-800/60 hover:bg-slate-700/70 hover:text-white border border-slate-700/50 transition-all cursor-pointer select-none active:scale-95 group shadow-sm"
-              title="ภาษาไทย (TH)"
+              title={language === 'th' ? 'คลิกเพื่อเปลี่ยนเป็น English (EN)' : 'Click to switch to ภาษาไทย (TH)'}
             >
               <Globe className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform" />
-              <span className="font-semibold text-slate-200">Thai (TH)</span>
+              <span className="font-semibold text-slate-200 truncate">
+                {language === 'th' ? 'Thai (TH)' : 'English (EN)'}
+              </span>
             </button>
           </div>
 
@@ -278,7 +290,7 @@ export function UserDropdown() {
               className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors text-xs font-semibold cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
-              <span>ออกจากระบบ</span>
+              <span>{t('user_logout', 'ออกจากระบบ')}</span>
             </button>
           </div>
         </div>

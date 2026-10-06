@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight, ShieldCheck, Zap, Sparkles, Flame, Star } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { useLanguage } from '@/context/LanguageContext';
 import dynamic from 'next/dynamic';
 
 const ASCIIText = dynamic(() => import('@/components/ui/ASCIIText'), {
@@ -35,6 +36,8 @@ const ElectricLogo = dynamic(() => import('@/components/ui/ElectricLogo'), {
 });
 
 export function HeroSection() {
+  const { t } = useLanguage();
+
   return (
     <section className="relative overflow-hidden pt-8 pb-16 lg:pt-16 lg:pb-24">
       {/* Soft ambient atmospheric glow */}
@@ -52,7 +55,7 @@ export function HeroSection() {
             <div className="rb-pill border-cyan-500/30 text-cyan-300 shadow-[0_0_20px_rgba(6,182,212,0.2)]">
               <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
               <Flame className="w-3.5 h-3.5 text-amber-400" />
-              <span>เวอร์ชันใหม่เปิดให้บริการแล้ว! ระบบอัตโนมัติ 24 ชม.</span>
+              <span>{t('hero_new_version', 'เวอร์ชันใหม่เปิดให้บริการแล้ว! ระบบอัตโนมัติ 24 ชม.')}</span>
             </div>
 
             {/* Main Headline with ASCIIText */}
@@ -67,13 +70,13 @@ export function HeroSection() {
             {/* Sub-headline badge */}
             <div className="flex items-center justify-center lg:justify-start gap-2 -mt-2">
               <span className="text-xs sm:text-sm font-bold tracking-widest uppercase text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-sky-300 to-indigo-400">
-                Next-Gen E-Commerce & Digital Store
+                {t('hero_title_tag', 'Next-Gen E-Commerce & Digital Store')}
               </span>
             </div>
 
             {/* Subtext */}
             <p className="text-sm sm:text-base text-slate-300 max-w-xl mx-auto lg:mx-0 leading-relaxed">
-              สัมผัสประสบการณ์ช้อปปิ้งยุคใหม่ที่ <strong className="text-cyan-400">J3A STORE</strong> ศูนย์รวมไอเทมเกม บัตรเติมเงิน และบริการดิจิทัลระดับพรีเมียม ทำรายการรวดเร็ว ปลอดภัย ด้วยระบบตรวจสอบอัตโนมัติ
+              {t('hero_description', 'สัมผัสประสบการณ์ช้อปปิ้งยุคใหม่ที่ J3A STORE ศูนย์รวมไอเทมเกม บัตรเติมเงิน และบริการดิจิทัลระดับพรีเมียม ทำรายการรวดเร็ว ปลอดภัย ด้วยระบบตรวจสอบอัตโนมัติ')}
             </p>
 
             {/* Action Buttons */}
@@ -85,12 +88,12 @@ export function HeroSection() {
                   rightIcon={<ArrowRight className="w-5 h-5" />}
                   className="px-8 shadow-[0_0_30px_rgba(6,182,212,0.4)] cursor-target"
                 >
-                  เลือกซื้อสินค้า (Shop Now)
+                  {t('hero_shop_now', 'เลือกซื้อสินค้า (Shop Now)')}
                 </Button>
               </Link>
               <Link href="/profile?tab=topup">
                 <Button variant="secondary" size="lg" className="px-6 cursor-target">
-                  เติมเครดิตบัญชี
+                  {t('hero_topup_wallet', 'เติมเครดิตบัญชี')}
                 </Button>
               </Link>
             </div>

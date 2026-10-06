@@ -18,6 +18,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { Button } from '@/components/ui/Button';
 
@@ -34,6 +35,7 @@ export function CartDrawer() {
     isCartOpen,
     setIsCartOpen,
   } = useCart();
+  const { t, language } = useLanguage();
 
   // Prevent background scroll when open
   useEffect(() => {
@@ -76,10 +78,10 @@ export function CartDrawer() {
               <div>
                 <div className="flex items-center gap-2">
                   <h2 className="text-base font-black text-white tracking-tight">
-                    ตะกร้าสินค้า
+                    {t('cart_title')}
                   </h2>
                   <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300">
-                    {totalItems} รายการ
+                    {totalItems} {t('cart_items_count')}
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-400">J3A STORE • Digital Commerce</p>
@@ -92,7 +94,7 @@ export function CartDrawer() {
                   onClick={clearCart}
                   className="text-[11px] font-semibold text-slate-400 hover:text-rose-400 px-2 py-1 rounded-lg hover:bg-rose-500/10 transition-colors"
                 >
-                  ล้างตะกร้า
+                  {t('cart_clear')}
                 </button>
               )}
               <button
@@ -123,10 +125,10 @@ export function CartDrawer() {
 
                 <div className="space-y-1.5 max-w-xs">
                   <h3 className="text-lg font-black text-white tracking-tight">
-                    ตะกร้าสินค้ายังว่างอยู่
+                    {t('cart_empty')}
                   </h3>
                   <p className="text-xs text-slate-400 leading-relaxed">
-                    คุณยังไม่ได้เลือกสินค้าใดๆ เข้ามา เลือกชมโปรแกรม บอท หรือแพ็กเกจสุดคุ้มในราคาพิเศษได้เลย!
+                    {t('cart_empty_sub')}
                   </p>
                 </div>
 
@@ -143,7 +145,7 @@ export function CartDrawer() {
                       className="w-full justify-center shadow-[0_0_20px_rgba(6,182,212,0.35)]"
                     >
                       <Sparkles className="w-4 h-4 mr-1.5" />
-                      เลือกชมสินค้าในร้านค้า (Shop)
+                      {language === 'th' ? 'เลือกชมสินค้าในร้านค้า (Shop)' : 'Browse Shop'}
                     </Button>
                   </Link>
 
@@ -154,7 +156,7 @@ export function CartDrawer() {
                   >
                     <span className="flex items-center gap-2 font-medium">
                       <Layers className="w-4 h-4 text-cyan-400" />
-                      ดูแพ็กเกจรวมสุดคุ้ม (Bundles)
+                      {language === 'th' ? 'ดูแพ็กเกจรวมสุดคุ้ม (Bundles)' : 'Explore Bundles'}
                     </span>
                     <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-cyan-400 transition-colors" />
                   </Link>
@@ -164,11 +166,11 @@ export function CartDrawer() {
                 <div className="pt-4 border-t border-slate-800/80 grid grid-cols-2 gap-2 text-[10px] text-slate-400 w-full">
                   <div className="flex items-center gap-1.5 p-2 rounded-lg bg-slate-900/40 border border-slate-800/60">
                     <Zap className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                    <span>จัดส่งอัตโนมัติ 24 ชม.</span>
+                    <span>{language === 'th' ? 'จัดส่งอัตโนมัติ 24 ชม.' : '24/7 Automated Delivery'}</span>
                   </div>
                   <div className="flex items-center gap-1.5 p-2 rounded-lg bg-slate-900/40 border border-slate-800/60">
                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <span>รับประกันแท้ 100%</span>
+                    <span>{language === 'th' ? 'รับประกันแท้ 100%' : '100% Guaranteed Safe'}</span>
                   </div>
                 </div>
               </div>
@@ -277,17 +279,17 @@ export function CartDrawer() {
               {/* Pricing Breakdown */}
               <div className="space-y-1.5 text-xs text-slate-400">
                 <div className="flex justify-between">
-                  <span>ยอดรวมสินค้า ({totalItems} ชิ้น)</span>
+                  <span>{t('cart_subtotal')} ({totalItems} {t('cart_items_count')})</span>
                   <span className="text-slate-200 font-semibold">{formatCurrency(subtotal)}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span>การจัดส่ง</span>
+                  <span>{t('cart_shipping')}</span>
                   <span className="text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full text-[10px]">
-                    ฟรี (จัดส่งอัตโนมัติ)
+                    {t('cart_free_delivery')}
                   </span>
                 </div>
                 <div className="flex justify-between items-baseline pt-2.5 border-t border-slate-800 text-white font-bold">
-                  <span className="text-sm">ยอดชำระสุทธิ</span>
+                  <span className="text-sm">{t('cart_total')}</span>
                   <div className="text-right">
                     <span className="text-xl font-black text-cyan-400 drop-shadow-[0_0_12px_rgba(6,182,212,0.4)]">
                       {formatCurrency(total)}
@@ -309,7 +311,7 @@ export function CartDrawer() {
                     className="w-full justify-center font-black shadow-[0_0_25px_rgba(6,182,212,0.4)]"
                     rightIcon={<ArrowRight className="w-4 h-4" />}
                   >
-                    ชำระเงินทันที (Checkout)
+                    {t('cart_checkout_btn')}
                   </Button>
                 </Link>
 
@@ -323,7 +325,7 @@ export function CartDrawer() {
                     size="md"
                     className="w-full justify-center text-xs font-bold text-slate-300 hover:text-white"
                   >
-                    ดูตะกร้าสินค้าฉบับเต็ม
+                    {t('cart_view_full')}
                   </Button>
                 </Link>
               </div>
@@ -331,11 +333,11 @@ export function CartDrawer() {
               {/* Guarantees */}
               <div className="flex items-center justify-center gap-4 text-[10px] text-slate-400 pt-1">
                 <span className="flex items-center gap-1">
-                  <ShieldCheck className="w-3 h-3 text-cyan-400" /> ชำระเงินปลอดภัย 100%
+                  <ShieldCheck className="w-3 h-3 text-cyan-400" /> {t('cart_secure_100')}
                 </span>
                 <span>•</span>
                 <span className="flex items-center gap-1">
-                  <Zap className="w-3 h-3 text-amber-400" /> ได้รับสินค้าทันที
+                  <Zap className="w-3 h-3 text-amber-400" /> {t('cart_instant')}
                 </span>
               </div>
             </div>

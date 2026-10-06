@@ -21,6 +21,7 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/context/CartContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { UserDropdown } from './UserDropdown';
 import { CartDrawer } from '@/components/cart/CartDrawer';
 
@@ -28,15 +29,16 @@ export function Navbar() {
   const { isAdmin } = useAuth();
   const { totalItems, setIsCartOpen } = useCart();
   const { theme, resolvedTheme, toggleTheme } = useTheme();
+  const { language, toggleLanguage, t } = useLanguage();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const router = useRouter();
   const pathname = usePathname();
 
   const navLinks = [
-    { href: '/', label: 'หน้าแรก', icon: Home, exact: true },
-    { href: '/shop', label: 'ร้านค้า', icon: Store, exact: false },
-    { href: '/shop?category=all', label: 'หมวดหมู่', icon: Layers, exact: false },
+    { href: '/', label: t('nav_home', 'หน้าแรก'), icon: Home, exact: true },
+    { href: '/shop', label: t('nav_shop', 'ร้านค้า'), icon: Store, exact: false },
+    { href: '/shop?category=all', label: t('nav_categories', 'หมวดหมู่'), icon: Layers, exact: false },
   ];
 
   const handleSearch = (e: React.FormEvent) => {
@@ -125,15 +127,26 @@ export function Navbar() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="ค้นหาเกม / บัตรเติมเงิน / สินค้า..."
+                  placeholder={t('nav_search_placeholder', 'ค้นหาเกม / บัตรเติมเงิน / สินค้า...')}
                   className="w-full bg-slate-900/90 text-sm text-slate-100 placeholder:text-slate-500 rounded-full pl-10 pr-4 py-2 border border-slate-700/80 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 outline-none transition-all"
                 />
                 <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               </div>
             </form>
 
-            {/* 3. Actions (Theme, Cart & User) */}
-            <div className="flex items-center gap-2.5">
+            {/* 3. Actions (Theme, Language, Cart & User) */}
+            <div className="flex items-center gap-2">
+              {/* Language Toggle Button (Desktop & Mobile) */}
+              <button
+                type="button"
+                onClick={toggleLanguage}
+                className="px-2.5 py-1.5 rounded-full bg-slate-900 border border-slate-700/80 hover:border-cyan-500/50 hover:bg-slate-800 transition-all text-slate-200 hover:text-white cursor-pointer group shadow-sm active:scale-95 text-xs font-bold flex items-center gap-1.5 select-none"
+                title={language === 'th' ? 'Switch to English (EN)' : 'เปลี่ยนเป็น ภาษาไทย (TH)'}
+                aria-label="Toggle language"
+              >
+                <span>{language === 'th' ? '🇹🇭 TH' : '🇺🇸 EN'}</span>
+              </button>
+
               {/* Theme Toggle Button (Desktop & Mobile) */}
               <button
                 type="button"
@@ -143,11 +156,11 @@ export function Navbar() {
                 aria-label="Toggle theme"
               >
                 {theme === 'system' ? (
-                  <Laptop className="w-5 h-5 text-cyan-400 group-hover:scale-110 transition-transform" />
+                  <Laptop className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
                 ) : resolvedTheme === 'dark' ? (
-                  <Moon className="w-5 h-5 text-cyan-400 group-hover:scale-110 transition-transform" />
+                  <Moon className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
                 ) : (
-                  <Sun className="w-5 h-5 text-amber-400 group-hover:scale-110 transition-transform" />
+                  <Sun className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
                 )}
               </button>
 

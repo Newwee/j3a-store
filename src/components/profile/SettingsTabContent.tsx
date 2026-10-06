@@ -35,6 +35,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { useLoading } from '@/context/LoadingContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { updateUserProfile } from '@/lib/firestore/users';
 import {
   requestAccountDeletion,
@@ -78,7 +79,7 @@ export function SettingsTabContent() {
 
   // Preferences state
   const { theme, setTheme } = useTheme();
-  const [language, setLanguage] = useState<'th' | 'en'>('th');
+  const { language, setLanguage } = useLanguage();
   const [timezone, setTimezone] = useState('Asia/Bangkok (GMT+7)');
   const [dateFormat, setDateFormat] = useState('DD/MM/YYYY HH:mm');
 
@@ -665,7 +666,10 @@ export function SettingsTabContent() {
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
-                    onClick={() => setLanguage('th')}
+                    onClick={() => {
+                      setLanguage('th');
+                      success('เปลี่ยนภาษาเป็น ภาษาไทย (TH) เรียบร้อยแล้ว');
+                    }}
                     className={`p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                       language === 'th'
                         ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.3)]'
@@ -676,7 +680,10 @@ export function SettingsTabContent() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setLanguage('en')}
+                    onClick={() => {
+                      setLanguage('en');
+                      success('Switched language to English (EN) successfully');
+                    }}
                     className={`p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                       language === 'en'
                         ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.3)]'

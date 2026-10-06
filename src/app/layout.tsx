@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Inter, Prompt } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '@/context/ThemeContext';
+import { LanguageProvider } from '@/context/LanguageContext';
 import { AuthProvider } from '@/context/AuthContext';
 import { CartProvider } from '@/context/CartContext';
 import { ToastProvider } from '@/context/ToastContext';
@@ -109,24 +110,26 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <ThemeProvider>
-          <TargetCursor
-            spinDuration={5}
-            hideDefaultCursor={false}
-            parallaxOn
-            hoverDuration={0.25}
-            cursorColor="#ffffff"
-            cursorColorOnTarget="#B497CF"
-            targetSelector=".cursor-target, button, a, [role='button']"
-          />
-          <ToastProvider>
-            <LoadingProvider>
-              <AuthProvider>
-                <CartProvider>
-                  {children}
-                </CartProvider>
-              </AuthProvider>
-            </LoadingProvider>
-          </ToastProvider>
+          <LanguageProvider>
+            <TargetCursor
+              spinDuration={5}
+              hideDefaultCursor={false}
+              parallaxOn
+              hoverDuration={0.25}
+              cursorColor="#ffffff"
+              cursorColorOnTarget="#B497CF"
+              targetSelector=".cursor-target, button, a, [role='button']"
+            />
+            <ToastProvider>
+              <LoadingProvider>
+                <AuthProvider>
+                  <CartProvider>
+                    {children}
+                  </CartProvider>
+                </AuthProvider>
+              </LoadingProvider>
+            </ToastProvider>
+          </LanguageProvider>
         </ThemeProvider>
       </body>
     </html>

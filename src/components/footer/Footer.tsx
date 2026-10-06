@@ -1,9 +1,14 @@
+'use client';
+
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ShieldCheck, Zap, Headphones, Sparkles, Send, MessageCircle } from 'lucide-react';
+import { useLanguage } from '@/context/LanguageContext';
 
 export function Footer() {
+  const { t, language } = useLanguage();
+
   return (
     <footer className="border-t border-slate-800/80 bg-slate-950 text-slate-400 text-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
@@ -30,16 +35,15 @@ export function Footer() {
             </Link>
 
             <p className="text-xs text-slate-400 leading-relaxed max-w-sm">
-              แพลตฟอร์มศูนย์รวมสินค้าและบริการดิจิทัลชั้นนำ เติมเกม ไอดีเกม บัตรเติมเงิน และอุปกรณ์ระดับพรีเมียม
-              ระบบอัตโนมัติ รวดเร็ว ปลอดภัย 100% พร้อมบริการตลอด 24 ชั่วโมง
+              {t('footer_desc')}
             </p>
 
             <div className="flex items-center gap-3 pt-2">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-950/50 border border-cyan-500/30 text-cyan-300 text-xs font-semibold">
-                <Zap className="w-3.5 h-3.5 text-cyan-400" /> จัดส่งทันใจใน 1 นาที
+                <Zap className="w-3.5 h-3.5 text-cyan-400" /> {t('footer_delivery_badge')}
               </span>
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-950/50 border border-emerald-500/30 text-emerald-300 text-xs font-semibold">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> ปลอดภัย 100%
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> {t('footer_secure_badge')}
               </span>
             </div>
           </div>
@@ -47,32 +51,32 @@ export function Footer() {
           {/* Col 2: Quick Links */}
           <div className="space-y-3">
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200">
-              เมนูหลัก
+              {t('footer_menu_main')}
             </h4>
             <ul className="space-y-2 text-xs">
               <li>
                 <Link href="/" className="hover:text-cyan-400 transition-colors">
-                  หน้าแรก (Home)
+                  {language === 'th' ? 'หน้าแรก (Home)' : 'Home'}
                 </Link>
               </li>
               <li>
                 <Link href="/shop" className="hover:text-cyan-400 transition-colors">
-                  ร้านค้าทั้งหมด (Shop)
+                  {language === 'th' ? 'ร้านค้าทั้งหมด (Shop)' : 'All Products / Shop'}
                 </Link>
               </li>
               <li>
                 <Link href="/shop?category=all" className="hover:text-cyan-400 transition-colors">
-                  หมวดหมู่สินค้า (Categories)
+                  {language === 'th' ? 'หมวดหมู่สินค้า (Categories)' : 'Categories'}
                 </Link>
               </li>
               <li>
                 <Link href="/cart" className="hover:text-cyan-400 transition-colors">
-                  ตะกร้าสินค้า (Cart)
+                  {language === 'th' ? 'ตะกร้าสินค้า (Cart)' : 'Shopping Cart'}
                 </Link>
               </li>
               <li>
                 <Link href="/orders" className="hover:text-cyan-400 transition-colors">
-                  ประวัติการสั่งซื้อ (Orders)
+                  {language === 'th' ? 'ประวัติการสั่งซื้อ (Orders)' : 'Order History'}
                 </Link>
               </li>
             </ul>
@@ -81,27 +85,27 @@ export function Footer() {
           {/* Col 3: Customer Care & Policy */}
           <div className="space-y-3">
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200">
-              ข้อกำหนด & การช่วยเหลือ
+              {t('footer_menu_help')}
             </h4>
             <ul className="space-y-2 text-xs">
               <li>
                 <Link href="/about" className="hover:text-cyan-400 transition-colors">
-                  เกี่ยวกับเรา (About J3A)
+                  {t('footer_about')}
                 </Link>
               </li>
               <li>
                 <Link href="/terms" className="hover:text-cyan-400 transition-colors">
-                  เงื่อนไขการใช้บริการ (Terms of Service)
+                  {t('footer_terms')}
                 </Link>
               </li>
               <li>
                 <Link href="/privacy" className="hover:text-cyan-400 transition-colors">
-                  นโยบายความเป็นส่วนตัว (Privacy Policy)
+                  {t('footer_privacy')}
                 </Link>
               </li>
               <li>
                 <Link href="/contact" className="hover:text-cyan-400 transition-colors">
-                  ติดต่อฝ่ายซัพพอร์ต (Contact Support)
+                  {t('footer_support')}
                 </Link>
               </li>
             </ul>
@@ -110,10 +114,10 @@ export function Footer() {
           {/* Col 4: Community & Contact */}
           <div className="space-y-3">
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200">
-              ติดต่อเรา
+              {t('footer_menu_contact')}
             </h4>
             <p className="text-xs text-slate-400">
-              มีข้อสงสัยหรือต้องการความช่วยเหลือ? ทีมงานแอดมินพร้อมตอบคำถามตลอดเวลา
+              {t('footer_contact_desc')}
             </p>
             <div className="flex flex-col gap-2 pt-1 text-xs">
               <a
@@ -140,7 +144,7 @@ export function Footer() {
         <div className="mt-12 pt-8 border-t border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
           <p>© {new Date().getFullYear()} J3A STORE. All rights reserved. Powered by Next.js & Supabase.</p>
           <div className="flex items-center gap-6">
-            <span>Server Status: <span className="text-emerald-400 font-semibold">● Online</span></span>
+            <span>Server Status: <span className="text-emerald-400 font-semibold">● {t('footer_server_online')}</span></span>
             <span>Version: 1.0.0 (Production)</span>
           </div>
         </div>

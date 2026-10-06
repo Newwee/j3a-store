@@ -7,8 +7,10 @@ import { getStoreDashboardStats } from '@/lib/firestore/stats';
 
 import { CountUp } from '@/components/ui/CountUp';
 import { supabase } from '@/lib/supabase/client';
+import { useLanguage } from '@/context/LanguageContext';
 
 export function LiveStatsSection() {
+  const { t } = useLanguage();
   const [stats, setStats] = useState({
     members: 1,
     orders: 0,
@@ -83,10 +85,10 @@ export function LiveStatsSection() {
           <div className="flex items-center justify-between gap-4 mb-6">
             <div>
               <h2 className="text-base sm:text-lg font-bold text-white tracking-wide">
-                สถิติการใช้งาน
+                {t('stats_title', 'สถิติการใช้งาน')}
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                ข้อมูลจริงจากระบบ J3A STORE
+                {t('stats_subtitle', 'ข้อมูลจริงจากระบบ J3A STORE')}
               </p>
             </div>
 
@@ -96,7 +98,7 @@ export function LiveStatsSection() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
-              <span className="text-[11px] sm:text-xs">อัปเดตเรียลไทม์</span>
+              <span className="text-[11px] sm:text-xs">{t('stats_live_badge', 'อัปเดตเรียลไทม์')}</span>
             </div>
           </div>
 
@@ -110,16 +112,16 @@ export function LiveStatsSection() {
                 </div>
                 <div>
                   <p className="text-xs font-bold text-slate-200 leading-tight">
-                    สมาชิกทั้งหมด
+                    {t('stats_members', 'สมาชิกทั้งหมด')}
                   </p>
-                  <p className="text-[11px] text-cyan-400/90 font-medium">คนที่สมัครทั้งหมด</p>
+                  <p className="text-[11px] text-cyan-400/90 font-medium">{t('stats_members_sub', 'คนที่สมัครทั้งหมด')}</p>
                 </div>
               </div>
               <div className="text-right">
                 <span className="text-2xl sm:text-3xl font-black text-white tracking-tight">
                   <CountUp to={stats.members} duration={1} separator="," />
                 </span>
-                <span className="text-xs text-slate-400 ml-1.5 font-medium">คน</span>
+                <span className="text-xs text-slate-400 ml-1.5 font-medium">{t('stats_unit_people', 'คน')}</span>
               </div>
             </div>
 
@@ -131,16 +133,16 @@ export function LiveStatsSection() {
                 </div>
                 <div>
                   <p className="text-xs font-medium text-slate-300 leading-tight">
-                    คำสั่งซื้อสะสม
+                    {t('stats_orders', 'คำสั่งซื้อสะสม')}
                   </p>
-                  <p className="text-[11px] text-slate-500">ทั้งหมด</p>
+                  <p className="text-[11px] text-slate-500">{t('stats_orders_sub', 'ทั้งหมด')}</p>
                 </div>
               </div>
               <div className="text-right">
                 <span className="text-2xl sm:text-3xl font-black text-white tracking-tight">
                   <CountUp to={stats.orders} duration={1} separator="," />
                 </span>
-                <span className="text-xs text-slate-400 ml-1.5 font-medium">รายการ</span>
+                <span className="text-xs text-slate-400 ml-1.5 font-medium">{t('stats_unit_orders', 'รายการ')}</span>
               </div>
             </div>
 
@@ -152,16 +154,16 @@ export function LiveStatsSection() {
                 </div>
                 <div>
                   <p className="text-xs font-medium text-slate-300 leading-tight">
-                    สินค้าในคลัง
+                    {t('stats_products', 'สินค้าในคลัง')}
                   </p>
-                  <p className="text-[11px] text-slate-500">พร้อมจำหน่าย</p>
+                  <p className="text-[11px] text-slate-500">{t('stats_products_sub', 'พร้อมจำหน่าย')}</p>
                 </div>
               </div>
               <div className="text-right">
                 <span className="text-2xl sm:text-3xl font-black text-white tracking-tight">
                   <CountUp to={stats.products} duration={1} separator="," />
                 </span>
-                <span className="text-xs text-slate-400 ml-1.5 font-medium">รายการ</span>
+                <span className="text-xs text-slate-400 ml-1.5 font-medium">{t('stats_unit_orders', 'รายการ')}</span>
               </div>
             </div>
 
@@ -173,10 +175,10 @@ export function LiveStatsSection() {
                 </div>
                 <div>
                   <p className="text-xs font-medium text-slate-300 leading-tight">
-                    คะแนนรีวิวร้านค้า
+                    {t('stats_reviews', 'คะแนนรีวิวร้านค้า')}
                   </p>
                   <p className="text-[11px] text-amber-400">
-                    {stats.totalReviews > 0 ? `${stats.totalReviews} รีวิวจากผู้ซื้อจริง` : 'พึงพอใจ 100%'}
+                    {stats.totalReviews > 0 ? `${stats.totalReviews} ${t('stats_reviews_sub', 'รีวิวจากผู้ซื้อจริง')}` : t('stats_reviews_satisfied', 'พึงพอใจ 100%')}
                   </p>
                 </div>
               </div>
