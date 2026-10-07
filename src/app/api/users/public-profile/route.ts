@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
 
     let profileQuery = client
       .from('profiles')
-      .select('id, display_name, email, avatar_url, role, tier, created_at');
+      .select('id, display_name, email, avatar_url, role, tier, bio, social_links, created_at');
 
     if (userId.includes('@')) {
       profileQuery = profileQuery.eq('email', userId);
@@ -63,12 +63,21 @@ export async function GET(request: NextRequest) {
         ? profileRow.email.split('@')[0]
         : fallbackName;
 
+    const socialLinks =
+      typeof profileRow?.social_links === 'object' && profileRow?.social_links !== null
+        ? profileRow.social_links
+        : typeof profileRow?.social_links === 'string'
+        ? JSON.parse(profileRow.social_links || '{}')
+        : {};
+
     const publicProfile: PublicUserProfile = {
       uid: userId,
       displayName,
       photoURL: profileRow?.avatar_url || fallbackAvatar,
       role: (profileRow?.role as any) || 'customer',
       tier: (profileRow?.tier as any) || 'Bronze',
+      bio: profileRow?.bio || undefined,
+      socialLinks,
       createdAt:
         profileRow?.created_at || (firstReview?.created_at || new Date().toISOString()),
       reviewCount: totalReviews,

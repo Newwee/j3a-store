@@ -149,6 +149,123 @@ export default function CustomerPublicProfilePage({
                     {profile && <TierBadge tier={profile.tier || 'Bronze'} />}
                     {profile?.role === 'admin' && <RoleBadge role="admin" />}
                   </div>
+
+                  {/* Customer Bio */}
+                  {profile?.bio && (
+                    <p className="text-xs sm:text-sm text-slate-300 mt-2 line-clamp-2 max-w-xl">
+                      {profile.bio}
+                    </p>
+                  )}
+
+                  {/* Customer Social Links */}
+                  {profile?.socialLinks && Object.values(profile.socialLinks).some((v) => v && v.trim()) && (
+                    <div className="flex flex-wrap items-center gap-2 mt-3 pt-1">
+                      {profile.socialLinks.discord && (
+                        <a
+                          href={
+                            profile.socialLinks.discord.startsWith('http')
+                              ? profile.socialLinks.discord
+                              : profile.socialLinks.discord.includes('discord.gg')
+                              ? `https://${profile.socialLinks.discord}`
+                              : `https://discord.com/users/${profile.socialLinks.discord}`
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-[#5865F2]/10 hover:bg-[#5865F2]/20 text-[#7983F5] border border-[#5865F2]/30 transition-all hover:scale-105 shadow-sm"
+                          title={`Discord: ${profile.socialLinks.discord}`}
+                        >
+                          <span className="w-2 h-2 rounded-full bg-[#5865F2]" />
+                          <span>Discord</span>
+                          <ExternalLink className="w-3 h-3 opacity-60" />
+                        </a>
+                      )}
+                      {profile.socialLinks.facebook && (
+                        <a
+                          href={
+                            profile.socialLinks.facebook.startsWith('http')
+                              ? profile.socialLinks.facebook
+                              : `https://facebook.com/${profile.socialLinks.facebook}`
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-[#1877F2]/10 hover:bg-[#1877F2]/20 text-[#3B82F6] border border-[#1877F2]/30 transition-all hover:scale-105 shadow-sm"
+                          title="Facebook Profile"
+                        >
+                          <span className="w-2 h-2 rounded-full bg-[#1877F2]" />
+                          <span>Facebook</span>
+                          <ExternalLink className="w-3 h-3 opacity-60" />
+                        </a>
+                      )}
+                      {profile.socialLinks.twitter && (
+                        <a
+                          href={
+                            profile.socialLinks.twitter.startsWith('http')
+                              ? profile.socialLinks.twitter
+                              : `https://x.com/${profile.socialLinks.twitter.replace(/^@/, '')}`
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all hover:scale-105 shadow-sm"
+                          title="X / Twitter"
+                        >
+                          <span className="w-2 h-2 rounded-full bg-slate-400" />
+                          <span>X / Twitter</span>
+                          <ExternalLink className="w-3 h-3 opacity-60" />
+                        </a>
+                      )}
+                      {profile.socialLinks.instagram && (
+                        <a
+                          href={
+                            profile.socialLinks.instagram.startsWith('http')
+                              ? profile.socialLinks.instagram
+                              : `https://instagram.com/${profile.socialLinks.instagram.replace(/^@/, '')}`
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-[#E4405F]/10 hover:bg-[#E4405F]/20 text-[#F43F5E] border border-[#E4405F]/30 transition-all hover:scale-105 shadow-sm"
+                          title="Instagram Profile"
+                        >
+                          <span className="w-2 h-2 rounded-full bg-[#E4405F]" />
+                          <span>Instagram</span>
+                          <ExternalLink className="w-3 h-3 opacity-60" />
+                        </a>
+                      )}
+                      {profile.socialLinks.youtube && (
+                        <a
+                          href={
+                            profile.socialLinks.youtube.startsWith('http')
+                              ? profile.socialLinks.youtube
+                              : `https://youtube.com/@${profile.socialLinks.youtube.replace(/^@/, '')}`
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-[#FF0000]/10 hover:bg-[#FF0000]/20 text-rose-400 border border-[#FF0000]/30 transition-all hover:scale-105 shadow-sm"
+                          title="YouTube Channel"
+                        >
+                          <span className="w-2 h-2 rounded-full bg-[#FF0000]" />
+                          <span>YouTube</span>
+                          <ExternalLink className="w-3 h-3 opacity-60" />
+                        </a>
+                      )}
+                      {profile.socialLinks.website && (
+                        <a
+                          href={
+                            profile.socialLinks.website.startsWith('http')
+                              ? profile.socialLinks.website
+                              : `https://${profile.socialLinks.website}`
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 transition-all hover:scale-105 shadow-sm"
+                          title="Website"
+                        >
+                          <span className="w-2 h-2 rounded-full bg-cyan-400" />
+                          <span>Website</span>
+                          <ExternalLink className="w-3 h-3 opacity-60" />
+                        </a>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

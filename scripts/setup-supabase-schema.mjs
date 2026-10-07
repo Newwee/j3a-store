@@ -95,7 +95,7 @@ const migrations = [
   `CREATE TABLE IF NOT EXISTS public.reviews (
     id TEXT PRIMARY KEY,
     product_id TEXT NOT NULL,
-    user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
     user_name TEXT,
     user_avatar TEXT,
     rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 10),

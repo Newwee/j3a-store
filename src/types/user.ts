@@ -2,6 +2,16 @@ export type UserRole = 'customer' | 'admin';
 
 export type UserTier = 'Bronze' | 'Silver' | 'Gold' | 'VIP';
 
+export interface SocialLinks {
+  discord?: string;
+  facebook?: string;
+  twitter?: string;
+  instagram?: string;
+  youtube?: string;
+  github?: string;
+  website?: string;
+}
+
 export interface UserProfile {
   uid: string;
   email: string | null;
@@ -11,6 +21,8 @@ export interface UserProfile {
   credits: number; // Balance in THB
   tier: UserTier;
   phone?: string;
+  bio?: string;
+  socialLinks?: SocialLinks;
   reviewBannedUntil?: string | null;
   reviewBanReason?: string | null;
   createdAt: string;
@@ -50,6 +62,8 @@ export interface PublicUserProfile {
   photoURL: string | null;
   role: UserRole;
   tier: UserTier;
+  bio?: string;
+  socialLinks?: SocialLinks;
   createdAt: string;
   reviewCount: number;
   averageRating: number;

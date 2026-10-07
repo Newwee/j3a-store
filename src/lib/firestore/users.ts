@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase/client';
-import { UserProfile, UserRole, UserTier, PublicUserProfile } from '@/types/user';
+import { UserProfile, UserRole, UserTier, PublicUserProfile, SocialLinks } from '@/types/user';
 import { clearOrArchiveDeletionRequest } from './deletionRequests';
 
 function getAdminEmails(): string[] {
@@ -21,20 +21,30 @@ function mapRowToUserProfile(row: any): UserProfile {
   const adminEmails = getAdminEmails();
   const isMasterAdmin = Boolean(email && adminEmails.includes(email.toLowerCase()));
 
-  return {
-    uid: row.id,
-    email,
-    displayName,
-    photoURL: row.avatar_url || null,
-    role: isMasterAdmin ? 'admin' : ((row.role as UserRole) || 'customer'),
-    credits: Number(row.credits) || 0,
-    tier: (row.tier as UserTier) || (isMasterAdmin ? 'VIP' : 'Bronze'),
-    reviewBannedUntil: row.review_banned_until || null,
-    reviewBanReason: row.review_ban_reason || null,
-    createdAt: row.created_at || new Date().toISOString(),
-    updatedAt: row.updated_at || new Date().toISOString(),
-  };
-}
+    const socialLinks =
+      typeof row.social_links === 'object' && row.social_links !== null
+        ? row.social_links
+        : typeof row.social_links === 'string'
+        ? JSON.parse(row.social_links || '{}')
+        : {};
+
+    return {
+      uid: row.id,
+      email,
+      displayName,
+      photoURL: row.avatar_url || null,
+      role: isMasterAdmin ? 'admin' : ((row.role as UserRole) || 'customer'),
+      credits: Number(row.credits) || 0,
+      tier: (row.tier as UserTier) || (isMasterAdmin ? 'VIP' : 'Bronze'),
+      phone: row.phone || undefined,
+      bio: row.bio || undefined,
+      socialLinks,
+      reviewBannedUntil: row.review_banned_until || null,
+      reviewBanReason: row.review_ban_reason || null,
+      createdAt: row.created_at || new Date().toISOString(),
+      updatedAt: row.updated_at || new Date().toISOString(),
+    };
+  }
 
 /**
  * Fetch a user profile from Supabase by UID
@@ -132,7 +142,14 @@ export async function createUserProfile(
  */
 export async function updateUserProfile(
   uid: string,
-  data: { displayName?: string; photoURL?: string; phone?: string; tier?: UserTier }
+  data: {
+    displayName?: string;
+    photoURL?: string;
+    phone?: string;
+    bio?: string;
+    socialLinks?: SocialLinks;
+    tier?: UserTier;
+  }
 ): Promise<void> {
   const updates: Record<string, any> = {
     updated_at: new Date().toISOString(),
@@ -140,10 +157,58 @@ export async function updateUserProfile(
 
   if (data.displayName !== undefined) updates.display_name = data.displayName;
   if (data.photoURL !== undefined) updates.avatar_url = data.photoURL;
+  if (data.phone !== undefined) updates.phone = data.phone;
+  if (data.bio !== undefined) updates.bio = data.bio;
+  if (data.socialLinks !== undefined) updates.social_links = data.socialLinks;
   if (data.tier !== undefined) updates.tier = data.tier;
 
   const { error } = await supabase.from('profiles').update(updates).eq('id', uid);
   if (error) throw new Error(error.message);
+
+  // Sync to Supabase auth user metadata if photoURL or displayName was updated
+  if (data.photoURL !== undefined || data.displayName !== undefined) {
+    const userMeta: Record<string, any> = {};
+    if (data.photoURL !== undefined) {
+      userMeta.avatar_url = data.photoURL;
+      userMeta.picture = data.photoURL;
+    }
+    if (data.displayName !== undefined) {
+      userMeta.full_name = data.displayName;
+      userMeta.name = data.displayName;
+    }
+    Promise.resolve(supabase.auth.updateUser({ data: userMeta })).catch(() => {});
+
+    // Also sync reviews written by this user if photo or name changed
+    if (data.photoURL !== undefined || data.displayName !== undefined) {
+      const reviewUpdates: Record<string, any> = { updated_at: new Date().toISOString() };
+      if (data.photoURL !== undefined) reviewUpdates.user_avatar = data.photoURL;
+      if (data.displayName !== undefined) reviewUpdates.user_name = data.displayName;
+      Promise.resolve(supabase.from('reviews').update(reviewUpdates).eq('user_id', uid)).catch(() => {});
+    }
+  }
+}
+
+/**
+ * Upload a user avatar with standard 2MB limit enforcement
+ */
+export async function uploadUserAvatar(file: File, userId: string): Promise<string> {
+  const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+  if (!validTypes.includes(file.type)) {
+    throw new Error('กรุณาอัปโหลดไฟล์รูปภาพที่ถูกต้อง (PNG, JPG, WEBP หรือ GIF)');
+  }
+
+  // 2MB standard limit
+  const MAX_SIZE = 2 * 1024 * 1024;
+  if (file.size > MAX_SIZE) {
+    const sizeMB = (file.size / 1024 / 1024).toFixed(2);
+    throw new Error(
+      `ขนาดไฟล์รูปภาพเกิน 2 MB ตามมาตรฐาน (ขนาดของคุณ: ${sizeMB} MB) กรุณาเลือกไฟล์ที่มีขนาดไม่เกิน 2 MB`
+    );
+  }
+
+  const { uploadProductImage } = await import('@/lib/storage/upload');
+  const { downloadUrl } = await uploadProductImage(file, 'avatars', undefined, 4000);
+  return downloadUrl;
 }
 
 /**
@@ -284,6 +349,11 @@ export async function deleteUserDoc(uid: string): Promise<void> {
   }
 
   // 2. Direct authenticated supabase client delete
+  try {
+    await supabase.from('reviews').delete().eq('user_id', uid);
+  } catch (revErr) {
+    console.warn('Could not cascade delete reviews in client fallback:', revErr);
+  }
   const { error } = await supabase.from('profiles').delete().eq('id', uid);
   if (error) throw new Error(error.message);
 }
