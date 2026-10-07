@@ -1,12 +1,16 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight, ShieldCheck, Zap, Sparkles, Flame, Star } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useLanguage } from '@/context/LanguageContext';
 import dynamic from 'next/dynamic';
+import CardSwap, { Card } from '@/components/ui/CardSwap';
+import { ShowcaseVideoCard } from '@/components/home/ShowcaseVideoCard';
+import { getStoreSettings } from '@/lib/firestore/settings';
+import { StoreSettings } from '@/types/settings';
 
 const ASCIIText = dynamic(() => import('@/components/ui/ASCIIText'), {
   ssr: false,
@@ -37,6 +41,21 @@ const ElectricLogo = dynamic(() => import('@/components/ui/ElectricLogo'), {
 
 export function HeroSection() {
   const { t } = useLanguage();
+  const [settings, setSettings] = useState<StoreSettings | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    getStoreSettings()
+      .then((res) => {
+        if (isMounted) setSettings(res);
+      })
+      .catch((err) => {
+        console.warn('Failed to load store settings for showcase:', err);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <section className="relative overflow-hidden pt-8 pb-16 lg:pt-16 lg:pb-24">
@@ -121,32 +140,70 @@ export function HeroSection() {
             </div>
           </div>
 
-          {/* Right Column: ElectricLogo with Logo2.png */}
-          <div className="lg:col-span-5 relative flex items-center justify-center">
-            <div
-              style={{ width: '100%', height: '480px', position: 'relative' }}
-              className="rounded-3xl overflow-hidden border border-cyan-500/30 bg-slate-950/70 shadow-[0_0_50px_rgba(255,82,96,0.25)] flex items-center justify-center"
+          {/* Right Column: 3D CardSwap (YouTube Showcase & Electric Logo) */}
+          <div className="lg:col-span-5 relative flex items-center justify-center min-h-[500px]">
+            <CardSwap
+              width={460}
+              height={460}
+              cardDistance={35}
+              verticalDistance={30}
+              delay={5000}
+              pauseOnHover={true}
+              skewAmount={4}
+              easing="elastic"
             >
-              <ElectricLogo
-                src="/Logo2.png"
-                color="#ffcdd2"
-                glowColor="#ff5260"
-                scale={0.7}
-                strands={4}
-                bend={0.6}
-                crackle={1.5}
-                arcs={0.4}
-                speed={2.5}
-                interactive
-                intensity={1}
-                glow={1}
-                thickness={1.5}
-                flicker={0.6}
-                fill={0}
-                cursorIntensity={0.75}
-                cursorRadius={100}
-              />
-            </div>
+              {/* Card 1: YouTube Showcase (Shown FIRST when entering website) */}
+              <Card customClass="w-full h-full">
+                <ShowcaseVideoCard
+                  youtubeUrl={settings?.showcaseYoutubeUrl}
+                  title={settings?.showcaseTitle}
+                  subtitle={settings?.showcaseSubtitle}
+                />
+              </Card>
+
+              {/* Card 2: Electric Logo */}
+              <Card customClass="w-full h-full rounded-3xl overflow-hidden border border-cyan-500/40 bg-slate-950/85 shadow-[0_0_50px_rgba(6,182,212,0.3)] flex flex-col items-center justify-between relative p-4 select-none">
+                {/* Header Tag */}
+                <div className="w-full flex items-center justify-between z-10">
+                  <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/40 text-cyan-300 font-extrabold text-[10px] tracking-wider uppercase shadow-[0_0_12px_rgba(6,182,212,0.2)]">
+                    J3A STORE • OFFICIAL
+                  </span>
+                  <span className="text-[10px] font-bold text-slate-400">
+                    Next-Gen Store
+                  </span>
+                </div>
+
+                {/* Electric Logo Animation */}
+                <div className="w-full flex-1 flex items-center justify-center my-auto scale-90 sm:scale-100">
+                  <ElectricLogo
+                    src="/Logo2.png"
+                    color="#ffcdd2"
+                    glowColor="#ff5260"
+                    scale={0.7}
+                    strands={4}
+                    bend={0.6}
+                    crackle={1.5}
+                    arcs={0.4}
+                    speed={2.5}
+                    interactive
+                    intensity={1}
+                    glow={1}
+                    thickness={1.5}
+                    flicker={0.6}
+                    fill={0}
+                    cursorIntensity={0.75}
+                    cursorRadius={100}
+                  />
+                </div>
+
+                {/* Footer Tag */}
+                <div className="w-full text-center z-10 pt-1 border-t border-slate-800/80">
+                  <span className="text-[10px] tracking-widest text-slate-400 uppercase font-semibold">
+                    Automated Digital Delivery • 24/7
+                  </span>
+                </div>
+              </Card>
+            </CardSwap>
           </div>
         </div>
       </div>

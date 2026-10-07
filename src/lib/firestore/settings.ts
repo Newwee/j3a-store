@@ -11,6 +11,9 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   announcement: 'ยินดีต้อนรับสู่ J3A STORE ซอฟต์แวร์ Discord และบริการดิจิทัลอัตโนมัติ 24 ชม.',
   shippingFee: 0,
   freeShippingThreshold: 0,
+  showcaseYoutubeUrl: '',
+  showcaseTitle: 'วิธีใช้งานร้านค้า J3A STORE',
+  showcaseSubtitle: 'ชมวิดีโอแนะนำขั้นตอนการสั่งซื้อ เติมเงิน และรับสินค้าแบบอัตโนมัติ 24 ชม.',
 };
 
 /**
@@ -37,6 +40,9 @@ export async function getStoreSettings(): Promise<StoreSettings> {
       announcement: data.announcement || DEFAULT_STORE_SETTINGS.announcement,
       shippingFee: typeof data.shipping_fee === 'number' ? Number(data.shipping_fee) : DEFAULT_STORE_SETTINGS.shippingFee,
       freeShippingThreshold: typeof data.free_shipping_threshold === 'number' ? Number(data.free_shipping_threshold) : DEFAULT_STORE_SETTINGS.freeShippingThreshold,
+      showcaseYoutubeUrl: data.showcase_youtube_url ?? DEFAULT_STORE_SETTINGS.showcaseYoutubeUrl,
+      showcaseTitle: data.showcase_title ?? DEFAULT_STORE_SETTINGS.showcaseTitle,
+      showcaseSubtitle: data.showcase_subtitle ?? DEFAULT_STORE_SETTINGS.showcaseSubtitle,
       updatedAt: data.updated_at || undefined,
     };
   } catch (error) {
@@ -87,6 +93,9 @@ export async function updateStoreSettings(settings: Partial<StoreSettings>): Pro
   if (settings.announcement !== undefined) updates.announcement = settings.announcement;
   if (settings.shippingFee !== undefined) updates.shipping_fee = Number(settings.shippingFee);
   if (settings.freeShippingThreshold !== undefined) updates.free_shipping_threshold = Number(settings.freeShippingThreshold);
+  if (settings.showcaseYoutubeUrl !== undefined) updates.showcase_youtube_url = settings.showcaseYoutubeUrl;
+  if (settings.showcaseTitle !== undefined) updates.showcase_title = settings.showcaseTitle;
+  if (settings.showcaseSubtitle !== undefined) updates.showcase_subtitle = settings.showcaseSubtitle;
 
   const { error } = await supabase
     .from('settings')

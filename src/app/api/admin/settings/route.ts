@@ -24,6 +24,9 @@ export async function POST(req: Request) {
     if (body.announcement !== undefined) updates.announcement = body.announcement;
     if (body.shippingFee !== undefined) updates.shipping_fee = Number(body.shippingFee);
     if (body.freeShippingThreshold !== undefined) updates.free_shipping_threshold = Number(body.freeShippingThreshold);
+    if (body.showcaseYoutubeUrl !== undefined) updates.showcase_youtube_url = body.showcaseYoutubeUrl;
+    if (body.showcaseTitle !== undefined) updates.showcase_title = body.showcaseTitle;
+    if (body.showcaseSubtitle !== undefined) updates.showcase_subtitle = body.showcaseSubtitle;
 
     const { data, error } = await supabaseAdmin
       .from('settings')

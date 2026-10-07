@@ -2,12 +2,13 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Settings, Save, Shield, Store, QrCode, MessageCircle, AlertCircle, CheckCircle2, Sparkles, Truck } from 'lucide-react';
+import { Settings, Save, Shield, Store, QrCode, MessageCircle, AlertCircle, CheckCircle2, Sparkles, Truck, Video, Play, ExternalLink } from 'lucide-react';
 import { AdminHeader } from '@/components/admin/AdminHeader';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useToast } from '@/context/ToastContext';
 import { getStoreSettings, updateStoreSettings, DEFAULT_STORE_SETTINGS } from '@/lib/firestore/settings';
+import { extractYouTubeVideoId, getYouTubeEmbedUrl } from '@/lib/utils/youtube';
 
 export default function AdminSettingsPage() {
   const { success, error } = useToast();
@@ -18,6 +19,9 @@ export default function AdminSettingsPage() {
   const [announcement, setAnnouncement] = useState(DEFAULT_STORE_SETTINGS.announcement);
   const [shippingFee, setShippingFee] = useState(String(DEFAULT_STORE_SETTINGS.shippingFee));
   const [freeShippingThreshold, setFreeShippingThreshold] = useState(String(DEFAULT_STORE_SETTINGS.freeShippingThreshold));
+  const [showcaseYoutubeUrl, setShowcaseYoutubeUrl] = useState(DEFAULT_STORE_SETTINGS.showcaseYoutubeUrl || '');
+  const [showcaseTitle, setShowcaseTitle] = useState(DEFAULT_STORE_SETTINGS.showcaseTitle || 'วิธีใช้งานร้านค้า J3A STORE');
+  const [showcaseSubtitle, setShowcaseSubtitle] = useState(DEFAULT_STORE_SETTINGS.showcaseSubtitle || 'ชมวิดีโอแนะนำขั้นตอนการสั่งซื้อ เติมเงิน และรับสินค้าแบบอัตโนมัติ');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -32,6 +36,9 @@ export default function AdminSettingsPage() {
         setAnnouncement(data.announcement);
         setShippingFee(String(data.shippingFee));
         setFreeShippingThreshold(String(data.freeShippingThreshold));
+        setShowcaseYoutubeUrl(data.showcaseYoutubeUrl || '');
+        setShowcaseTitle(data.showcaseTitle || 'วิธีใช้งานร้านค้า J3A STORE');
+        setShowcaseSubtitle(data.showcaseSubtitle || 'ชมวิดีโอแนะนำขั้นตอนการสั่งซื้อ เติมเงิน และรับสินค้าแบบอัตโนมัติ');
       } catch (err: any) {
         console.error('Failed to load settings:', err);
       } finally {
@@ -54,8 +61,11 @@ export default function AdminSettingsPage() {
         announcement: announcement.trim(),
         shippingFee: Math.max(0, Number(shippingFee) || 0),
         freeShippingThreshold: Math.max(0, Number(freeShippingThreshold) || 0),
+        showcaseYoutubeUrl: showcaseYoutubeUrl.trim(),
+        showcaseTitle: showcaseTitle.trim(),
+        showcaseSubtitle: showcaseSubtitle.trim(),
       });
-      success('บันทึกการตั้งค่าร้านค้าเรียบร้อยแล้ว! เบอร์พร้อมเพย์และ QR Code อัปเดตไปยังหน้าลูกค้าทันที');
+      success('บันทึกการตั้งค่าร้านค้าเรียบร้อยแล้ว! ข้อมูลและวิดีโอแนะนำร้านค้าอัปเดตไปยังหน้าแรกทันที');
     } catch (err: any) {
       error(`เกิดข้อผิดพลาดในการบันทึก: ${err.message || 'กรุณาลองใหม่อีกครั้ง'}`);
     } finally {
@@ -67,6 +77,8 @@ export default function AdminSettingsPage() {
   const previewQrUrl = cleanNumber
     ? `https://promptpay.io/${cleanNumber}/100.png`
     : `https://promptpay.io/0812345678/100.png`;
+
+  const detectedVideoId = extractYouTubeVideoId(showcaseYoutubeUrl);
 
   return (
     <div className="space-y-6">
@@ -193,6 +205,85 @@ export default function AdminSettingsPage() {
                 <p>📦 ตัวอย่างการตั้งค่า:</p>
                 <p>• <strong className="text-white">ฟรีเสมอ</strong>: ค่าจัดส่ง = 0, ขั้นต่ำ = 0</p>
                 <p>• <strong className="text-white">ค่าจัดส่ง 50฿ ฟรีถ้าซื้อเกิน 500฿</strong>: ค่าจัดส่ง = 50, ขั้นต่ำ = 500</p>
+              </div>
+            </div>
+
+            {/* YouTube Showcase Settings */}
+            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-md space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <Video className="w-5 h-5 text-rose-400" />
+                  <span>วิดีโอแนะนำร้านค้าหน้าแรก (Hero YouTube Showcase)</span>
+                </h2>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-300">
+                  CardSwap • Loop 5s
+                </span>
+              </div>
+
+              <p className="text-xs text-slate-400 leading-relaxed">
+                วิดีโอนี้จะแสดงในการ์ดหน้าแรกที่สลับกับโลโก้ J3A STORE อัตโนมัติทุก 5 วินาที เพื่อแนะนำวิธีการสั่งซื้อและการใช้งานให้แก่ลูกค้า
+              </p>
+
+              <div className="space-y-4">
+                <Input
+                  label="ชื่อหัวข้อวิดีโอ (Showcase Title)"
+                  value={showcaseTitle}
+                  onChange={(e) => setShowcaseTitle(e.target.value)}
+                  placeholder="วิธีใช้งานร้านค้า J3A STORE"
+                  required
+                />
+
+                <Input
+                  label="คำอธิบายย่อย (Showcase Subtitle)"
+                  value={showcaseSubtitle}
+                  onChange={(e) => setShowcaseSubtitle(e.target.value)}
+                  placeholder="ชมวิดีโอแนะนำขั้นตอนการสั่งซื้อ เติมเงิน และรับสินค้าแบบอัตโนมัติ 24 ชม."
+                />
+
+                <div className="space-y-1.5">
+                  <Input
+                    label="ลิงก์ YouTube (YouTube Video URL)"
+                    value={showcaseYoutubeUrl}
+                    onChange={(e) => setShowcaseYoutubeUrl(e.target.value)}
+                    placeholder="https://www.youtube.com/watch?v=... หรือ https://youtu.be/..."
+                  />
+                  <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] pt-1">
+                    <span className="text-slate-400">
+                      รองรับ: youtube.com/watch?v=..., youtu.be/..., shorts/... หรือใส่ Video ID 11 หลัก
+                    </span>
+                    {detectedVideoId ? (
+                      <span className="text-emerald-400 font-medium flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> ตรวจพบ Video ID: <code>{detectedVideoId}</code>
+                      </span>
+                    ) : showcaseYoutubeUrl.trim() ? (
+                      <span className="text-amber-400 flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5" /> ไม่พบ Video ID ที่ถูกต้อง
+                      </span>
+                    ) : (
+                      <span className="text-slate-500">
+                        (หากเว้นว่างไว้ จะใช้วิดีโอแนะนำตัวอย่างเริ่มต้น)
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Live YouTube Preview inside Settings */}
+                {detectedVideoId && (
+                  <div className="pt-2 space-y-2">
+                    <label className="block text-xs font-semibold text-slate-300">
+                      ตัวอย่างวิดีโอที่จะแสดงบนหน้าแรก (Live Preview):
+                    </label>
+                    <div className="relative aspect-video w-full rounded-2xl overflow-hidden border border-rose-500/30 bg-black shadow-[0_0_25px_rgba(244,63,94,0.15)]">
+                      <iframe
+                        src={getYouTubeEmbedUrl(detectedVideoId) || ''}
+                        title="YouTube Showcase Preview"
+                        className="w-full h-full"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
