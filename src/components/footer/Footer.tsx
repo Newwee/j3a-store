@@ -6,8 +6,31 @@ import Image from 'next/image';
 import { ShieldCheck, Zap, Headphones, Sparkles, Send, MessageCircle } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 
-export function Footer() {
+interface FooterProps {
+  footerDescription?: string;
+}
+
+export function Footer({ footerDescription }: FooterProps = {}) {
   const { t, language } = useLanguage();
+  const [desc, setDesc] = React.useState<string | undefined>(footerDescription);
+
+  React.useEffect(() => {
+    if (footerDescription !== undefined) {
+      setDesc(footerDescription);
+      return;
+    }
+    import('@/lib/firestore/settings').then(({ getStoreSettings }) => {
+      getStoreSettings()
+        .then((s) => {
+          if (s?.footerDescription) setDesc(s.footerDescription);
+        })
+        .catch(() => {});
+    });
+  }, [footerDescription]);
+
+  const defaultDescTh = 'แพลตฟอร์มศูนย์รวมสินค้าและบริการดิจิทัลชั้นนำ เติมเกม ไอดีเกม บัตรเติมเงิน และอุปกรณ์ระดับพรีเมียม ระบบอัตโนมัติ รวดเร็ว ปลอดภัย 100% พร้อมบริการตลอด 24 ชั่วโมง';
+  const isCustomized = Boolean(desc && desc.trim() !== defaultDescTh.trim());
+  const activeDesc = (language === 'en' && !isCustomized) ? t('footer_desc') : (desc || t('footer_desc'));
 
   return (
     <footer className="border-t border-slate-800/80 bg-slate-950 text-slate-400 text-sm">
@@ -34,8 +57,8 @@ export function Footer() {
               </div>
             </Link>
 
-            <p className="text-xs text-slate-400 leading-relaxed max-w-sm">
-              {t('footer_desc')}
+            <p className="text-xs text-slate-400 leading-relaxed max-w-sm whitespace-pre-line">
+              {activeDesc}
             </p>
 
             <div className="flex items-center gap-3 pt-2">

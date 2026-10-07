@@ -27,6 +27,10 @@ export async function POST(req: Request) {
     if (body.showcaseYoutubeUrl !== undefined) updates.showcase_youtube_url = body.showcaseYoutubeUrl;
     if (body.showcaseTitle !== undefined) updates.showcase_title = body.showcaseTitle;
     if (body.showcaseSubtitle !== undefined) updates.showcase_subtitle = body.showcaseSubtitle;
+    if (body.heroTagline !== undefined) updates.hero_tagline = body.heroTagline;
+    if (body.heroDescription !== undefined) updates.hero_description = body.heroDescription;
+    if (body.privacyPolicy !== undefined) updates.privacy_policy = body.privacyPolicy;
+    if (body.footerDescription !== undefined) updates.footer_description = body.footerDescription;
 
     const { data, error } = await supabaseAdmin
       .from('settings')

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { SafeImage } from '@/components/ui/SafeImage';
 import { ShoppingCart, Eye, Sparkles, Star } from 'lucide-react';
 import { Product } from '@/types/product';
@@ -11,6 +12,7 @@ import { ProductStatusBadge } from '@/components/ui/Badge';
 import { GlareHover } from '@/components/ui/GlareHover';
 
 export function ProductCard({ product }: { product: Product }) {
+  const router = useRouter();
   const { addItem } = useCart();
 
   const isOutOfStock = product.stock <= 0 || product.status === 'out_of_stock';
@@ -19,8 +21,21 @@ export function ProductCard({ product }: { product: Product }) {
       ? Math.round(((product.comparePrice - product.price) / product.comparePrice) * 100)
       : null;
 
+  const productUrl = `/products/${product.slug || product.id}`;
+
+  const handleCardClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('button, a')) {
+      return;
+    }
+    router.push(productUrl);
+  };
+
   return (
-    <GlareHover className="group relative flex flex-col rb-card overflow-hidden transition-all duration-300">
+    <GlareHover
+      onClick={handleCardClick}
+      className="group relative flex flex-col rb-card overflow-hidden transition-all duration-300 cursor-pointer"
+    >
       {/* Top Image Banner */}
       <div className="relative w-full aspect-square bg-slate-950/60 overflow-hidden flex items-center justify-center p-3">
         <SafeImage
@@ -55,7 +70,8 @@ export function ProductCard({ product }: { product: Product }) {
         {/* Quick action overlay on hover */}
         <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-3">
           <Link
-            href={`/products/${product.slug || product.id}`}
+            href={productUrl}
+            onClick={(e) => e.stopPropagation()}
             className="p-3 rounded-full bg-slate-800/90 text-white hover:bg-cyan-500 hover:text-slate-950 border border-slate-600 hover:border-cyan-400 transition-all shadow-lg cursor-pointer transform -translate-y-2 group-hover:translate-y-0 duration-200"
             aria-label="View product details"
           >
@@ -63,7 +79,10 @@ export function ProductCard({ product }: { product: Product }) {
           </Link>
           {!isOutOfStock && (
             <button
-              onClick={() => addItem(product, 1)}
+              onClick={(e) => {
+                e.stopPropagation();
+                addItem(product, 1);
+              }}
               className="p-3 rounded-full bg-cyan-500 text-slate-950 hover:bg-cyan-400 border border-cyan-400 transition-all shadow-[0_0_15px_rgba(6,182,212,0.4)] cursor-pointer transform translate-y-2 group-hover:translate-y-0 duration-200"
               aria-label="Add to cart"
             >
@@ -87,7 +106,11 @@ export function ProductCard({ product }: { product: Product }) {
             </div>
           </div>
 
-          <Link href={`/products/${product.slug || product.id}`} className="block group-hover:text-cyan-400 transition-colors">
+          <Link
+            href={productUrl}
+            onClick={(e) => e.stopPropagation()}
+            className="block group-hover:text-cyan-400 transition-colors"
+          >
             <h3 className="font-bold text-sm text-slate-100 line-clamp-2 leading-snug">
               {product.name}
             </h3>
@@ -121,7 +144,10 @@ export function ProductCard({ product }: { product: Product }) {
           </div>
 
           <button
-            onClick={() => addItem(product, 1)}
+            onClick={(e) => {
+              e.stopPropagation();
+              addItem(product, 1);
+            }}
             disabled={isOutOfStock}
             className="p-2.5 rounded-xl bg-slate-800 hover:bg-cyan-500 hover:text-slate-950 text-slate-200 border border-slate-700 hover:border-cyan-400 transition-all shadow-sm disabled:opacity-40 disabled:hover:bg-slate-800 disabled:hover:text-slate-200 cursor-pointer"
             aria-label="Add to cart"

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Settings, Save, Shield, Store, QrCode, MessageCircle, AlertCircle, CheckCircle2, Sparkles, Truck, Video, Play, ExternalLink } from 'lucide-react';
+import { Settings, Save, Shield, Store, QrCode, MessageCircle, AlertCircle, CheckCircle2, Sparkles, Truck, Video, Play, ExternalLink, FileText, AlignLeft } from 'lucide-react';
 import { AdminHeader } from '@/components/admin/AdminHeader';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -22,6 +22,10 @@ export default function AdminSettingsPage() {
   const [showcaseYoutubeUrl, setShowcaseYoutubeUrl] = useState(DEFAULT_STORE_SETTINGS.showcaseYoutubeUrl || '');
   const [showcaseTitle, setShowcaseTitle] = useState(DEFAULT_STORE_SETTINGS.showcaseTitle || 'วิธีใช้งานร้านค้า J3A STORE');
   const [showcaseSubtitle, setShowcaseSubtitle] = useState(DEFAULT_STORE_SETTINGS.showcaseSubtitle || 'ชมวิดีโอแนะนำขั้นตอนการสั่งซื้อ เติมเงิน และรับสินค้าแบบอัตโนมัติ');
+  const [heroTagline, setHeroTagline] = useState(DEFAULT_STORE_SETTINGS.heroTagline || 'Next-Gen E-Commerce & Digital Store');
+  const [heroDescription, setHeroDescription] = useState(DEFAULT_STORE_SETTINGS.heroDescription || 'สัมผัสประสบการณ์ช้อปปิ้งยุคใหม่ที่ J3A STORE ศูนย์รวมไอเทมเกม บัตรเติมเงิน และบริการดิจิทัลระดับพรีเมียม ทำรายการรวดเร็ว ปลอดภัย ด้วยระบบตรวจสอบอัตโนมัติ');
+  const [privacyPolicy, setPrivacyPolicy] = useState(DEFAULT_STORE_SETTINGS.privacyPolicy || '');
+  const [footerDescription, setFooterDescription] = useState(DEFAULT_STORE_SETTINGS.footerDescription || 'แพลตฟอร์มศูนย์รวมสินค้าและบริการดิจิทัลชั้นนำ เติมเกม ไอดีเกม บัตรเติมเงิน และอุปกรณ์ระดับพรีเมียม ระบบอัตโนมัติ รวดเร็ว ปลอดภัย 100% พร้อมบริการตลอด 24 ชั่วโมง');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -39,6 +43,10 @@ export default function AdminSettingsPage() {
         setShowcaseYoutubeUrl(data.showcaseYoutubeUrl || '');
         setShowcaseTitle(data.showcaseTitle || 'วิธีใช้งานร้านค้า J3A STORE');
         setShowcaseSubtitle(data.showcaseSubtitle || 'ชมวิดีโอแนะนำขั้นตอนการสั่งซื้อ เติมเงิน และรับสินค้าแบบอัตโนมัติ');
+        setHeroTagline(data.heroTagline || DEFAULT_STORE_SETTINGS.heroTagline || 'Next-Gen E-Commerce & Digital Store');
+        setHeroDescription(data.heroDescription || DEFAULT_STORE_SETTINGS.heroDescription || '');
+        setPrivacyPolicy(data.privacyPolicy || DEFAULT_STORE_SETTINGS.privacyPolicy || '');
+        setFooterDescription(data.footerDescription || DEFAULT_STORE_SETTINGS.footerDescription || '');
       } catch (err: any) {
         console.error('Failed to load settings:', err);
       } finally {
@@ -64,8 +72,12 @@ export default function AdminSettingsPage() {
         showcaseYoutubeUrl: showcaseYoutubeUrl.trim(),
         showcaseTitle: showcaseTitle.trim(),
         showcaseSubtitle: showcaseSubtitle.trim(),
+        heroTagline: heroTagline.trim(),
+        heroDescription: heroDescription.trim(),
+        privacyPolicy: privacyPolicy.trim(),
+        footerDescription: footerDescription.trim(),
       });
-      success('บันทึกการตั้งค่าร้านค้าเรียบร้อยแล้ว! ข้อมูลและวิดีโอแนะนำร้านค้าอัปเดตไปยังหน้าแรกทันที');
+      success('บันทึกการตั้งค่าร้านค้าเรียบร้อยแล้ว! ข้อมูลหน้าแรก, นโยบาย และคำอธิบายร้านค้าอัปเดตทันที');
     } catch (err: any) {
       error(`เกิดข้อผิดพลาดในการบันทึก: ${err.message || 'กรุณาลองใหม่อีกครั้ง'}`);
     } finally {
@@ -284,6 +296,89 @@ export default function AdminSettingsPage() {
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* Homepage & Footer Content Settings (รูป 1 และ รูป 3) */}
+            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-md space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <AlignLeft className="w-5 h-5 text-cyan-400" />
+                  <span>ข้อความหน้าแรกและคำอธิบายท้ายเว็บ (Homepage & Footer)</span>
+                </h2>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300">
+                  รูป 1 & รูป 3
+                </span>
+              </div>
+
+              <div className="space-y-4">
+                <Input
+                  label="แท็กหัวข้อ Hero Section (รูป 1 - Tagline Badge)"
+                  value={heroTagline}
+                  onChange={(e) => setHeroTagline(e.target.value)}
+                  placeholder="NEXT-GEN E-COMMERCE & DIGITAL STORE"
+                />
+
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-slate-300">
+                    คำอธิบายร้านค้าใน Hero Section (รูป 1 - Hero Description)
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={heroDescription}
+                    onChange={(e) => setHeroDescription(e.target.value)}
+                    placeholder="สัมผัสประสบการณ์ช้อปปิ้งยุคใหม่ที่ J3A STORE ศูนย์รวมไอเทมเกม บัตรเติมเงิน และบริการดิจิทัลระดับพรีเมียม ทำรายการรวดเร็ว ปลอดภัย ด้วยระบบตรวจสอบอัตโนมัติ"
+                    className="w-full bg-slate-950/70 text-sm text-slate-100 placeholder:text-slate-600 rounded-xl px-4 py-3 border border-slate-700/80 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 outline-none transition-all"
+                  />
+                  <p className="text-[11px] text-slate-400">
+                    * ข้อความนี้จะแสดงอยู่ใต้หัวข้อ J3A STORE ในหน้าแรก
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-slate-300">
+                    คำอธิบายร้านค้าท้ายเว็บ (รูป 3 - Footer Description)
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={footerDescription}
+                    onChange={(e) => setFooterDescription(e.target.value)}
+                    placeholder="แพลตฟอร์มศูนย์รวมสินค้าและบริการดิจิทัลชั้นนำ เติมเกม ไอดีเกม บัตรเติมเงิน และอุปกรณ์ระดับพรีเมียม ระบบอัตโนมัติ รวดเร็ว ปลอดภัย 100% พร้อมบริการตลอด 24 ชั่วโมง"
+                    className="w-full bg-slate-950/70 text-sm text-slate-100 placeholder:text-slate-600 rounded-xl px-4 py-3 border border-slate-700/80 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 outline-none transition-all"
+                  />
+                  <p className="text-[11px] text-slate-400">
+                    * ข้อความนี้จะแสดงในส่วนล่างสุดของทุกหน้า (Footer)
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Privacy Policy Content Settings (รูป 2) */}
+            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-md space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-emerald-400" />
+                  <span>เนื้อหานโยบายความเป็นส่วนตัว (Privacy Policy)</span>
+                </h2>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300">
+                  รูป 2
+                </span>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-slate-300">
+                  เนื้อหาในหน้า นโยบายความเป็นส่วนตัว (/privacy)
+                </label>
+                <textarea
+                  rows={8}
+                  value={privacyPolicy}
+                  onChange={(e) => setPrivacyPolicy(e.target.value)}
+                  placeholder="1. ข้อมูลที่เราเก็บรวบรวม..."
+                  className="w-full bg-slate-950/70 text-sm text-slate-100 placeholder:text-slate-600 rounded-xl px-4 py-3 border border-slate-700/80 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 outline-none transition-all font-mono text-xs"
+                />
+                <p className="text-[11px] text-slate-400">
+                  * ข้อความนี้จะนำไปแสดงในหน้า <code>/privacy</code> ลูกค้าสามารถเข้าอ่านได้ตลอดเวลา
+                </p>
               </div>
             </div>
           </div>

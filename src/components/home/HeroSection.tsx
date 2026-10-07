@@ -39,6 +39,10 @@ const ElectricLogo = dynamic(() => import('@/components/ui/ElectricLogo'), {
   ),
 });
 
+const Particles = dynamic(() => import('@/components/ui/Particles'), {
+  ssr: false,
+});
+
 export function HeroSection() {
   const { t } = useLanguage();
   const [settings, setSettings] = useState<StoreSettings | null>(null);
@@ -59,6 +63,21 @@ export function HeroSection() {
 
   return (
     <section className="relative overflow-hidden pt-8 pb-16 lg:pt-16 lg:pb-24">
+      {/* 3D WebGL Particles Background (Settings matched with user Image 4) */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 opacity-70">
+        <Particles
+          particleColors={['#6187ff']}
+          particleCount={200}
+          particleSpread={10}
+          speed={0.2}
+          particleBaseSize={100}
+          moveParticlesOnHover={false}
+          alphaParticles={false}
+          disableRotation={false}
+          pixelRatio={1}
+        />
+      </div>
+
       {/* Soft ambient atmospheric glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[500px] bg-gradient-to-tr from-cyan-500/10 via-indigo-500/10 to-transparent rounded-full blur-[140px] pointer-events-none" />
 
@@ -86,16 +105,16 @@ export function HeroSection() {
               />
             </div>
 
-            {/* Sub-headline badge */}
+            {/* Sub-headline badge (รูป 1: แก้ไขได้จาก Admin Settings) */}
             <div className="flex items-center justify-center lg:justify-start gap-2 -mt-2">
               <span className="text-xs sm:text-sm font-bold tracking-widest uppercase text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-sky-300 to-indigo-400">
-                {t('hero_title_tag', 'Next-Gen E-Commerce & Digital Store')}
+                {settings?.heroTagline || t('hero_title_tag', 'Next-Gen E-Commerce & Digital Store')}
               </span>
             </div>
 
-            {/* Subtext */}
+            {/* Subtext (รูป 1: แก้ไขได้จาก Admin Settings) */}
             <p className="text-sm sm:text-base text-slate-300 max-w-xl mx-auto lg:mx-0 leading-relaxed">
-              {t('hero_description', 'สัมผัสประสบการณ์ช้อปปิ้งยุคใหม่ที่ J3A STORE ศูนย์รวมไอเทมเกม บัตรเติมเงิน และบริการดิจิทัลระดับพรีเมียม ทำรายการรวดเร็ว ปลอดภัย ด้วยระบบตรวจสอบอัตโนมัติ')}
+              {settings?.heroDescription || t('hero_description', 'สัมผัสประสบการณ์ช้อปปิ้งยุคใหม่ที่ J3A STORE ศูนย์รวมไอเทมเกม บัตรเติมเงิน และบริการดิจิทัลระดับพรีเมียม ทำรายการรวดเร็ว ปลอดภัย ด้วยระบบตรวจสอบอัตโนมัติ')}
             </p>
 
             {/* Action Buttons */}

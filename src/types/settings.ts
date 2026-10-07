@@ -14,5 +14,13 @@ export interface StoreSettings {
   showcaseTitle?: string;
   /** คำอธิบายย่อย Showcase */
   showcaseSubtitle?: string;
+  /** รูป 1: แท็กหัวข้อ Hero Section (เช่น NEXT-GEN E-COMMERCE & DIGITAL STORE) */
+  heroTagline?: string;
+  /** รูป 1: คำอธิบายร้านค้าใน Hero Section */
+  heroDescription?: string;
+  /** รูป 2: นโยบายความเป็นส่วนตัว (Privacy Policy) */
+  privacyPolicy?: string;
+  /** รูป 3: คำอธิบายร้านค้าท้ายเว็บ (Footer Description) */
+  footerDescription?: string;
   updatedAt?: string;
 }

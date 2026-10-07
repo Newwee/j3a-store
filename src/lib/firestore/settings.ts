@@ -14,6 +14,10 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   showcaseYoutubeUrl: '',
   showcaseTitle: 'วิธีใช้งานร้านค้า J3A STORE',
   showcaseSubtitle: 'ชมวิดีโอแนะนำขั้นตอนการสั่งซื้อ เติมเงิน และรับสินค้าแบบอัตโนมัติ 24 ชม.',
+  heroTagline: 'Next-Gen E-Commerce & Digital Store',
+  heroDescription: 'สัมผัสประสบการณ์ช้อปปิ้งยุคใหม่ที่ J3A STORE ศูนย์รวมไอเทมเกม บัตรเติมเงิน และบริการดิจิทัลระดับพรีเมียม ทำรายการรวดเร็ว ปลอดภัย ด้วยระบบตรวจสอบอัตโนมัติ',
+  privacyPolicy: '1. ข้อมูลที่เราเก็บรวบรวม\nJ3A STORE เก็บรวบรวมข้อมูลที่จำเป็นต่อการให้บริการ เช่น ชื่อ-นามสกุล, ที่อยู่อีเมล, เบอร์โทรศัพท์, และประวัติการทำรายการ เพื่อใช้ในการจัดส่งสินค้าดิจิทัลและยืนยันสถานะการชำระเงิน\n\n2. การรักษาความปลอดภัยของข้อมูล\nข้อมูลรหัสผ่านทั้งหมดได้รับการจัดการและเข้ารหัสผ่าน Supabase Authentication ซึ่งเป็นไปตามมาตรฐานความปลอดภัยชั้นนำระดับโลก เราไม่มีนโยบายจำหน่ายหรือเปิดเผยข้อมูลส่วนบุคคลของคุณแก่บุคคลภายนอก',
+  footerDescription: 'แพลตฟอร์มศูนย์รวมสินค้าและบริการดิจิทัลชั้นนำ เติมเกม ไอดีเกม บัตรเติมเงิน และอุปกรณ์ระดับพรีเมียม ระบบอัตโนมัติ รวดเร็ว ปลอดภัย 100% พร้อมบริการตลอด 24 ชั่วโมง',
 };
 
 /**
@@ -43,6 +47,10 @@ export async function getStoreSettings(): Promise<StoreSettings> {
       showcaseYoutubeUrl: data.showcase_youtube_url ?? DEFAULT_STORE_SETTINGS.showcaseYoutubeUrl,
       showcaseTitle: data.showcase_title ?? DEFAULT_STORE_SETTINGS.showcaseTitle,
       showcaseSubtitle: data.showcase_subtitle ?? DEFAULT_STORE_SETTINGS.showcaseSubtitle,
+      heroTagline: data.hero_tagline ?? DEFAULT_STORE_SETTINGS.heroTagline,
+      heroDescription: data.hero_description ?? DEFAULT_STORE_SETTINGS.heroDescription,
+      privacyPolicy: data.privacy_policy ?? DEFAULT_STORE_SETTINGS.privacyPolicy,
+      footerDescription: data.footer_description ?? DEFAULT_STORE_SETTINGS.footerDescription,
       updatedAt: data.updated_at || undefined,
     };
   } catch (error) {
@@ -96,6 +104,10 @@ export async function updateStoreSettings(settings: Partial<StoreSettings>): Pro
   if (settings.showcaseYoutubeUrl !== undefined) updates.showcase_youtube_url = settings.showcaseYoutubeUrl;
   if (settings.showcaseTitle !== undefined) updates.showcase_title = settings.showcaseTitle;
   if (settings.showcaseSubtitle !== undefined) updates.showcase_subtitle = settings.showcaseSubtitle;
+  if (settings.heroTagline !== undefined) updates.hero_tagline = settings.heroTagline;
+  if (settings.heroDescription !== undefined) updates.hero_description = settings.heroDescription;
+  if (settings.privacyPolicy !== undefined) updates.privacy_policy = settings.privacyPolicy;
+  if (settings.footerDescription !== undefined) updates.footer_description = settings.footerDescription;
 
   const { error } = await supabase
     .from('settings')
