@@ -2,13 +2,16 @@
 
 import React, { useState } from 'react';
 import { SafeImage } from '@/components/ui/SafeImage';
-import { Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Sparkles, ChevronLeft, ChevronRight, Play } from 'lucide-react';
+import { extractYouTubeVideoId, getYouTubeThumbnailUrl } from '@/lib/utils/youtube';
 
 interface ImageGalleryProps {
   mainImage: string;
   images?: string[];
   productName: string;
   featured?: boolean;
+  showcaseUrl?: string;
+  onOpenShowcase?: () => void;
 }
 
 export function ImageGallery({
@@ -16,6 +19,8 @@ export function ImageGallery({
   images = [],
   productName,
   featured,
+  showcaseUrl,
+  onOpenShowcase,
 }: ImageGalleryProps) {
   // Deduplicate and filter out empty images
   const validImages = Array.from(
@@ -30,6 +35,9 @@ export function ImageGallery({
   const [currentIndex, setCurrentIndex] = useState(0);
   const safeIndex = currentIndex >= allImages.length ? 0 : currentIndex;
   const currentImage = allImages[safeIndex] || '/logo.png';
+
+  const youtubeVideoId = showcaseUrl ? extractYouTubeVideoId(showcaseUrl) : null;
+  const youtubeThumbnail = youtubeVideoId ? getYouTubeThumbnailUrl(youtubeVideoId) : null;
 
   const handlePrev = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -67,6 +75,24 @@ export function ImageGallery({
           </div>
         )}
 
+        {/* Showcase Floating Badge */}
+        {showcaseUrl && onOpenShowcase && (
+          <div className="absolute top-4 right-4 z-20">
+            <button
+              type="button"
+              onClick={onOpenShowcase}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-red-600 via-rose-600 to-red-500 hover:from-red-500 hover:to-rose-500 text-white text-xs font-black shadow-[0_0_20px_rgba(244,63,94,0.6)] backdrop-blur-md transition-all hover:scale-105 active:scale-95 border border-white/20 cursor-pointer group/showcase"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+              </span>
+              <Play className="w-3.5 h-3.5 fill-white" />
+              <span>ดูคลิป Showcase</span>
+            </button>
+          </div>
+        )}
+
         {/* Navigation Arrows & Counter: Render ONLY IF there is more than 1 image */}
         {allImages.length > 1 && (
           <>
@@ -100,28 +126,58 @@ export function ImageGallery({
         )}
       </div>
 
-      {/* Thumbnails row: Render ONLY IF there is more than 1 image */}
-      {allImages.length > 1 && (
+      {/* Thumbnails row: Render IF there is more than 1 image OR if showcaseUrl exists */}
+      {(allImages.length > 1 || (showcaseUrl && onOpenShowcase)) && (
         <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-none">
-          {allImages.map((img, index) => (
+          {allImages.length > 1 &&
+            allImages.map((img, index) => (
+              <button
+                key={`${img}-${index}`}
+                type="button"
+                onClick={() => setCurrentIndex(index)}
+                className={`relative w-20 h-20 rounded-xl overflow-hidden bg-slate-900 border-2 transition-all shrink-0 cursor-pointer ${
+                  safeIndex === index
+                    ? 'border-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.5)] scale-105 ring-2 ring-cyan-500/30'
+                    : 'border-slate-800 opacity-60 hover:opacity-100 hover:border-slate-600'
+                }`}
+              >
+                <SafeImage
+                  src={img}
+                  alt={`${productName} thumbnail ${index + 1}`}
+                  fill
+                  className="object-cover"
+                />
+              </button>
+            ))}
+
+          {/* Video Showcase Thumbnail */}
+          {showcaseUrl && onOpenShowcase && (
             <button
-              key={`${img}-${index}`}
               type="button"
-              onClick={() => setCurrentIndex(index)}
-              className={`relative w-20 h-20 rounded-xl overflow-hidden bg-slate-900 border-2 transition-all shrink-0 cursor-pointer ${
-                safeIndex === index
-                  ? 'border-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.5)] scale-105 ring-2 ring-cyan-500/30'
-                  : 'border-slate-800 opacity-60 hover:opacity-100 hover:border-slate-600'
-              }`}
+              onClick={onOpenShowcase}
+              className="relative w-20 h-20 rounded-xl overflow-hidden bg-slate-900 border-2 border-rose-500/60 hover:border-rose-400 transition-all shrink-0 cursor-pointer flex flex-col items-center justify-center gap-1 group shadow-[0_0_15px_rgba(244,63,94,0.3)] hover:scale-105"
+              title="ดูวิดีโอตัวอย่างสินค้า (Showcase)"
             >
-              <SafeImage
-                src={img}
-                alt={`${productName} thumbnail ${index + 1}`}
-                fill
-                className="object-cover"
-              />
+              {youtubeThumbnail ? (
+                <>
+                  <img
+                    src={youtubeThumbnail}
+                    alt="Showcase Video Thumbnail"
+                    className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:opacity-85 transition-opacity"
+                  />
+                  <div className="absolute inset-0 bg-slate-950/40 group-hover:bg-slate-950/20 transition-colors" />
+                </>
+              ) : (
+                <div className="absolute inset-0 bg-gradient-to-br from-rose-950/60 to-slate-950" />
+              )}
+              <div className="relative z-10 w-7 h-7 rounded-full bg-red-600 text-white flex items-center justify-center shadow-md group-hover:scale-110 group-hover:bg-red-500 transition-all">
+                <Play className="w-3.5 h-3.5 fill-white ml-0.5" />
+              </div>
+              <span className="relative z-10 text-[9px] font-black text-white bg-slate-950/80 px-1.5 py-0.5 rounded border border-rose-500/30">
+                วิดีโอ
+              </span>
             </button>
-          ))}
+          )}
         </div>
       )}
     </div>
