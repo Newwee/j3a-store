@@ -119,8 +119,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 6. Promotional Banner Section */}
-      <PromoBannerSection />
+      {/* 6. Promotional Banner Section (ซ่อนไว้ก่อนตามคำขอของทางร้าน) */}
+      {/* <PromoBannerSection /> */}
 
       {/* 7. Store Reviews Section with Gating and PeekRating */}
       <StoreReviewsSection />
