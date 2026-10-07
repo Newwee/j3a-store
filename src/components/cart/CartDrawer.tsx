@@ -232,6 +232,12 @@ export function CartDrawer() {
                             </button>
                           </div>
 
+                          {(isBundle && (item.product.stock <= 0 || item.product.tags?.includes('bundle_item_out_of_stock'))) && (
+                            <p className="text-[11px] font-bold text-rose-400 mt-1 flex items-center gap-1">
+                              ⚠️ มีสินค้าใน Bundle หมด (สั่งซื้อไม่ได้)
+                            </p>
+                          )}
+
                           <p className="text-xs text-cyan-300 font-extrabold mt-1">
                             {formatCurrency(item.product.price)}
                             <span className="text-[10px] text-slate-500 font-normal ml-1">/ ชิ้น</span>
@@ -300,20 +306,35 @@ export function CartDrawer() {
 
               {/* Action Buttons */}
               <div className="space-y-2 pt-1">
-                <Link
-                  href="/checkout"
-                  onClick={() => setIsCartOpen(false)}
-                  className="block w-full"
-                >
+                {items.some(
+                  (i) =>
+                    i.product.tags?.includes('bundle_item_out_of_stock') ||
+                    (i.product.id.startsWith('bundle_') && i.product.stock <= 0)
+                ) ? (
                   <Button
-                    variant="neon"
+                    variant="secondary"
                     size="lg"
-                    className="w-full justify-center font-black shadow-[0_0_25px_rgba(6,182,212,0.4)]"
-                    rightIcon={<ArrowRight className="w-4 h-4" />}
+                    disabled={true}
+                    className="w-full justify-center font-bold bg-slate-900 border border-rose-500/40 text-rose-400 opacity-80 cursor-not-allowed"
                   >
-                    {t('cart_checkout_btn')}
+                    มีสินค้าใน Bundle หมด (สั่งซื้อไม่ได้)
                   </Button>
-                </Link>
+                ) : (
+                  <Link
+                    href="/checkout"
+                    onClick={() => setIsCartOpen(false)}
+                    className="block w-full"
+                  >
+                    <Button
+                      variant="neon"
+                      size="lg"
+                      className="w-full justify-center font-black shadow-[0_0_25px_rgba(6,182,212,0.4)]"
+                      rightIcon={<ArrowRight className="w-4 h-4" />}
+                    >
+                      {t('cart_checkout_btn')}
+                    </Button>
+                  </Link>
+                )}
 
                 <Link
                   href="/cart"

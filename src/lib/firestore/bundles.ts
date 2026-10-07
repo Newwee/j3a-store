@@ -70,6 +70,94 @@ function mapRowToBundle(row: any): BundlePackage {
   };
 }
 
+/**
+ * Enrich bundle packages with live product stocks and availability
+ */
+export async function enrichBundlesWithLiveProducts(bundles: BundlePackage[]): Promise<BundlePackage[]> {
+  if (!bundles || bundles.length === 0) return bundles;
+
+  try {
+    const { data: products, error } = await supabase
+      .from('products')
+      .select('id, name, slug, stock, status, price, image, category');
+
+    if (error || !products) {
+      console.warn('Could not fetch products to enrich bundles:', error?.message);
+      return bundles;
+    }
+
+    const prodById = new Map<string, any>();
+    const prodBySlug = new Map<string, any>();
+    const prodByName = new Map<string, any>();
+
+    for (const p of products) {
+      if (p.id) prodById.set(p.id, p);
+      if (p.slug) prodBySlug.set(p.slug, p);
+      if (p.name) prodByName.set(p.name.toLowerCase().trim(), p);
+    }
+
+    return bundles.map((bundle) => {
+      let hasOutOfStockItems = false;
+      const outOfStockItemNames: string[] = [];
+
+      const enrichedItems = (bundle.items || []).map((item) => {
+        const matched =
+          (item.productId ? prodById.get(item.productId) : null) ||
+          (item.productId ? prodBySlug.get(item.productId) : null) ||
+          (item.name ? prodByName.get(item.name.toLowerCase().trim()) : null) ||
+          null;
+
+        if (matched) {
+          const itemStock = typeof matched.stock === 'number' ? matched.stock : 0;
+          const isOutOfStock = itemStock <= 0 || matched.status === 'out_of_stock';
+          if (isOutOfStock) {
+            hasOutOfStockItems = true;
+            if (!outOfStockItemNames.includes(matched.name || item.name)) {
+              outOfStockItemNames.push(matched.name || item.name);
+            }
+          }
+          return {
+            ...item,
+            productId: matched.id || item.productId,
+            name: matched.name || item.name,
+            price: Number(matched.price) || item.price,
+            image: matched.image || item.image,
+            category: matched.category || item.category,
+            stock: itemStock,
+            isOutOfStock,
+          };
+        }
+
+        const isOutOfStock = item.stock !== undefined && item.stock <= 0;
+        if (isOutOfStock) {
+          hasOutOfStockItems = true;
+          if (!outOfStockItemNames.includes(item.name)) {
+            outOfStockItemNames.push(item.name);
+          }
+        }
+        return {
+          ...item,
+          isOutOfStock,
+        };
+      });
+
+      const rawStock = Number(bundle.stock) || 999;
+      const effectiveStock = hasOutOfStockItems ? 0 : rawStock;
+
+      return {
+        ...bundle,
+        items: enrichedItems,
+        stock: effectiveStock,
+        hasOutOfStockItems,
+        outOfStockItemNames,
+      };
+    });
+  } catch (err) {
+    console.warn('Error enriching bundles with live products:', err);
+    return bundles;
+  }
+}
+
 export interface GetBundlesFilter {
   status?: BundleStatus | 'all';
   limitCount?: number;
@@ -96,7 +184,8 @@ export async function getBundles(filter: GetBundlesFilter = {}): Promise<BundleP
       return [];
     }
 
-    const bundles = (data || []).map(mapRowToBundle);
+    const mapped = (data || []).map(mapRowToBundle);
+    const bundles = await enrichBundlesWithLiveProducts(mapped);
     bundles.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return bundles;
   } catch (error) {
@@ -120,7 +209,9 @@ export async function getBundleById(id: string): Promise<BundlePackage | null> {
       .maybeSingle();
 
     if (error || !data) return null;
-    return mapRowToBundle(data);
+    const mapped = mapRowToBundle(data);
+    const enriched = await enrichBundlesWithLiveProducts([mapped]);
+    return enriched[0] || null;
   } catch (error) {
     console.error(`Error fetching bundle id=${id}:`, error);
     return null;
@@ -141,7 +232,11 @@ export async function getBundleBySlug(slug: string): Promise<BundlePackage | nul
       .limit(1)
       .maybeSingle();
 
-    if (data) return mapRowToBundle(data);
+    if (data) {
+      const mapped = mapRowToBundle(data);
+      const enriched = await enrichBundlesWithLiveProducts([mapped]);
+      return enriched[0] || null;
+    }
 
     // Normalized fallback: look up by ID or substring
     const allBundles = await getBundles();
@@ -250,27 +345,49 @@ export async function deleteBundle(id: string): Promise<void> {
  * Helper to convert BundlePackage into standard Product format
  */
 export function bundleToProduct(bundle: BundlePackage): Product {
+  const isBundleOutOfStock =
+    (bundle.stock ?? 999) <= 0 ||
+    bundle.status === 'out_of_stock' ||
+    Boolean(bundle.hasOutOfStockItems);
+
   const itemNames = (bundle.items || [])
-    .map((i) => `• ${i?.name || 'สินค้า'} (฿${(i?.price ?? 0).toLocaleString()})`)
+    .map(
+      (i) =>
+        `• ${i?.name || 'สินค้า'}${i.isOutOfStock ? ' (สินค้าหมด)' : ''} (฿${(i?.price ?? 0).toLocaleString()})`
+    )
     .join('\n');
+
+  const outOfStockNotice = bundle.hasOutOfStockItems
+    ? `\n\n⚠️ ไม่สามารถสั่งซื้อได้ เนื่องจากมีสินค้าใน Bundle หมด (${bundle.outOfStockItemNames?.join(', ') || 'สินค้าบางรายการหมดสต็อก'})`
+    : '';
+
   return {
     id: bundle.id.startsWith('bundle_') ? bundle.id : `bundle_${bundle.id}`,
     name: bundle.name.startsWith('[Bundle]') ? bundle.name : `[Bundle] ${bundle.name}`,
     slug: bundle.slug || `bundle-${bundle.id}`,
-    description: `${bundle.description || 'แพ็กเกจรวมสินค้าราคาพิเศษ'}\n\nสินค้าที่ได้รับในแพ็กเกจ:\n${itemNames}`,
+    description: `${bundle.description || 'แพ็กเกจรวมสินค้าสุดคุ้ม'}\n\nสินค้าที่ได้รับในแพ็กเกจ:\n${itemNames}${outOfStockNotice}`,
     price: bundle.price ?? 0,
     comparePrice: bundle.originalPrice,
     image: bundle.image || '/logo.png',
     images: bundle.images && bundle.images.length > 0 ? bundle.images : [bundle.image || '/logo.png'],
     category: 'แพ็กเกจบันเดิล (Bundle)',
-    stock: bundle.stock ?? 999,
-    status: bundle.status === 'active' ? 'active' : 'draft',
+    stock: isBundleOutOfStock ? 0 : (bundle.stock ?? 999),
+    status: isBundleOutOfStock ? 'out_of_stock' : (bundle.status === 'active' ? 'active' : 'draft'),
     featured: Boolean(bundle.featured),
-    tags: ['bundle', 'package', 'discount', ...(bundle.tags || [])],
+    tags: [
+      'bundle',
+      'package',
+      'discount',
+      ...(bundle.hasOutOfStockItems ? ['bundle_item_out_of_stock'] : []),
+      ...(bundle.tags || []),
+    ],
     specs: {
       'ประเภท': 'แพ็กเกจรวมสินค้าสุดคุ้ม (Bundle Package)',
       'จำนวนสินค้าในชุด': `${bundle.items?.length || 0} ชิ้น`,
       'ประหยัดได้': `฿${(bundle.savings ?? 0).toLocaleString()} (${bundle.discountPercent || 0}% OFF)`,
+      'สถานะสินค้าในชุด': bundle.hasOutOfStockItems
+        ? `มีสินค้าใน Bundle หมด (${bundle.outOfStockItemNames?.join(', ') || ''})`
+        : 'สินค้าครบทุกชิ้นพร้อมส่ง',
     },
     rating: (bundle as any).rating || 5.0,
     reviewCount: (bundle as any).reviewCount || 0,
@@ -280,7 +397,7 @@ export function bundleToProduct(bundle: BundlePackage): Product {
 }
 
 /**
- * Real-time subscription to active bundles list
+ * Real-time subscription to active bundles list (listens to both bundles and products)
  */
 export function subscribeBundles(
   callback: (bundles: BundlePackage[]) => void,
@@ -294,6 +411,13 @@ export function subscribeBundles(
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'bundles' },
+      () => {
+        getBundles(options).then(callback).catch(console.error);
+      }
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'products' },
       () => {
         getBundles(options).then(callback).catch(console.error);
       }

@@ -56,6 +56,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, [items, isLoaded]);
 
   const addItem = (product: Product, quantity: number = 1) => {
+    if (product.tags?.includes('bundle_item_out_of_stock')) {
+      toast('ไม่สามารถสั่งซื้อได้ เนื่องจากมีสินค้าใน Bundle หมด', 'error');
+      return;
+    }
+
     if (product.stock <= 0 || product.status === 'out_of_stock') {
       toast('สินค้านี้หมดชั่วคราว', 'error');
       return;

@@ -15,6 +15,7 @@ import {
   ArrowRight,
   Upload,
   AlertCircle,
+  AlertTriangle,
   ShieldCheck,
   ShoppingBag,
 } from 'lucide-react';
@@ -152,6 +153,24 @@ export default function CheckoutPage() {
       errs.license = 'กรุณายอมรับเงื่อนไข 1 คีย์ต่อ 1 เครื่อง และนโยบายความเป็นส่วนตัว ก่อนดำเนินการชำระเงิน';
     }
 
+    const bundleOutOfStock = items.find(
+      (item) =>
+        item.product.tags?.includes('bundle_item_out_of_stock') ||
+        (item.product.id.startsWith('bundle_') && item.product.stock <= 0)
+    );
+    if (bundleOutOfStock) {
+      errs.bundle = `ไม่สามารถทำรายการได้ เนื่องจากแพ็กเกจ "${bundleOutOfStock.product.name}" มีสินค้าใน Bundle หมด`;
+    }
+
+    const singleOutOfStock = items.find(
+      (item) =>
+        !item.product.id.startsWith('bundle_') &&
+        (item.product.stock <= 0 || item.product.status === 'out_of_stock')
+    );
+    if (singleOutOfStock) {
+      errs.stock = `ไม่สามารถทำรายการได้ เนื่องจากสินค้า "${singleOutOfStock.product.name}" หมดสต็อกชั่วคราว`;
+    }
+
     setFormErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -167,7 +186,8 @@ export default function CheckoutPage() {
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) {
-      error('กรุณากรอกข้อมูลที่จำเป็นและยอมรับเงื่อนไขให้ครบถ้วน');
+      const firstError = Object.values(formErrors)[0];
+      error(firstError || 'กรุณากรอกข้อมูลที่จำเป็นและยอมรับเงื่อนไขให้ครบถ้วน');
       return;
     }
 
@@ -313,6 +333,12 @@ export default function CheckoutPage() {
 
   const promptpayNumber = storeSettings.promptpay || process.env.NEXT_PUBLIC_PROMPTPAY_NUMBER || '081-234-5678';
 
+  const bundleOutOfStockItem = items.find(
+    (item) =>
+      item.product.tags?.includes('bundle_item_out_of_stock') ||
+      (item.product.id.startsWith('bundle_') && item.product.stock <= 0)
+  );
+
   return (
     <div className="py-8 sm:py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -325,6 +351,21 @@ export default function CheckoutPage() {
             กรอกข้อมูลผู้รับและเลือกช่องทางการชำระเงินเพื่อเสร็จสิ้นคำสั่งซื้อ
           </p>
         </div>
+
+        {bundleOutOfStockItem && (
+          <div className="mb-8 p-4 rounded-2xl bg-rose-950/60 border border-rose-500/50 flex items-start gap-3 text-rose-200 text-xs shadow-lg">
+            <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="font-bold text-sm text-rose-300">ไม่สามารถทำรายการชำระเงินได้</p>
+              <p className="text-slate-300 leading-relaxed">
+                แพ็กเกจ <strong>"{bundleOutOfStockItem.product.name}"</strong> มีสินค้าใน Bundle หมด จึงไม่สามารถสั่งซื้อได้ กรุณาลบแพ็กเกจนี้ออกจากตะกร้าก่อนทำรายการ
+              </p>
+              <Link href="/cart" className="inline-block mt-1 font-bold text-cyan-400 hover:underline">
+                ← กลับไปจัดการตะกร้าสินค้า
+              </Link>
+            </div>
+          </div>
+        )}
 
         <form onSubmit={handlePlaceOrder}>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">

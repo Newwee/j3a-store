@@ -233,6 +233,12 @@ export default function ProductDetailPage({
     router.push('/checkout');
   };
 
+  const isBundle =
+    product.id.startsWith('bundle_') ||
+    Boolean(product.tags && product.tags.includes('bundle'));
+  const isBundleOutOfStock =
+    isBundle && (isOutOfStock || Boolean(product.tags?.includes('bundle_item_out_of_stock')));
+
   return (
     <div className="py-8 sm:py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -275,6 +281,19 @@ export default function ProductDetailPage({
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight leading-tight">
               {product.name}
             </h1>
+
+            {/* Out-of-stock Banner for Bundles */}
+            {isBundleOutOfStock && (
+              <div className="p-3.5 rounded-2xl bg-rose-950/50 border border-rose-500/40 flex items-start gap-3 text-xs text-rose-200 shadow-md">
+                <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <p className="font-bold text-sm text-rose-300">ไม่สามารถสั่งซื้อแพ็กเกจนี้ได้</p>
+                  <p className="text-slate-300 leading-relaxed">
+                    เนื่องจากมีสินค้าใน Bundle หมด จึงไม่สามารถจัดส่งสินค้าได้ครบตามแพ็กเกจ กรุณารอสินค้าเติมสต็อก
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Rating Stars Summary */}
             <div className="flex items-center gap-2.5 text-xs">
@@ -336,7 +355,8 @@ export default function ProductDetailPage({
               <span className="text-slate-400">สถานะสต็อก:</span>
               {isOutOfStock ? (
                 <span className="font-bold text-rose-400 flex items-center gap-1">
-                  <AlertTriangle className="w-3.5 h-3.5" /> สินค้าหมดชั่วคราว
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  {isBundleOutOfStock ? 'มีสินค้าใน Bundle หมด' : 'สินค้าหมดชั่วคราว'}
                 </span>
               ) : (
                 <span className="font-bold text-emerald-400 flex items-center gap-1">
@@ -403,10 +423,18 @@ export default function ProductDetailPage({
                   size="lg"
                   onClick={handleAddToCart}
                   disabled={isOutOfStock}
-                  leftIcon={<ShoppingCart className="w-5 h-5 text-cyan-400" />}
-                  className="w-full text-sm font-bold"
+                  leftIcon={
+                    isBundleOutOfStock ? (
+                      <AlertTriangle className="w-5 h-5 text-rose-400" />
+                    ) : (
+                      <ShoppingCart className="w-5 h-5 text-cyan-400" />
+                    )
+                  }
+                  className={`w-full text-sm font-bold ${
+                    isBundleOutOfStock ? 'border-rose-500/40 text-rose-400 opacity-80 cursor-not-allowed' : ''
+                  }`}
                 >
-                  เพิ่มลงตะกร้า
+                  {isBundleOutOfStock ? 'มีสินค้าใน Bundle หมด' : 'เพิ่มลงตะกร้า'}
                 </Button>
 
                 <Button
@@ -414,10 +442,20 @@ export default function ProductDetailPage({
                   size="lg"
                   onClick={handleBuyNow}
                   disabled={isOutOfStock}
-                  leftIcon={<Zap className="w-5 h-5" />}
-                  className="w-full text-sm font-bold shadow-[0_0_25px_rgba(6,182,212,0.4)]"
+                  leftIcon={
+                    isBundleOutOfStock ? (
+                      <AlertTriangle className="w-5 h-5" />
+                    ) : (
+                      <Zap className="w-5 h-5" />
+                    )
+                  }
+                  className={`w-full text-sm font-bold ${
+                    isBundleOutOfStock
+                      ? 'bg-slate-900 border border-slate-700 text-slate-500 cursor-not-allowed shadow-none'
+                      : 'shadow-[0_0_25px_rgba(6,182,212,0.4)]'
+                  }`}
                 >
-                  ซื้อทันที (Buy Now)
+                  {isBundleOutOfStock ? 'สินค้าหมด (ซื้อไม่ได้)' : 'ซื้อทันที (Buy Now)'}
                 </Button>
               </div>
             </div>

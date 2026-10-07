@@ -279,23 +279,38 @@ export default function AdminBundlesPage() {
                     <div className="space-y-2 pt-2 border-t border-slate-800">
                       <div className="flex items-center justify-between text-xs text-slate-400 font-semibold">
                         <span>สินค้าในชุด ({bundle.items?.length || 0} ชิ้น):</span>
-                        <span className="text-slate-500">
-                          คงเหลือ {bundle.stock} ชุด
-                        </span>
+                        {bundle.hasOutOfStockItems ? (
+                          <span className="text-rose-400 font-bold text-[11px] flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3 text-rose-400" /> มีสินค้าในชุดหมด
+                          </span>
+                        ) : (
+                          <span className="text-slate-500">
+                            คงเหลือ {bundle.stock} ชุด
+                          </span>
+                        )}
                       </div>
                       <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
                         {bundle.items?.map((item, idx) => (
                           <div
                             key={idx}
-                            className="flex items-center justify-between gap-2 p-1.5 rounded-lg bg-slate-950/60 border border-slate-800/80 text-xs"
+                            className={`flex items-center justify-between gap-2 p-1.5 rounded-lg border text-xs ${
+                              item.isOutOfStock
+                                ? 'bg-rose-950/20 border-rose-500/40'
+                                : 'bg-slate-950/60 border-slate-800/80'
+                            }`}
                           >
                             <div className="flex items-center gap-2 min-w-0">
                               <div className="relative w-6 h-6 rounded overflow-hidden shrink-0 bg-slate-900">
                                 <SafeImage src={item?.image || '/images/default-avatar.png'} alt={item?.name || 'สินค้า'} fill className="object-cover" />
                               </div>
-                              <span className="text-slate-300 truncate text-[11px] font-medium">
+                              <span className={`truncate text-[11px] font-medium ${item.isOutOfStock ? 'text-rose-300 line-through' : 'text-slate-300'}`}>
                                 {item?.name || 'สินค้า'}
                               </span>
+                              {item.isOutOfStock && (
+                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40 shrink-0">
+                                  หมด
+                                </span>
+                              )}
                             </div>
                             <span className="text-slate-400 text-[11px] shrink-0 font-mono">
                               ฿{(item?.price ?? 0).toLocaleString()}

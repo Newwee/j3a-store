@@ -236,6 +236,12 @@ export default function CartPage() {
                           {item.product.name}
                         </Link>
 
+                        {(isBundle && (item.product.stock <= 0 || item.product.tags?.includes('bundle_item_out_of_stock'))) && (
+                          <p className="text-xs font-bold text-rose-400 mt-1 flex items-center gap-1">
+                            ⚠️ ไม่สามารถสั่งซื้อได้ เนื่องจากมีสินค้าใน Bundle หมด กรุณาลบแพ็กเกจนี้ออกจากตะกร้า
+                          </p>
+                        )}
+
                         <div className="flex items-center gap-2 mt-1">
                           <span className="text-xs text-cyan-400 font-bold">
                             {formatCurrency(item.product.price)}
@@ -353,16 +359,31 @@ export default function CartPage() {
               </div>
 
               {/* Checkout CTA */}
-              <Link href="/checkout" className="block w-full">
+              {items.some(
+                (i) =>
+                  i.product.tags?.includes('bundle_item_out_of_stock') ||
+                  (i.product.id.startsWith('bundle_') && i.product.stock <= 0)
+              ) ? (
                 <Button
-                  variant="neon"
+                  variant="secondary"
                   size="lg"
-                  rightIcon={<ArrowRight className="w-5 h-5" />}
-                  className="w-full font-black text-base shadow-[0_0_30px_rgba(6,182,212,0.45)] justify-center cursor-pointer py-3.5 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400"
+                  disabled={true}
+                  className="w-full font-black text-base justify-center py-3.5 bg-slate-900 border border-rose-500/40 text-rose-400 opacity-80 cursor-not-allowed"
                 >
-                  ดำเนินการชำระเงินทันที
+                  มีสินค้าใน Bundle หมดในตะกร้า
                 </Button>
-              </Link>
+              ) : (
+                <Link href="/checkout" className="block w-full">
+                  <Button
+                    variant="neon"
+                    size="lg"
+                    rightIcon={<ArrowRight className="w-5 h-5" />}
+                    className="w-full font-black text-base shadow-[0_0_30px_rgba(6,182,212,0.45)] justify-center cursor-pointer py-3.5 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400"
+                  >
+                    ดำเนินการชำระเงินทันที
+                  </Button>
+                </Link>
+              )}
 
               {/* Trust Badges */}
               <div className="pt-3 border-t border-slate-800/80 space-y-2.5 text-[11px] text-slate-400">

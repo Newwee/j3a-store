@@ -5,6 +5,7 @@ export interface BundleItem {
   image: string;
   category?: string;
   stock?: number;
+  isOutOfStock?: boolean;
 }
 
 export type BundleStatus = 'active' | 'draft' | 'out_of_stock';
@@ -25,6 +26,8 @@ export interface BundlePackage {
   status: BundleStatus;
   featured?: boolean;
   tags?: string[];
+  hasOutOfStockItems?: boolean; // มีสินค้าในบันเดิลหมดสต็อก
+  outOfStockItemNames?: string[]; // รายชื่อสินค้าในบันเดิลที่หมด
   createdAt: string;
   updatedAt: string;
 }

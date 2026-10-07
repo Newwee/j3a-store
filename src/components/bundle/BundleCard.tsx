@@ -13,6 +13,7 @@ import {
   ChevronDown,
   ChevronUp,
   Star,
+  AlertTriangle,
 } from 'lucide-react';
 import { BundlePackage } from '@/types/bundle';
 import { bundleToProduct } from '@/lib/firestore/bundles';
@@ -33,10 +34,20 @@ export function BundleCard({ bundle }: BundleCardProps) {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showItemsDropdown, setShowItemsDropdown] = useState(false);
 
-  const isOutOfStock = bundle.stock <= 0 || bundle.status === 'out_of_stock';
+  const isOutOfStock =
+    bundle.stock <= 0 ||
+    bundle.status === 'out_of_stock' ||
+    Boolean(bundle.hasOutOfStockItems);
 
   const handleAddToCart = (e?: React.MouseEvent) => {
     e?.stopPropagation();
+    if (bundle.hasOutOfStockItems) {
+      toast(
+        `ไม่สามารถสั่งซื้อได้ เนื่องจากมีสินค้าใน Bundle หมด (${bundle.outOfStockItemNames?.join(', ') || 'สินค้าบางรายการหมดสต็อก'})`,
+        'error'
+      );
+      return;
+    }
     if (isOutOfStock) {
       toast('แพ็กเกจนี้สินค้าหมดชั่วคราว', 'error');
       return;
@@ -88,11 +99,16 @@ export function BundleCard({ bundle }: BundleCardProps) {
               <span className="text-[11px] font-extrabold text-cyan-400 uppercase tracking-wider flex items-center gap-1">
                 <Sparkles className="w-3 h-3" /> แนะนำพิเศษ
               </span>
-              <span className="text-[11px] text-slate-400 font-medium">
-                {isOutOfStock ? (
+              <span className="text-[11px] font-medium">
+                {bundle.hasOutOfStockItems ? (
+                  <span className="text-rose-400 font-bold flex items-center gap-1 bg-rose-500/10 border border-rose-500/30 px-2 py-0.5 rounded-md">
+                    <AlertTriangle className="w-3 h-3 text-rose-400 shrink-0" />
+                    มีสินค้าใน Bundle หมด
+                  </span>
+                ) : isOutOfStock ? (
                   <span className="text-rose-400 font-bold">สินค้าหมด</span>
                 ) : (
-                  <span>คงเหลือ {bundle.stock} ชุด</span>
+                  <span className="text-slate-400">คงเหลือ {bundle.stock} ชุด</span>
                 )}
               </span>
             </div>
@@ -102,6 +118,19 @@ export function BundleCard({ bundle }: BundleCardProps) {
                 {bundle.name}
               </h3>
             </Link>
+
+            {/* Warning Banner when bundle item is out of stock */}
+            {bundle.hasOutOfStockItems && (
+              <div className="mt-2 p-2 rounded-xl bg-rose-950/40 border border-rose-500/30 text-[11px] text-rose-300 flex items-start gap-1.5 leading-snug">
+                <AlertTriangle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+                <span>
+                  ไม่สามารถสั่งซื้อได้ เนื่องจากมีสินค้าใน Bundle หมด{' '}
+                  {bundle.outOfStockItemNames && bundle.outOfStockItemNames.length > 0 && (
+                    <strong className="text-rose-200">({bundle.outOfStockItemNames.join(', ')})</strong>
+                  )}
+                </span>
+              </div>
+            )}
 
             {/* Bundle Rating & Review Link */}
             <div className="flex items-center gap-2 mt-1.5">
@@ -143,8 +172,23 @@ export function BundleCard({ bundle }: BundleCardProps) {
                 {bundle.items?.map((item, idx) => (
                   <div key={idx} className="flex items-center justify-between gap-2 text-[11px]">
                     <div className="flex items-center gap-1.5 truncate">
-                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0" />
-                      <span className="text-slate-300 truncate">{item?.name || 'สินค้า'}</span>
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                          item.isOutOfStock ? 'bg-rose-500 ring-2 ring-rose-500/20' : 'bg-cyan-400'
+                        }`}
+                      />
+                      <span
+                        className={`truncate ${
+                          item.isOutOfStock ? 'text-rose-300 line-through' : 'text-slate-300'
+                        }`}
+                      >
+                        {item?.name || 'สินค้า'}
+                      </span>
+                      {item.isOutOfStock && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40 shrink-0">
+                          หมด (0)
+                        </span>
+                      )}
                     </div>
                     <span className="text-slate-500 font-mono shrink-0">
                       ฿{(item?.price ?? 0).toLocaleString()}
@@ -177,14 +221,26 @@ export function BundleCard({ bundle }: BundleCardProps) {
               </button>
 
               <Button
-                variant="primary"
+                variant={bundle.hasOutOfStockItems || isOutOfStock ? 'secondary' : 'primary'}
                 size="sm"
                 onClick={handleAddToCart}
                 disabled={isOutOfStock}
-                leftIcon={<ShoppingCart className="w-4 h-4" />}
-                className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black shadow-[0_0_15px_rgba(6,182,212,0.4)]"
+                leftIcon={
+                  bundle.hasOutOfStockItems ? (
+                    <AlertTriangle className="w-4 h-4 text-rose-400" />
+                  ) : (
+                    <ShoppingCart className="w-4 h-4" />
+                  )
+                }
+                className={
+                  bundle.hasOutOfStockItems
+                    ? 'bg-slate-900 border border-rose-500/40 text-rose-400 font-bold opacity-80 cursor-not-allowed text-xs'
+                    : isOutOfStock
+                    ? 'bg-slate-900 border border-slate-700 text-slate-500 font-bold cursor-not-allowed text-xs'
+                    : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black shadow-[0_0_15px_rgba(6,182,212,0.4)]'
+                }
               >
-                ใส่ตะกร้า
+                {bundle.hasOutOfStockItems ? 'มีสินค้าใน Bundle หมด' : isOutOfStock ? 'สินค้าหมด' : 'ใส่ตะกร้า'}
               </Button>
             </div>
           </div>
@@ -198,6 +254,22 @@ export function BundleCard({ bundle }: BundleCardProps) {
         title={bundle.name}
       >
         <div className="space-y-4 pt-2">
+          {bundle.hasOutOfStockItems && (
+            <div className="p-3.5 rounded-xl bg-rose-950/60 border border-rose-500/50 flex items-start gap-3 text-rose-200 text-xs shadow-md">
+              <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <p className="font-bold text-sm text-rose-300">ไม่สามารถสั่งซื้อแพ็กเกจนี้ได้</p>
+                <p className="text-slate-300 leading-relaxed">
+                  เนื่องจากมีสินค้าใน Bundle หมด{' '}
+                  {bundle.outOfStockItemNames && bundle.outOfStockItemNames.length > 0 && (
+                    <strong className="text-rose-200">({bundle.outOfStockItemNames.join(', ')})</strong>
+                  )}{' '}
+                  จึงไม่สามารถส่งมอบสินค้าได้ครบตามแพ็กเกจ
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="relative aspect-video w-full rounded-2xl bg-slate-950 overflow-hidden border border-slate-800">
             <SafeImage src={bundle.image} alt={bundle.name} fill className="object-contain p-4" />
           </div>
@@ -227,14 +299,27 @@ export function BundleCard({ bundle }: BundleCardProps) {
               {bundle.items?.map((item, idx) => (
                 <div
                   key={idx}
-                  className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-slate-950/80 border border-slate-800"
+                  className={`flex items-center justify-between gap-3 p-2.5 rounded-xl border ${
+                    item.isOutOfStock
+                      ? 'bg-rose-950/20 border-rose-500/40'
+                      : 'bg-slate-950/80 border-slate-800'
+                  }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className="relative w-8 h-8 rounded-lg bg-slate-900 overflow-hidden shrink-0">
                       <SafeImage src={item?.image || '/images/default-avatar.png'} alt={item?.name || 'สินค้า'} fill className="object-cover" />
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-white truncate">{item?.name || 'สินค้า'}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className={`text-xs font-bold truncate ${item.isOutOfStock ? 'text-rose-300 line-through' : 'text-white'}`}>
+                          {item?.name || 'สินค้า'}
+                        </p>
+                        {item.isOutOfStock && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40 shrink-0">
+                            หมด (0)
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[10px] text-slate-400">{item?.category || 'สินค้าทั่วไป'}</p>
                     </div>
                   </div>
@@ -258,17 +343,29 @@ export function BundleCard({ bundle }: BundleCardProps) {
             </div>
 
             <Button
-              variant="primary"
+              variant={bundle.hasOutOfStockItems || isOutOfStock ? 'secondary' : 'primary'}
               size="md"
               onClick={() => {
                 handleAddToCart();
                 setShowDetailModal(false);
               }}
               disabled={isOutOfStock}
-              leftIcon={<ShoppingCart className="w-4 h-4" />}
-              className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black shadow-[0_0_20px_rgba(6,182,212,0.4)]"
+              leftIcon={
+                bundle.hasOutOfStockItems ? (
+                  <AlertTriangle className="w-4 h-4 text-rose-400" />
+                ) : (
+                  <ShoppingCart className="w-4 h-4" />
+                )
+              }
+              className={
+                bundle.hasOutOfStockItems
+                  ? 'bg-slate-900 border border-rose-500/40 text-rose-400 cursor-not-allowed opacity-80'
+                  : isOutOfStock
+                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                  : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black shadow-[0_0_20px_rgba(6,182,212,0.4)]'
+              }
             >
-              สั่งซื้อแพ็กเกจนี้
+              {bundle.hasOutOfStockItems ? 'มีสินค้าใน Bundle หมด' : isOutOfStock ? 'สินค้าหมด' : 'สั่งซื้อแพ็กเกจนี้'}
             </Button>
           </div>
 
