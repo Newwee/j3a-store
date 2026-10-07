@@ -17,6 +17,10 @@ import {
   RefreshCw,
   Download,
   Key,
+  Star,
+  Trash2,
+  Plus,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { Product, ProductFormData, ProductStatus } from '@/types/product';
 import { uploadProductImage, deleteProductImage } from '@/lib/storage/upload';
@@ -33,6 +37,12 @@ interface ProductFormProps {
   isEdit?: boolean;
 }
 
+interface ProductImageItem {
+  id: string;
+  url: string;
+  file?: File | null;
+}
+
 const CATEGORIES = [
   'ซอฟต์แวร์ Discord',
   'ระบบเซิร์ฟเวอร์ & บอท',
@@ -41,6 +51,28 @@ const CATEGORIES = [
   'บริการดิจิทัล',
   'ทั่วไป',
 ];
+
+const getInitialImages = (data?: Product): ProductImageItem[] => {
+  if (!data) return [];
+  const list: string[] = [];
+  if (data.image && data.image !== '/logo.png') {
+    list.push(data.image);
+  }
+  if (Array.isArray(data.images)) {
+    data.images.forEach((img) => {
+      if (img && typeof img === 'string' && img !== '/logo.png' && !list.includes(img)) {
+        list.push(img);
+      }
+    });
+  }
+  if (list.length === 0 && data.image) {
+    list.push(data.image);
+  }
+  return list.slice(0, 5).map((url, idx) => ({
+    id: `init-${idx}-${url.slice(-8)}`,
+    url,
+  }));
+};
 
 export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
   const router = useRouter();
@@ -68,9 +100,9 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
     initialData?.deliveryType || 'link'
   );
 
-  // Image states
-  const [imagePreview, setImagePreview] = useState<string>(initialData?.image || '');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  // Image states (up to 5 images)
+  const [imagesList, setImagesList] = useState<ProductImageItem[]>(() => getInitialImages(initialData));
+  const [urlInput, setUrlInput] = useState<string>('');
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -89,36 +121,82 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
     setSlug(slugify(name));
   };
 
-  // Image selection
+  // Image selection (support multiple files up to remaining slots)
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setSelectedFile(file);
+    if (!e.target.files || e.target.files.length === 0) return;
+    const files = Array.from(e.target.files);
+    const remainingSlots = 5 - imagesList.length;
+    if (remainingSlots <= 0) {
+      error('เพิ่มรูปภาพได้สูงสุด 5 รูปแล้ว');
+      return;
+    }
+
+    const filesToAdd = files.slice(0, remainingSlots);
+    if (files.length > remainingSlots) {
+      toast(`เลือกรูปภาพเกินโควตา ระบบเพิ่มให้เพียง ${remainingSlots} รูป (สูงสุด 5 รูป)`, 'info');
+    }
+
+    const newItems: ProductImageItem[] = [];
+    for (const file of filesToAdd) {
+      let preview = '';
       try {
         if (file.type === 'image/gif' || file.name.toLowerCase().endsWith('.gif')) {
-          const reader = new FileReader();
-          reader.onload = (ev) => {
-            setImagePreview(ev.target?.result as string);
-          };
-          reader.readAsDataURL(file);
+          preview = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (ev) => resolve((ev.target?.result as string) || '');
+            reader.readAsDataURL(file);
+          });
         } else {
-          const compressed = await compressImageToDataUrl(file, 800, 800, 0.75);
-          setImagePreview(compressed);
+          preview = await compressImageToDataUrl(file, 800, 800, 0.75);
         }
       } catch (err) {
         console.warn('Could not compress image preview:', err);
-        setImagePreview(URL.createObjectURL(file));
+        preview = URL.createObjectURL(file);
       }
-      setUploadProgress(0);
-    }
-  };
 
-  const handleRemoveImage = () => {
-    setSelectedFile(null);
-    setImagePreview('');
+      newItems.push({
+        id: `img-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        url: preview,
+        file,
+      });
+    }
+
+    setImagesList((prev) => [...prev, ...newItems]);
+    setUploadProgress(0);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+  };
+
+  const handleAddUrl = (customUrl?: string) => {
+    const targetUrl = (customUrl !== undefined ? customUrl : urlInput).trim();
+    if (!targetUrl) return;
+    if (imagesList.length >= 5) {
+      error('เพิ่มรูปภาพได้สูงสุด 5 รูปแล้ว');
+      return;
+    }
+    setImagesList((prev) => [
+      ...prev,
+      {
+        id: `url-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        url: targetUrl,
+      },
+    ]);
+    setUrlInput('');
+  };
+
+  const handleRemoveImage = (index: number) => {
+    setImagesList((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleSetPrimary = (index: number) => {
+    if (index === 0) return;
+    setImagesList((prev) => {
+      const next = [...prev];
+      const [selected] = next.splice(index, 1);
+      return [selected, ...next];
+    });
+    toast('ตั้งเป็นรูปภาพหลักเรียบร้อยแล้ว', 'info');
   };
 
   // Validation
@@ -142,60 +220,64 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
 
     setIsSaving(true);
     showLoading(isEdit ? 'กำลังอัปเดตข้อมูลสินค้าและอัปโหลดรูปภาพ...' : 'กำลังบันทึกและสร้างสินค้าใหม่...');
-    let finalImageUrl = imagePreview || '/logo.png';
 
     try {
-      // 1. Upload new image if file is selected
-      if (selectedFile) {
-        // Fast path for duck.gif (local asset)
-        if (selectedFile.name.toLowerCase() === 'duck.gif') {
-          finalImageUrl = '/products/duck.gif';
-        } else {
-          setIsUploading(true);
-          try {
-            const { downloadUrl } = await uploadProductImage(
-              selectedFile,
-              'products',
-              (progress) => setUploadProgress(progress),
-              4000
-            );
-            finalImageUrl = downloadUrl;
+      const uploadedUrls: string[] = [];
 
-            // If editing and previous image was on Firebase Storage, clean it up
-            if (isEdit && initialData?.image && initialData.image.includes('firebasestorage')) {
-              await deleteProductImage(initialData.image);
+      // 1. Process and upload each image (up to 5)
+      for (let i = 0; i < imagesList.length; i++) {
+        const item = imagesList[i];
+        let finalUrl = item.url;
+
+        if (item.file) {
+          // Fast path for duck.gif (local asset)
+          if (item.file.name.toLowerCase() === 'duck.gif') {
+            finalUrl = '/products/duck.gif';
+          } else {
+            setIsUploading(true);
+            try {
+              const { downloadUrl } = await uploadProductImage(
+                item.file,
+                'products',
+                (progress) => setUploadProgress(progress),
+                4000
+              );
+              finalUrl = downloadUrl;
+            } catch (uploadErr: any) {
+              console.warn('Firebase Storage upload blocked (CORS) or timed out, using compressed data URL:', uploadErr);
+              if (!item.url || item.url.startsWith('blob:')) {
+                finalUrl = await compressImageToDataUrl(item.file, 800, 800, 0.75);
+              } else {
+                finalUrl = item.url;
+              }
+            } finally {
+              setIsUploading(false);
             }
-          } catch (uploadErr: any) {
-            console.warn('Firebase Storage upload blocked (CORS) or timed out, using compressed data URL:', uploadErr);
-            // If storage isn't configured or CORS blocked, use compressed data URL so product creation succeeds immediately!
-            if (!imagePreview || imagePreview.startsWith('blob:')) {
-              finalImageUrl = await compressImageToDataUrl(selectedFile, 800, 800, 0.75);
-            } else {
-              finalImageUrl = imagePreview;
-            }
-            toast('บันทึกรูปภาพลงฐานข้อมูลเรียบร้อย (ระบบใช้ Compressed Fallback อัตโนมัติ)', 'info');
-          } finally {
-            setIsUploading(false);
           }
         }
+
+        // Safeguard: Ensure finalUrl is never a temporary blob: URL
+        if (finalUrl.startsWith('blob:') && item.file) {
+          finalUrl = await compressImageToDataUrl(item.file, 800, 800, 0.75);
+        } else if (finalUrl.startsWith('blob:')) {
+          finalUrl = '/logo.png';
+        }
+
+        // Check Firestore 1MB string size limit
+        if (finalUrl.length > 850000) {
+          error(
+            `รูปภาพที่ ${i + 1} ขนาดข้อมูลใหญ่เกินขีดจำกัดฐานข้อมูล (${(finalUrl.length / 1024 / 1024).toFixed(2)} MB) กรุณาใช้ไฟล์ไม่เกิน 500 KB หรือใส่ Image URL โดยตรง`
+          );
+          setIsSaving(false);
+          hideLoading();
+          return;
+        }
+
+        uploadedUrls.push(finalUrl);
       }
 
-      // Safeguard: Ensure finalImageUrl is never a temporary blob: URL
-      if (finalImageUrl.startsWith('blob:') && selectedFile) {
-        finalImageUrl = await compressImageToDataUrl(selectedFile, 800, 800, 0.75);
-      } else if (finalImageUrl.startsWith('blob:')) {
-        finalImageUrl = '/logo.png';
-      }
-
-      // Check Firestore 1MB string size limit
-      if (finalImageUrl.length > 850000) {
-        error(
-          `ขนาดข้อมูลรูปภาพใหญ่เกินขีดจำกัดฐานข้อมูล (${(finalImageUrl.length / 1024 / 1024).toFixed(2)} MB) กรุณาใช้ไฟล์ไม่เกิน 500 KB หรือใส่ Image URL โดยตรง (เช่น /products/duck.gif)`
-        );
-        setIsSaving(false);
-        hideLoading();
-        return;
-      }
+      const finalImages = uploadedUrls.length > 0 ? uploadedUrls : ['/logo.png'];
+      const primaryImage = finalImages[0] || '/logo.png';
 
       // 2. Prepare payload
       const tags = tagsInput
@@ -213,8 +295,8 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
         stock: Number(stock),
         status,
         featured,
-        image: finalImageUrl,
-        images: initialData?.images || [],
+        image: primaryImage,
+        images: finalImages,
         tags,
         ...(showcaseUrl.trim() ? { showcaseUrl: showcaseUrl.trim() } : {}),
         ...(downloadUrl.trim() ? { downloadUrl: downloadUrl.trim() } : {}),
@@ -222,7 +304,7 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
         ...(downloadUrl.trim() || deliveryNote.trim() || deliveryType !== 'link' ? { deliveryType } : {}),
       };
 
-      // 3. Save to Firestore
+      // 3. Save to Supabase
       if (isEdit && initialData?.id) {
         await updateProduct(initialData.id, payload);
         success(`อัปเดตสินค้า "${name}" สำเร็จแล้ว`);
@@ -552,80 +634,198 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
 
         {/* Right Column: Image Upload & Status Toggles */}
         <div className="lg:col-span-4 space-y-6">
-          {/* Image Upload Box */}
+          {/* Image Upload Box (Up to 5 images) */}
           <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-md space-y-4">
-            <h3 className="text-base font-bold text-white mb-2">
-              รูปภาพสินค้า (Product Image)
-            </h3>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <ImageIcon className="w-5 h-5 text-cyan-400" />
+                  รูปภาพสินค้า (Product Images)
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  ใส่ได้สูงสุด 5 รูป (รูปแรกจะเป็นรูปหน้าปกหลัก)
+                </p>
+              </div>
+              <span
+                className={`px-2.5 py-1 rounded-full text-xs font-mono font-bold border ${
+                  imagesList.length >= 5
+                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                    : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-300'
+                }`}
+              >
+                {imagesList.length} / 5 รูป
+              </span>
+            </div>
 
-            {/* Hidden file input */}
+            {/* Hidden multi-file input */}
             <input
               type="file"
               ref={fileInputRef}
               onChange={handleFileChange}
               accept="image/png, image/jpeg, image/jpg, image/gif, image/webp"
+              multiple
               className="hidden"
             />
 
-            {/* Preview Box */}
-            <div className="relative w-full aspect-square rounded-2xl border-2 border-dashed border-slate-700 hover:border-cyan-500/50 bg-slate-950/60 overflow-hidden flex flex-col items-center justify-center p-4 transition-colors">
-              {imagePreview ? (
-                <>
+            {/* Empty state if 0 images */}
+            {imagesList.length === 0 && (
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="relative w-full aspect-square rounded-2xl border-2 border-dashed border-slate-700 hover:border-cyan-500/60 bg-slate-950/60 overflow-hidden flex flex-col items-center justify-center p-6 text-center cursor-pointer transition-all group"
+              >
+                <div className="w-14 h-14 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-center text-slate-400 group-hover:text-cyan-400 group-hover:border-cyan-500/40 transition-colors mb-3">
+                  <Upload className="w-7 h-7" />
+                </div>
+                <p className="text-sm font-bold text-slate-200 group-hover:text-cyan-300 transition-colors">
+                  คลิกเพื่ออัปโหลดรูปภาพ
+                </p>
+                <p className="text-xs text-slate-400 mt-1">
+                  เลือกรูปภาพได้สูงสุด 5 รูปพร้อมกัน
+                </p>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  รองรับ JPG, PNG, GIF, WEBP
+                </p>
+              </div>
+            )}
+
+            {/* Gallery Display if >= 1 image */}
+            {imagesList.length > 0 && (
+              <div className="space-y-3">
+                {/* Primary Image Preview (Item 0) */}
+                <div className="relative w-full aspect-square rounded-2xl border-2 border-cyan-500/50 bg-slate-950/80 overflow-hidden shadow-[0_0_20px_rgba(6,182,212,0.15)] flex items-center justify-center group">
                   <SafeImage
-                    src={imagePreview}
-                    alt="Preview"
+                    src={imagesList[0].url}
+                    alt="Primary Image Preview"
                     fill
-                    className="object-contain p-2"
+                    className="object-contain p-3"
                   />
-                  {(imagePreview.includes('.gif') || imagePreview.startsWith('data:image/gif')) && (
-                    <div className="absolute bottom-2 left-2 z-10">
+
+                  {/* Primary Badge */}
+                  <div className="absolute top-3 left-3 z-10">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-500 text-slate-950 text-xs font-black uppercase tracking-wider shadow-lg">
+                      <Star className="w-3.5 h-3.5 fill-current" /> รูปหลัก (หน้าปก)
+                    </span>
+                  </div>
+
+                  {/* Animated GIF badge */}
+                  {(imagesList[0].url.includes('.gif') || imagesList[0].url.startsWith('data:image/gif')) && (
+                    <div className="absolute bottom-3 left-3 z-10">
                       <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 backdrop-blur-md shadow-sm">
                         🎬 ANIMATED GIF
                       </span>
                     </div>
                   )}
-                  <div className="absolute top-2 right-2 flex gap-1.5 z-10">
+
+                  {/* Delete primary image button */}
+                  <div className="absolute top-3 right-3 z-10">
                     <button
                       type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="p-1.5 rounded-lg bg-slate-900/90 text-slate-200 hover:text-white border border-slate-700 hover:border-cyan-400 shadow-md cursor-pointer"
-                      title="เปลี่ยนรูปภาพ"
+                      onClick={() => handleRemoveImage(0)}
+                      className="p-2 rounded-xl bg-rose-950/80 hover:bg-rose-900 text-rose-200 border border-rose-700/80 shadow-md cursor-pointer transition-colors"
+                      title="ลบรูปภาพหลักนี้"
                     >
-                      <RefreshCw className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleRemoveImage}
-                      className="p-1.5 rounded-lg bg-rose-900/90 text-rose-200 hover:text-white border border-rose-700 shadow-md cursor-pointer"
-                      title="ลบรูปภาพ"
-                    >
-                      <X className="w-4 h-4" />
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
-                </>
-              ) : (
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex flex-col items-center justify-center text-center cursor-pointer p-4 group"
-                >
-                  <div className="w-12 h-12 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-center text-slate-400 group-hover:text-cyan-400 group-hover:border-cyan-500/40 transition-colors mb-3">
-                    <Upload className="w-6 h-6" />
-                  </div>
-                  <p className="text-xs font-semibold text-slate-200 group-hover:text-cyan-400 transition-colors">
-                    คลิกเพื่ออัปโหลดรูปภาพ
-                  </p>
-                  <p className="text-[11px] text-slate-500 mt-1">
-                    รองรับ JPG, JPEG, PNG, GIF, WEBP
-                  </p>
                 </div>
-              )}
-            </div>
+
+                {/* Grid of all 5 slots / thumbnails */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-300">
+                    รายการรูปภาพสินค้า ({imagesList.length}/5 รูป)
+                  </label>
+                  <div className="grid grid-cols-5 gap-2">
+                    {imagesList.map((item, idx) => (
+                      <div
+                        key={item.id}
+                        className={`relative aspect-square rounded-xl overflow-hidden bg-slate-950 border-2 transition-all group ${
+                          idx === 0
+                            ? 'border-cyan-400 ring-2 ring-cyan-500/30 shadow-md'
+                            : 'border-slate-800 hover:border-slate-600'
+                        }`}
+                      >
+                        <SafeImage
+                          src={item.url}
+                          alt={`Image ${idx + 1}`}
+                          fill
+                          className="object-cover"
+                        />
+
+                        {/* Number indicator */}
+                        <div className="absolute top-1 left-1 z-10">
+                          <span
+                            className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-black ${
+                              idx === 0 ? 'bg-cyan-500 text-slate-950' : 'bg-slate-900/90 text-slate-300 border border-slate-700'
+                            }`}
+                          >
+                            {idx + 1}
+                          </span>
+                        </div>
+
+                        {/* Hover overlay with action buttons */}
+                        <div className="absolute inset-0 bg-slate-950/85 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 p-1 z-20">
+                          {idx > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => handleSetPrimary(idx)}
+                              title="ตั้งเป็นรูปหลัก"
+                              className="p-1 rounded bg-cyan-500/20 hover:bg-cyan-500 text-cyan-300 hover:text-slate-950 transition-colors cursor-pointer"
+                            >
+                              <Star className="w-3.5 h-3.5 fill-current" />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveImage(idx)}
+                            title="ลบรูปนี้"
+                            className="p-1 rounded bg-rose-500/20 hover:bg-rose-500 text-rose-300 hover:text-white transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Empty slot placeholders up to 5 */}
+                    {Array.from({ length: Math.max(0, 5 - imagesList.length) }).map((_, placeholderIdx) => (
+                      <button
+                        key={`empty-${placeholderIdx}`}
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="aspect-square rounded-xl border border-dashed border-slate-800 hover:border-cyan-500/50 hover:bg-cyan-500/5 flex flex-col items-center justify-center text-slate-600 hover:text-cyan-400 transition-colors cursor-pointer"
+                        title="คลิกเพื่อเพิ่มรูปภาพ"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span className="text-[9px] mt-0.5">#{imagesList.length + placeholderIdx + 1}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Upload more button if < 5 */}
+            {imagesList.length < 5 ? (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full py-2.5 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 hover:border-cyan-500/50 text-xs font-bold text-slate-200 hover:text-cyan-300 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+              >
+                <Upload className="w-4 h-4 text-cyan-400" />
+                <span>+ เพิ่มรูปภาพจากเครื่อง (เพิ่มได้อีก {5 - imagesList.length} รูป)</span>
+              </button>
+            ) : (
+              <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs text-center font-medium flex items-center justify-center gap-1.5">
+                <Check className="w-4 h-4" />
+                <span>ครบ 5 รูปแล้ว (เต็มจำนวนสูงสุด)</span>
+              </div>
+            )}
 
             {/* Upload Progress Bar */}
             {isUploading && (
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 pt-1">
                 <div className="flex justify-between text-xs text-slate-400">
-                  <span>กำลังอัปโหลดขึ้นระบบจัดเก็บไฟล์...</span>
+                  <span>กำลังอัปโหลดรูปภาพ...</span>
                   <span className="font-bold text-cyan-400">{uploadProgress}%</span>
                 </div>
                 <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
@@ -638,35 +838,45 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
             )}
 
             {/* Direct Image URL input option */}
-            <div className="pt-2 border-t border-slate-800 space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="block text-[11px] font-medium text-slate-400">
-                  หรือใส่ Image URL โดยตรง:
-                </label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setImagePreview('/products/duck.gif');
-                    setSelectedFile(null);
-                  }}
-                  className="text-[11px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer bg-cyan-500/10 hover:bg-cyan-500/20 px-2 py-0.5 rounded-md border border-cyan-500/30 transition-all font-medium"
-                >
-                  🦆 ใช้เป็ดเต้น (/products/duck.gif)
-                </button>
+            {imagesList.length < 5 && (
+              <div className="pt-3 border-t border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-medium text-slate-400">
+                    หรือเพิ่มรูปภาพจาก URL / ลิงก์ตรง:
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => handleAddUrl('/products/duck.gif')}
+                    className="text-[11px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer bg-cyan-500/10 hover:bg-cyan-500/20 px-2 py-0.5 rounded-md border border-cyan-500/30 transition-all font-medium"
+                  >
+                    🦆 + เพิ่มเป็ดเต้น (/products/duck.gif)
+                  </button>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={urlInput}
+                    onChange={(e) => setUrlInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddUrl();
+                      }
+                    }}
+                    placeholder="https://... หรือ /products/duck.gif"
+                    className="w-full bg-slate-950/80 text-xs text-slate-200 rounded-xl px-3 py-2 border border-slate-800 focus:border-cyan-500 outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleAddUrl()}
+                    disabled={!urlInput.trim()}
+                    className="px-3 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-bold shrink-0 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                  >
+                    + เพิ่ม
+                  </button>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={imagePreview.startsWith('blob:') || imagePreview.startsWith('data:') ? '' : imagePreview}
-                  onChange={(e) => {
-                    setImagePreview(e.target.value);
-                    setSelectedFile(null);
-                  }}
-                  placeholder={imagePreview.startsWith('data:') ? '(รูปภาพที่อัปโหลดถูกบีบอัดพร้อมใช้งานแล้ว)' : 'https://... หรือ /products/duck.gif'}
-                  className="w-full bg-slate-950/80 text-xs text-slate-200 rounded-lg px-2.5 py-2 border border-slate-800 focus:border-cyan-500 outline-none"
-                />
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Status & Featured Card */}
