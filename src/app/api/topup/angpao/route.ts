@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { extractVoucherHash, redeemTrueMoneyVoucher } from '@/lib/utils/angpao';
+import { extractVoucherHash, redeemTrueMoneyVoucher, warmAngpaoProviders } from '@/lib/utils/angpao';
+
+export async function GET() {
+  warmAngpaoProviders().catch(() => {});
+  return NextResponse.json({ ok: true, status: 'ready' });
+}
 
 export async function POST(req: Request) {
   try {

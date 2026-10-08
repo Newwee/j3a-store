@@ -117,6 +117,9 @@ function ProfileContent() {
 
   useEffect(() => {
     if (activeTab === 'topup' && user) {
+      // Pre-warm Angpao service in the background
+      fetch('/api/topup/angpao').catch(() => {});
+
       setLoadingTopups(true);
       const unsubscribe = subscribeUserTopups(user.uid, (history) => {
         setUserTopups(history);

@@ -69,7 +69,55 @@ export interface AngpaoRedeemResult {
   code?: string;
 }
 
-import { Client, TruemoneyApiError, TruemoneyTimeoutError } from '@byteindev/truemoney-voucher';
+export const ANGPAO_PROVIDERS = [
+  'https://truemoney-voucher-nestjs.vercel.app',
+  'https://truemoney-voucher-fastapi.vercel.app',
+  'https://truemoney-voucher-go.vercel.app',
+];
+
+export function mapTrueMoneyError(code: string, rawMessage?: string): string {
+  switch (code) {
+    case 'VOUCHER_OUT_OF_STOCK':
+      return 'ซองของขวัญนี้ถูกรับไปแล้ว หรือยอดเงินในซองหมดแล้ว';
+    case 'CANNOT_GET_OWN_VOUCHER':
+      return 'ไม่สามารถรับซองของขวัญที่สร้างจากบัญชีเดียวกันกับเบอร์ร้านค้าได้ กรุณาใช้บัญชี TrueMoney อื่นในการสร้างซอง';
+    case 'TARGET_USER_NOT_FOUND':
+      return 'ไม่พบบัญชี TrueMoney ของเบอร์ปลายทางที่ร้านค้าตั้งค่าไว้ กรุณาติดต่อแอดมิน';
+    case 'TARGET_USER_REDEEMED':
+      return 'เบอร์ร้านค้านี้ได้รับเงินจากซองของขวัญนี้ไปเรียบร้อยแล้ว';
+    case 'VOUCHER_EXPIRED':
+      return 'ซองของขวัญนี้หมดอายุแล้ว (ซอง TrueMoney มีอายุใช้งาน 72 ชั่วโมง)';
+    case 'VOUCHER_NOT_FOUND':
+    case 'INVALID_VOUCHER':
+    case 'INVALID_VOUCHER_CODE':
+      return 'ลิงก์ซองของขวัญไม่ถูกต้อง หรือไม่พบข้อมูลซองในระบบ TrueMoney';
+    case 'INTERNAL_ERROR':
+      return 'ระบบ TrueMoney ขัดข้องชั่วคราว กรุณารอสักครู่แล้วลองใหม่อีกครั้ง';
+    default:
+      return rawMessage || 'ไม่สามารถรับซองของขวัญได้ กรุณาตรวจสอบลิงก์อีกครั้ง';
+  }
+}
+
+/**
+ * Pre-warms the serverless providers in the background to ensure instantaneous response
+ */
+export async function warmAngpaoProviders(): Promise<void> {
+  try {
+    await Promise.allSettled(
+      ANGPAO_PROVIDERS.map((p) =>
+        fetch(`${p}/status`, {
+          method: 'GET',
+          headers: { Accept: 'application/json' },
+          signal: AbortSignal.timeout(4000),
+        })
+      )
+    );
+  } catch {
+    // Ignore warmup network errors
+  }
+}
+
+import { createClient, TruemoneyApiError, TruemoneyTimeoutError } from '@byteindev/truemoney-voucher';
 
 export async function redeemTrueMoneyVoucher(
   voucherHash: string,
@@ -93,97 +141,122 @@ export async function redeemTrueMoneyVoucher(
     };
   }
 
+  let lastErrorCode = 'UNKNOWN_ERROR';
+  let lastErrorMessage = 'ไม่สามารถรับซองของขวัญได้ กรุณาตรวจสอบลิงก์อีกครั้ง';
+
+  // 1. Direct Multi-Provider Attempt with ample timeout (immune to cold-start probe drops)
+  for (const provider of ANGPAO_PROVIDERS) {
+    try {
+      const url = `${provider}/truemoney/${encodeURIComponent(cleanHash)}/${encodeURIComponent(cleanedPhone)}`;
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
+        },
+        signal: AbortSignal.timeout(10000), // 10s generous timeout handles cold starts reliably
+      });
+
+      if (!response.ok && response.status !== 400) {
+        continue;
+      }
+
+      const resJson = await response.json();
+      if (!resJson || typeof resJson !== 'object') continue;
+
+      if (resJson.status?.code === 'SUCCESS') {
+        const dataObj = resJson.data as any;
+        const voucherData = dataObj?.voucher;
+        const redeemedAmount = Number(
+          voucherData?.redeemed_amount_baht ||
+            voucherData?.amount_baht ||
+            dataObj?.redeemed_amount_baht ||
+            0
+        );
+
+        if (!isNaN(redeemedAmount) && redeemedAmount > 0) {
+          return {
+            success: true,
+            amount: redeemedAmount,
+            ownerName: dataObj?.owner_profile?.full_name || 'ลูกค้า',
+            voucherId: voucherData?.voucher_id || cleanHash,
+          };
+        }
+      }
+
+      if (resJson.status?.code) {
+        const statusCode = resJson.status.code;
+        lastErrorCode = statusCode;
+        lastErrorMessage = mapTrueMoneyError(statusCode, resJson.status.message);
+
+        // If it's a definitive business response from TrueMoney, return immediately
+        if (
+          statusCode === 'VOUCHER_OUT_OF_STOCK' ||
+          statusCode === 'CANNOT_GET_OWN_VOUCHER' ||
+          statusCode === 'TARGET_USER_REDEEMED' ||
+          statusCode === 'VOUCHER_EXPIRED'
+        ) {
+          return {
+            success: false,
+            code: statusCode,
+            error: lastErrorMessage,
+          };
+        }
+      }
+    } catch (err: any) {
+      console.warn(`[Angpao Redeem] Provider ${provider} attempt skipped:`, err?.message);
+    }
+  }
+
+  // 2. Secondary Fallback via official client
   try {
-    const redeemResponse = await Client.redeem(cleanHash, cleanedPhone);
+    const client = createClient({ timeoutMs: 15000 });
+    const redeemResponse = await client.redeem(cleanHash, cleanedPhone);
 
     if (redeemResponse.status?.code === 'SUCCESS') {
       const dataObj = redeemResponse.data as any;
       const voucherData = dataObj?.voucher;
       const redeemedAmount = Number(
-        voucherData?.redeemed_amount_baht || voucherData?.amount_baht || 0
+        voucherData?.redeemed_amount_baht ||
+          voucherData?.amount_baht ||
+          dataObj?.redeemed_amount_baht ||
+          0
       );
 
-      if (isNaN(redeemedAmount) || redeemedAmount <= 0) {
+      if (!isNaN(redeemedAmount) && redeemedAmount > 0) {
         return {
-          success: false,
-          code: 'ZERO_AMOUNT',
-          error: 'ยอดเงินในซองของขวัญไม่ถูกต้องหรือเท่ากับ 0 บาท',
+          success: true,
+          amount: redeemedAmount,
+          ownerName: dataObj?.owner_profile?.full_name || 'ลูกค้า',
+          voucherId: voucherData?.voucher_id || cleanHash,
         };
       }
+    }
 
+    if (redeemResponse.status?.code) {
+      const code = redeemResponse.status.code;
       return {
-        success: true,
-        amount: redeemedAmount,
-        ownerName: dataObj?.owner_profile?.full_name || 'ลูกค้า',
-        voucherId: voucherData?.voucher_id || cleanHash,
+        success: false,
+        code,
+        error: mapTrueMoneyError(code, redeemResponse.status.message),
       };
     }
-
-    // Map TrueMoney error codes to clear Thai descriptions
-    const errCode = redeemResponse.status?.code || 'UNKNOWN_ERROR';
-    const rawMessage = redeemResponse.status?.message || '';
-
-    let friendlyMessage = 'ไม่สามารถรับซองของขวัญได้ กรุณาตรวจสอบความถูกต้อง';
-
-    switch (errCode) {
-      case 'VOUCHER_NOT_FOUND':
-      case 'INVALID_VOUCHER':
-      case 'INVALID_VOUCHER_CODE':
-        friendlyMessage = 'ลิงก์ซองของขวัญไม่ถูกต้อง หรือไม่พบข้อมูลซองในระบบ TrueMoney';
-        break;
-      case 'VOUCHER_OUT_OF_STOCK':
-        friendlyMessage = 'ซองของขวัญนี้ถูกรับไปแล้ว หรือยอดเงินในซองหมดแล้ว';
-        break;
-      case 'CANNOT_GET_OWN_VOUCHER':
-        friendlyMessage =
-          'ไม่สามารถรับซองของขวัญที่สร้างจากบัญชีเดียวกันกับเบอร์ร้านค้าได้ กรุณาใช้บัญชี TrueMoney อื่นในการสร้างซอง';
-        break;
-      case 'TARGET_USER_NOT_FOUND':
-        friendlyMessage =
-          'ไม่พบบัญชี TrueMoney ของเบอร์ปลายทางที่ร้านค้าตั้งค่าไว้ กรุณาติดต่อแอดมิน';
-        break;
-      case 'TARGET_USER_REDEEMED':
-        friendlyMessage = 'เบอร์ร้านค้านี้ได้รับเงินจากซองของขวัญนี้ไปเรียบร้อยแล้ว';
-        break;
-      case 'VOUCHER_EXPIRED':
-        friendlyMessage = 'ซองของขวัญนี้หมดอายุแล้ว (ซอง TrueMoney มีอายุใช้งาน 72 ชั่วโมง)';
-        break;
-      case 'INTERNAL_ERROR':
-        friendlyMessage = 'ระบบ TrueMoney ขัดข้องชั่วคราว กรุณารอสักครู่แล้วลองใหม่อีกครั้ง';
-        break;
-      default:
-        friendlyMessage = rawMessage || 'ไม่สามารถรับซองของขวัญได้ กรุณาตรวจสอบลิงก์อีกครั้ง';
-        break;
-    }
-
-    return {
-      success: false,
-      code: errCode,
-      error: friendlyMessage,
-    };
   } catch (err: any) {
-    console.error('Error during TrueMoney voucher redeem:', err);
+    console.warn('[Angpao Redeem] Client fallback error:', err?.message);
 
     if (err instanceof TruemoneyTimeoutError) {
-      return {
-        success: false,
-        code: 'TIMEOUT',
-        error: 'การเชื่อมต่อไปยังระบบ TrueMoney หมดเวลา กรุณาลองใหม่อีกครั้ง',
-      };
+      lastErrorCode = 'TIMEOUT';
+      lastErrorMessage = 'การเชื่อมต่อไปยังระบบ TrueMoney หมดเวลา กรุณาลองใหม่อีกครั้ง';
+    } else if (err instanceof TruemoneyApiError) {
+      lastErrorCode = String(err.code || 'API_ERROR');
+      lastErrorMessage = err.envelope?.message || err.message || 'ข้อมูลซองของขวัญไม่ถูกต้อง';
     }
-
-    if (err instanceof TruemoneyApiError) {
-      return {
-        success: false,
-        code: String(err.code || 'API_ERROR'),
-        error: err.envelope?.message || err.message || 'ข้อมูลซองของขวัญไม่ถูกต้อง',
-      };
-    }
-
-    return {
-      success: false,
-      code: 'NETWORK_ERROR',
-      error: err.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อไปยัง TrueMoney กรุณาลองใหม่อีกครั้ง',
-    };
   }
+
+  return {
+    success: false,
+    code: lastErrorCode,
+    error: lastErrorMessage,
+  };
 }
