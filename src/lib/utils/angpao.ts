@@ -69,10 +69,8 @@ export interface AngpaoRedeemResult {
   code?: string;
 }
 
-/**
- * Calls TrueMoney's official voucher redemption API
- * Endpoint: POST https://gift.truemoney.com/campaign/v4/coupons/{voucher_hash}/redeem
- */
+import { Client, TruemoneyApiError, TruemoneyTimeoutError } from '@byteindev/truemoney-voucher';
+
 export async function redeemTrueMoneyVoucher(
   voucherHash: string,
   receiverMobile: string
@@ -96,24 +94,11 @@ export async function redeemTrueMoneyVoucher(
   }
 
   try {
-    const url = `https://gift.truemoney.com/campaign/v4/coupons/${cleanHash}/redeem`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-      },
-      body: JSON.stringify({
-        mobile: cleanedPhone,
-        voucher_hash: cleanHash,
-      }),
-    });
+    const redeemResponse = await Client.redeem(cleanHash, cleanedPhone);
 
-    const resJson = await response.json();
-
-    if (resJson.status?.code === 'SUCCESS') {
-      const voucherData = resJson.data?.voucher;
+    if (redeemResponse.status?.code === 'SUCCESS') {
+      const dataObj = redeemResponse.data as any;
+      const voucherData = dataObj?.voucher;
       const redeemedAmount = Number(
         voucherData?.redeemed_amount_baht || voucherData?.amount_baht || 0
       );
@@ -129,18 +114,23 @@ export async function redeemTrueMoneyVoucher(
       return {
         success: true,
         amount: redeemedAmount,
-        ownerName: resJson.data?.owner_profile?.full_name || 'ลูกค้า',
+        ownerName: dataObj?.owner_profile?.full_name || 'ลูกค้า',
         voucherId: voucherData?.voucher_id || cleanHash,
       };
     }
 
     // Map TrueMoney error codes to clear Thai descriptions
-    const errCode = resJson.status?.code || 'UNKNOWN_ERROR';
-    const rawMessage = resJson.status?.message || '';
+    const errCode = redeemResponse.status?.code || 'UNKNOWN_ERROR';
+    const rawMessage = redeemResponse.status?.message || '';
 
     let friendlyMessage = 'ไม่สามารถรับซองของขวัญได้ กรุณาตรวจสอบความถูกต้อง';
 
     switch (errCode) {
+      case 'VOUCHER_NOT_FOUND':
+      case 'INVALID_VOUCHER':
+      case 'INVALID_VOUCHER_CODE':
+        friendlyMessage = 'ลิงก์ซองของขวัญไม่ถูกต้อง หรือไม่พบข้อมูลซองในระบบ TrueMoney';
+        break;
       case 'VOUCHER_OUT_OF_STOCK':
         friendlyMessage = 'ซองของขวัญนี้ถูกรับไปแล้ว หรือยอดเงินในซองหมดแล้ว';
         break;
@@ -152,12 +142,11 @@ export async function redeemTrueMoneyVoucher(
         friendlyMessage =
           'ไม่พบบัญชี TrueMoney ของเบอร์ปลายทางที่ร้านค้าตั้งค่าไว้ กรุณาติดต่อแอดมิน';
         break;
+      case 'TARGET_USER_REDEEMED':
+        friendlyMessage = 'เบอร์ร้านค้านี้ได้รับเงินจากซองของขวัญนี้ไปเรียบร้อยแล้ว';
+        break;
       case 'VOUCHER_EXPIRED':
         friendlyMessage = 'ซองของขวัญนี้หมดอายุแล้ว (ซอง TrueMoney มีอายุใช้งาน 72 ชั่วโมง)';
-        break;
-      case 'INVALID_VOUCHER':
-      case 'INVALID_VOUCHER_CODE':
-        friendlyMessage = 'ลิงก์ซองของขวัญไม่ถูกต้อง หรือไม่พบข้อมูลซองในระบบ TrueMoney';
         break;
       case 'INTERNAL_ERROR':
         friendlyMessage = 'ระบบ TrueMoney ขัดข้องชั่วคราว กรุณารอสักครู่แล้วลองใหม่อีกครั้ง';
@@ -173,11 +162,28 @@ export async function redeemTrueMoneyVoucher(
       error: friendlyMessage,
     };
   } catch (err: any) {
-    console.error('Network error during TrueMoney voucher redeem:', err);
+    console.error('Error during TrueMoney voucher redeem:', err);
+
+    if (err instanceof TruemoneyTimeoutError) {
+      return {
+        success: false,
+        code: 'TIMEOUT',
+        error: 'การเชื่อมต่อไปยังระบบ TrueMoney หมดเวลา กรุณาลองใหม่อีกครั้ง',
+      };
+    }
+
+    if (err instanceof TruemoneyApiError) {
+      return {
+        success: false,
+        code: String(err.code || 'API_ERROR'),
+        error: err.envelope?.message || err.message || 'ข้อมูลซองของขวัญไม่ถูกต้อง',
+      };
+    }
+
     return {
       success: false,
       code: 'NETWORK_ERROR',
-      error: 'เกิดข้อผิดพลาดในการเชื่อมต่อไปยัง TrueMoney กรุณาลองใหม่อีกครั้ง',
+      error: err.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อไปยัง TrueMoney กรุณาลองใหม่อีกครั้ง',
     };
   }
 }

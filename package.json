@@ -11,6 +11,7 @@
     "set-admin": "node scripts/set-admin.mjs"
   },
   "dependencies": {
+    "@byteindev/truemoney-voucher": "^1.1.1",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.2",
     "@types/canvas-confetti": "^1.9.0",
