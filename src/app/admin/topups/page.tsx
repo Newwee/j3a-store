@@ -15,6 +15,8 @@ import {
   Loader2,
   User,
   ShieldCheck,
+  Gift,
+  QrCode,
 } from 'lucide-react';
 import { TopupRequest, TopupStatus } from '@/types/topup';
 import { getAllTopups, approveTopup, rejectTopup } from '@/lib/firestore/topups';
@@ -176,9 +178,10 @@ export default function AdminTopupsPage() {
               <thead className="bg-slate-950/80 text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-800">
                 <tr>
                   <th className="py-4 px-4 sm:px-6">รหัสคำขอ</th>
+                  <th className="py-4 px-4">ช่องทาง</th>
                   <th className="py-4 px-4">ลูกค้า (User ID & Email)</th>
                   <th className="py-4 px-4">ยอดเงินแจ้งโอน</th>
-                  <th className="py-4 px-4">สลิปหลักฐาน</th>
+                  <th className="py-4 px-4">หลักฐาน</th>
                   <th className="py-4 px-4">สถานะ</th>
                   <th className="py-4 px-4">วันที่แจ้ง</th>
                   <th className="py-4 px-4 sm:px-6 text-right">การดำเนินการ</th>
@@ -187,6 +190,10 @@ export default function AdminTopupsPage() {
               <tbody className="divide-y divide-slate-800/80">
                 {filteredTopups.map((topup) => {
                   const isProcessing = processingId === topup.id;
+                  const isAngpao =
+                    topup.paymentMethod === 'truemoney_angpao' ||
+                    Boolean(topup.voucherHash) ||
+                    Boolean(topup.paymentSlipUrl?.includes('gift.truemoney.com'));
 
                   return (
                     <tr key={topup.id} className="hover:bg-slate-850/50 transition-colors">
@@ -195,6 +202,21 @@ export default function AdminTopupsPage() {
                         <span className="font-bold text-white font-mono">
                           #{topup.topupNumber}
                         </span>
+                      </td>
+
+                      {/* Payment Method / Channel */}
+                      <td className="py-4 px-4 whitespace-nowrap">
+                        {isAngpao ? (
+                          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-rose-300 bg-rose-500/10 border border-rose-500/30 px-2.5 py-1 rounded-full">
+                            <Gift className="w-3.5 h-3.5 text-rose-400" />
+                            <span>TrueMoney ซอง (ออโต้)</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-300 bg-slate-800/60 border border-slate-700/60 px-2.5 py-1 rounded-full">
+                            <QrCode className="w-3.5 h-3.5 text-cyan-400" />
+                            <span>สลิป QR Code</span>
+                          </span>
+                        )}
                       </td>
 
                       {/* User Info */}
@@ -215,12 +237,27 @@ export default function AdminTopupsPage() {
                         </span>
                       </td>
 
-                      {/* Slip preview button */}
+                      {/* Slip / Link preview button */}
                       <td className="py-4 px-4 whitespace-nowrap">
-                        {topup.paymentSlipUrl ? (
+                        {isAngpao ? (
+                          topup.paymentSlipUrl?.startsWith('http') ? (
+                            <a
+                              href={topup.paymentSlipUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/40 text-rose-300 text-xs font-semibold hover:bg-rose-500/20 transition-colors inline-flex items-center gap-1.5"
+                            >
+                              <Gift className="w-3.5 h-3.5" />
+                              <span>ซองของขวัญ</span>
+                              <ExternalLink className="w-3 h-3 text-rose-400" />
+                            </a>
+                          ) : (
+                            <span className="text-slate-400 text-xs font-mono">ซองของขวัญ</span>
+                          )
+                        ) : topup.paymentSlipUrl ? (
                           <button
                             onClick={() => setViewingSlip(topup)}
-                            className="px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-400/40 text-cyan-300 text-xs font-semibold hover:bg-cyan-500/20 transition-colors flex items-center gap-1.5 cursor-pointer"
+                            className="px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-400/40 text-cyan-300 text-xs font-semibold hover:bg-cyan-500/20 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
                           >
                             <Receipt className="w-3.5 h-3.5" />
                             <span>ดูสลิปโอน</span>

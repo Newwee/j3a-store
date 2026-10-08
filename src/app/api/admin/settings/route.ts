@@ -19,6 +19,7 @@ export async function POST(req: Request) {
 
     if (body.storeName !== undefined) updates.store_name = body.storeName;
     if (body.promptpay !== undefined) updates.promptpay = body.promptpay;
+    if (body.truemoneyPhone !== undefined) updates.truemoney_phone = body.truemoneyPhone;
     if (body.lineContact !== undefined) updates.line_contact = body.lineContact;
     if (body.discordContact !== undefined) updates.discord_contact = body.discordContact;
     if (body.announcement !== undefined) updates.announcement = body.announcement;

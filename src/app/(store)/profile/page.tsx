@@ -34,7 +34,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { useLoading } from '@/context/LoadingContext';
 import { updateUserProfile } from '@/lib/firestore/users';
-import { createTopupRequest, getUserTopups, subscribeUserTopups } from '@/lib/firestore/topups';
+import { createTopupRequest, getUserTopups, subscribeUserTopups, redeemAngpaoTopup } from '@/lib/firestore/topups';
 import { redeemCodeForUser } from '@/lib/firestore/redeem';
 import { getStoreSettings, DEFAULT_STORE_SETTINGS } from '@/lib/firestore/settings';
 import { StoreSettings } from '@/types/settings';
@@ -76,6 +76,10 @@ function ProfileContent() {
   // Redeem Code state
   const [redeemCodeInput, setRedeemCodeInput] = useState('');
   const [isRedeeming, setIsRedeeming] = useState(false);
+
+  // Angpao Voucher state
+  const [angpaoLinkInput, setAngpaoLinkInput] = useState('');
+  const [isSubmittingAngpao, setIsSubmittingAngpao] = useState(false);
 
   // Top-up History
   const [userTopups, setUserTopups] = useState<TopupRequest[]>([]);
@@ -257,6 +261,42 @@ function ProfileContent() {
     } finally {
       setIsRedeeming(false);
       hideLoading();
+    }
+  };
+
+  const handleRedeemAngpao = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanLink = angpaoLinkInput.trim();
+    if (!cleanLink) {
+      error('กรุณากรอกหรือวางลิงก์ซองของขวัญ TrueMoney Wallet');
+      return;
+    }
+
+    setIsSubmittingAngpao(true);
+    showLoading('กำลังตัดยอดซองของขวัญและเติมเครดิตเข้าบัญชี...');
+    try {
+      const result = await redeemAngpaoTopup(cleanLink);
+      success(result.message || `เติมเงินสำเร็จ! ได้รับเครดิต ${result.amount} บาท`);
+      setAngpaoLinkInput('');
+      await refreshProfile();
+      await loadTopupHistory();
+    } catch (err: any) {
+      error(err.message || 'ไม่สามารถรับซองของขวัญได้ กรุณาตรวจสอบลิงก์อีกครั้ง');
+    } finally {
+      setIsSubmittingAngpao(false);
+      hideLoading();
+    }
+  };
+
+  const handlePasteAngpao = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        setAngpaoLinkInput(text.trim());
+        success('วางลิงก์จากคลิปบอร์ดแล้ว');
+      }
+    } catch {
+      // Ignore if permission denied
     }
   };
 
@@ -675,21 +715,143 @@ function ProfileContent() {
               </div>
             )}
 
-            {/* Method 3: Angpao Voucher (Coming Soon) */}
+            {/* Method 3: Angpao Voucher (Live & Fully Automated) */}
             {topupMethod === 'angpao' && (
-              <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-8 backdrop-blur-md text-center max-w-2xl mx-auto space-y-4">
-                <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 mx-auto">
-                  <Gift className="w-8 h-8" />
+              <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8 backdrop-blur-md max-w-2xl mx-auto space-y-6">
+                {/* Header */}
+                <div className="text-center space-y-2">
+                  <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-red-600/20 via-rose-600/30 to-amber-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 mx-auto shadow-lg shadow-rose-500/10">
+                    <span className="animate-ping absolute inset-0 rounded-2xl bg-rose-500 opacity-20"></span>
+                    <Gift className="w-8 h-8 text-rose-400" />
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-ping" />
+                      AUTO 24 ชม.
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                      <CheckCircle2 className="w-3 h-3" />
+                      เงินเข้าทันที
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
+                      <Sparkles className="w-3 h-3" />
+                      ฟรีค่าธรรมเนียม 0%
+                    </span>
+                  </div>
+
+                  <h3 className="text-xl font-black text-white tracking-tight">
+                    ซองของขวัญ TrueMoney Wallet (อั่งเปาอัตโนมัติ)
+                  </h3>
+                  <p className="text-xs text-slate-300 max-w-md mx-auto leading-relaxed">
+                    วางลิงก์ซองของขวัญ TrueMoney แล้วกดยืนยัน ระบบจะตัดยอดเข้ากระเป๋าและเติมเครดิตเข้าบัญชีของคุณทันที
+                  </p>
                 </div>
-                <h3 className="text-lg font-bold text-white">
-                  ซองอั่งเปา TrueMoney Wallet (Angpao Voucher)
-                </h3>
-                <span className="inline-block px-3 py-1 rounded-full text-xs font-black bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                  🧧 Coming Soon
-                </span>
-                <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
-                  ระบบตัดยอดซองของขวัญ TrueMoney Wallet อัตโนมัติ 24 ชม. กำลังอยู่ระหว่างการเชื่อมต่อ API ในระหว่างนี้ กรุณาแจ้งเติมเงินผ่าน <strong>"1. อัปโหลดสลิป"</strong> ได้ตามปกติครับ
-                </p>
+
+                {/* 3 Step Instructions */}
+                <div className="bg-slate-950/70 rounded-2xl p-4 border border-slate-800 space-y-3">
+                  <div className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    <span>ขั้นตอนการสร้างซองของขวัญในแอป TrueMoney</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                    <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800/80 space-y-1">
+                      <span className="text-[10px] font-black text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded">
+                        ขั้นตอนที่ 1
+                      </span>
+                      <p className="text-slate-300 font-medium leading-relaxed">
+                        เปิดแอป <strong>TrueMoney</strong> กด <strong>โอนเงิน</strong> &gt; <strong>ส่งซองของขวัญ</strong>
+                      </p>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-slate-900/80 border border-rose-500/30 space-y-1">
+                      <span className="text-[10px] font-black text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                        ขั้นตอนที่ 2 (สำคัญ)
+                      </span>
+                      <p className="text-slate-300 font-medium leading-relaxed">
+                        ใส่ยอดเงินที่ต้องการเติม และเลือก <strong>จำนวนคนรับ = 1 คน</strong>
+                      </p>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800/80 space-y-1">
+                      <span className="text-[10px] font-black text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded">
+                        ขั้นตอนที่ 3
+                      </span>
+                      <p className="text-slate-300 font-medium leading-relaxed">
+                        คัดลอกลิงก์ซองของขวัญมาวางในช่องด้านล่าง แล้วกดยืนยัน
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Redemption Form */}
+                <form onSubmit={handleRedeemAngpao} className="space-y-4">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                        <Gift className="w-3.5 h-3.5 text-rose-400" />
+                        <span>ลิงก์ซองของขวัญ TrueMoney Wallet *</span>
+                      </label>
+                      {typeof navigator !== 'undefined' && navigator.clipboard && (
+                        <button
+                          type="button"
+                          onClick={handlePasteAngpao}
+                          className="text-[11px] font-semibold text-rose-400 hover:text-rose-300 flex items-center gap-1 cursor-pointer transition-colors"
+                        >
+                          <Copy className="w-3 h-3" />
+                          <span>วางจากคลิปบอร์ด</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={angpaoLinkInput}
+                        onChange={(e) => setAngpaoLinkInput(e.target.value)}
+                        placeholder="https://gift.truemoney.com/campaign/?v=xxxxxxx"
+                        className="w-full bg-slate-950/80 text-sm text-slate-100 placeholder:text-slate-600 rounded-2xl px-4 py-3.5 border border-slate-700/80 focus:border-rose-500 outline-none transition-all pr-20 font-mono shadow-inner"
+                        disabled={isSubmittingAngpao}
+                      />
+                      {angpaoLinkInput && (
+                        <button
+                          type="button"
+                          onClick={() => setAngpaoLinkInput('')}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-white px-2 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 transition-colors cursor-pointer"
+                        >
+                          ล้าง
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      ตัวอย่าง: <span className="font-mono text-slate-500">https://gift.truemoney.com/campaign/?v=37013acbde0846068e...</span>
+                    </p>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="lg"
+                    isLoading={isSubmittingAngpao}
+                    leftIcon={<Send className="w-4 h-4" />}
+                    className="w-full bg-gradient-to-r from-red-600 via-rose-600 to-red-500 hover:from-red-500 hover:to-rose-500 border-none shadow-[0_0_25px_rgba(244,63,94,0.4)] hover:shadow-[0_0_35px_rgba(244,63,94,0.6)] font-bold text-sm cursor-pointer"
+                  >
+                    {isSubmittingAngpao ? 'กำลังตัดยอดซองและเติมเครดิต...' : 'ยืนยันเติมเงินด้วยซองของขวัญ (รับเครดิตทันที)'}
+                  </Button>
+                </form>
+
+                {/* Safety & Notice */}
+                <div className="p-3.5 rounded-xl bg-slate-950/40 border border-slate-800/80 text-xs text-slate-400 space-y-1">
+                  <p className="flex items-center gap-1.5 font-bold text-slate-300">
+                    <Shield className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>ข้อควรทราบและคำแนะนำความปลอดภัย</span>
+                  </p>
+                  <ul className="list-disc list-inside space-y-0.5 text-[11px] text-slate-400">
+                    <li>ระบบจะตัดยอดเงินเข้า TrueMoney ของร้านค้าทันที และเพิ่มเครดิตในเว็บให้อัตโนมัติในไม่กี่วินาที</li>
+                    <li>ซองของขวัญต้องตั้งค่า <strong>"จำนวนคนที่ได้รับสิทธิ์ = 1 คน"</strong> เท่านั้น</li>
+                    <li>ไม่สามารถใช้ซองของขวัญที่สร้างจากเบอร์เดียวกันกับเบอร์ร้านค้าได้ (กฎของ TrueMoney)</li>
+                  </ul>
+                </div>
               </div>
             )}
 
@@ -781,59 +943,95 @@ function ProfileContent() {
                     <thead className="bg-slate-950/60 text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-800">
                       <tr>
                         <th className="py-3 px-4">รหัสคำขอ</th>
+                        <th className="py-3 px-4">ช่องทาง</th>
                         <th className="py-3 px-4">ยอดเงิน</th>
                         <th className="py-3 px-4">สถานะ</th>
-                        <th className="py-3 px-4">หลักฐานสลิป</th>
+                        <th className="py-3 px-4">หลักฐาน</th>
                         <th className="py-3 px-4 text-right">วันที่แจ้ง</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/80">
-                      {userTopups.map((topup) => (
-                        <tr key={topup.id} className="hover:bg-slate-850/50 transition-colors">
-                          <td className="py-3 px-4 font-mono font-bold text-white">
-                            #{topup.topupNumber}
-                          </td>
-                          <td className="py-3 px-4 font-bold text-cyan-400">
-                            {formatCurrency(topup.amount)}
-                          </td>
-                          <td className="py-3 px-4">
-                            {topup.status === 'approved' ? (
-                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-                                <CheckCircle2 className="w-3 h-3" /> อนุมัติเข้ากระเป๋าแล้ว
-                              </span>
-                            ) : topup.status === 'rejected' ? (
-                              <div className="space-y-0.5">
-                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/30 px-2 py-0.5 rounded-full">
-                                  <XCircle className="w-3 h-3" /> ปฏิเสธ
+                      {userTopups.map((topup) => {
+                        const isAngpao =
+                          topup.paymentMethod === 'truemoney_angpao' ||
+                          Boolean(topup.voucherHash) ||
+                          Boolean(topup.paymentSlipUrl?.includes('gift.truemoney.com'));
+
+                        return (
+                          <tr key={topup.id} className="hover:bg-slate-850/50 transition-colors">
+                            <td className="py-3 px-4 font-mono font-bold text-white">
+                              #{topup.topupNumber}
+                            </td>
+                            <td className="py-3 px-4">
+                              {isAngpao ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/30 px-2 py-0.5 rounded-full">
+                                  <Gift className="w-3 h-3 text-rose-400" />
+                                  ซอง TrueMoney
                                 </span>
-                                {topup.adminNote && (
-                                  <p className="text-[10px] text-rose-300/80">{topup.adminNote}</p>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-300 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full">
-                                <Clock className="w-3 h-3" /> รอ Admin ตรวจสอบ
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-3 px-4">
-                            {topup.paymentSlipUrl ? (
-                              <button
-                                onClick={() => setViewingSlip(topup)}
-                                className="inline-flex items-center gap-1 text-cyan-400 hover:underline text-[11px] font-semibold cursor-pointer"
-                              >
-                                <FileImage className="w-3.5 h-3.5" />
-                                <span>ดูสลิป</span>
-                              </button>
-                            ) : (
-                              <span className="text-slate-600">-</span>
-                            )}
-                          </td>
-                          <td className="py-3 px-4 text-right text-slate-400">
-                            {formatDate(topup.createdAt)}
-                          </td>
-                        </tr>
-                      ))}
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-400 bg-slate-800/60 border border-slate-700/60 px-2 py-0.5 rounded-full">
+                                  <QrCode className="w-3 h-3 text-cyan-400" />
+                                  สลิป QR Code
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3 px-4 font-bold text-cyan-400">
+                              {formatCurrency(topup.amount)}
+                            </td>
+                            <td className="py-3 px-4">
+                              {topup.status === 'approved' ? (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                                  <CheckCircle2 className="w-3 h-3" /> อนุมัติเข้ากระเป๋าแล้ว
+                                </span>
+                              ) : topup.status === 'rejected' ? (
+                                <div className="space-y-0.5">
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/30 px-2 py-0.5 rounded-full">
+                                    <XCircle className="w-3 h-3" /> ปฏิเสธ
+                                  </span>
+                                  {topup.adminNote && (
+                                    <p className="text-[10px] text-rose-300/80">{topup.adminNote}</p>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-300 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                                  <Clock className="w-3 h-3" /> รอ Admin ตรวจสอบ
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3 px-4">
+                              {isAngpao ? (
+                                topup.paymentSlipUrl?.startsWith('http') ? (
+                                  <a
+                                    href={topup.paymentSlipUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-rose-400 hover:text-rose-300 hover:underline text-[11px] font-semibold"
+                                  >
+                                    <Gift className="w-3.5 h-3.5" />
+                                    <span>ลิ้งค์ซอง</span>
+                                    <ExternalLink className="w-3 h-3" />
+                                  </a>
+                                ) : (
+                                  <span className="text-[11px] text-slate-400 font-mono">ซองของขวัญ</span>
+                                )
+                              ) : topup.paymentSlipUrl ? (
+                                <button
+                                  onClick={() => setViewingSlip(topup)}
+                                  className="inline-flex items-center gap-1 text-cyan-400 hover:underline text-[11px] font-semibold cursor-pointer"
+                                >
+                                  <FileImage className="w-3.5 h-3.5" />
+                                  <span>ดูสลิป</span>
+                                </button>
+                              ) : (
+                                <span className="text-slate-600">-</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-4 text-right text-slate-400">
+                              {formatDate(topup.createdAt)}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

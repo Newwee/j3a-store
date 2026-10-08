@@ -14,6 +14,7 @@ export default function AdminSettingsPage() {
   const { success, error } = useToast();
   const [storeName, setStoreName] = useState(DEFAULT_STORE_SETTINGS.storeName);
   const [promptpay, setPromptpay] = useState(DEFAULT_STORE_SETTINGS.promptpay);
+  const [truemoneyPhone, setTruemoneyPhone] = useState(DEFAULT_STORE_SETTINGS.truemoneyPhone || '0983892996');
   const [lineContact, setLineContact] = useState(DEFAULT_STORE_SETTINGS.lineContact);
   const [discordContact, setDiscordContact] = useState(DEFAULT_STORE_SETTINGS.discordContact);
   const [announcement, setAnnouncement] = useState(DEFAULT_STORE_SETTINGS.announcement);
@@ -35,6 +36,7 @@ export default function AdminSettingsPage() {
         const data = await getStoreSettings();
         setStoreName(data.storeName);
         setPromptpay(data.promptpay);
+        setTruemoneyPhone(data.truemoneyPhone || data.promptpay || '0983892996');
         setLineContact(data.lineContact);
         setDiscordContact(data.discordContact);
         setAnnouncement(data.announcement);
@@ -61,9 +63,11 @@ export default function AdminSettingsPage() {
     setSaving(true);
     try {
       const cleanPromptpay = promptpay.trim().replace(/[^0-9]/g, '');
+      const cleanTruemoneyPhone = truemoneyPhone.trim().replace(/[^0-9]/g, '');
       await updateStoreSettings({
         storeName: storeName.trim(),
         promptpay: cleanPromptpay || promptpay.trim(),
+        truemoneyPhone: cleanTruemoneyPhone || cleanPromptpay || '0983892996',
         lineContact: lineContact.trim(),
         discordContact: discordContact.trim(),
         announcement: announcement.trim(),
@@ -158,6 +162,19 @@ export default function AdminSettingsPage() {
                 />
                 <p className="text-[11px] text-slate-400">
                   * เลขนี้จะถูกนำไปสร้าง PromptPay QR Code อัตโนมัติในหน้าเติมเงินของลูกค้า
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <Input
+                  label="เบอร์ TrueMoney Wallet สำหรับรับเงินซองของขวัญ (Angpao Receiver Phone)"
+                  value={truemoneyPhone}
+                  onChange={(e) => setTruemoneyPhone(e.target.value)}
+                  placeholder="08xxxxxxxx หรือ 09xxxxxxxx"
+                  required
+                />
+                <p className="text-[11px] text-rose-400/90">
+                  * เมื่อลูกค้าส่งลิงก์ซองของขวัญ TrueMoney ในหน้าเติมเงิน ระบบจะตัดยอดเงินเข้าเบอร์นี้ทันทีอัตโนมัติ 24 ชม. (ฟรี 0% ไม่มีค่าธรรมเนียม)
                 </p>
               </div>
 

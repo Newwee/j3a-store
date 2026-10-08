@@ -9,6 +9,8 @@ export interface TopupRequest {
   amount: number;
   paymentSlipUrl: string;
   status: TopupStatus;
+  paymentMethod?: 'slip' | 'truemoney_angpao';
+  voucherHash?: string;
   adminNote?: string;
   createdAt: string;
   updatedAt: string;

@@ -1,6 +1,8 @@
 export interface StoreSettings {
   storeName: string;
   promptpay: string;
+  /** เบอร์ TrueMoney Wallet สำหรับรับเงินซองของขวัญ (Angpao Voucher) */
+  truemoneyPhone?: string;
   lineContact: string;
   discordContact: string;
   announcement: string;

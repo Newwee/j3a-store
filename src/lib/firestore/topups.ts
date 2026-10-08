@@ -12,6 +12,8 @@ function mapRowToTopup(row: any): TopupRequest {
     amount: Number(row.amount) || 0,
     paymentSlipUrl: row.payment_slip_url || '',
     status: (row.status as TopupStatus) || 'pending',
+    paymentMethod: row.payment_method || 'slip',
+    voucherHash: row.voucher_hash || undefined,
     adminNote: row.admin_note || undefined,
     createdAt: row.created_at || new Date().toISOString(),
     updatedAt: row.updated_at || new Date().toISOString(),
@@ -267,4 +269,39 @@ export function subscribeUserTopups(
   return () => {
     supabase.removeChannel(channel);
   };
+}
+
+/**
+ * Redeem a TrueMoney Gift Voucher (ซองอั่งเปา) automatically
+ */
+export async function redeemAngpaoTopup(voucherLink: string): Promise<{
+  success: boolean;
+  amount: number;
+  newCredits: number;
+  ownerName?: string;
+  topupNumber?: string;
+  message?: string;
+}> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData?.session?.access_token;
+
+  if (!token) {
+    throw new Error('กรุณาเข้าสู่ระบบก่อนทำรายการเติมเงิน');
+  }
+
+  const res = await fetch('/api/topup/angpao', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ voucherLink }),
+  });
+
+  const json = await res.json();
+  if (!res.ok || !json.ok) {
+    throw new Error(json.error || 'ไม่สามารถรับซองของขวัญได้');
+  }
+
+  return json;
 }
