@@ -18,6 +18,8 @@ import {
   Wallet,
   Star,
   Ticket,
+  Megaphone,
+  ClipboardCheck,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils/cn';
@@ -77,6 +79,16 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
       href: '/admin/reviews',
       label: 'จัดการรีวิว (Reviews)',
       icon: Star,
+    },
+    {
+      href: '/admin/announcements',
+      label: 'ประกาศ & ป๊อปอัป (Campaigns)',
+      icon: Megaphone,
+    },
+    {
+      href: '/admin/audit-logs',
+      label: 'ประวัติระบบ (Audit Logs)',
+      icon: ClipboardCheck,
     },
     {
       href: '/admin/settings',

@@ -34,6 +34,7 @@ import { uploadProductImage } from '@/lib/storage/upload';
 import { getStoreSettings, DEFAULT_STORE_SETTINGS } from '@/lib/firestore/settings';
 import { StoreSettings } from '@/types/settings';
 import { LicenseAgreementCard } from '@/components/license/LicenseAgreementCard';
+import SlideCommit from '@/components/ui/SlideCommit';
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -183,12 +184,12 @@ export default function CheckoutPage() {
     }
   };
 
-  const handlePlaceOrder = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const executeOrderPayment = async () => {
     if (!validate()) {
       const firstError = Object.values(formErrors)[0];
-      error(firstError || 'กรุณากรอกข้อมูลที่จำเป็นและยอมรับเงื่อนไขให้ครบถ้วน');
-      return;
+      const errMsg = firstError || 'กรุณากรอกข้อมูลที่จำเป็นและยอมรับเงื่อนไขให้ครบถ้วน';
+      error(errMsg);
+      throw new Error(errMsg);
     }
 
     setIsProcessing(true);
@@ -198,15 +199,14 @@ export default function CheckoutPage() {
       // 1. Process Wallet Payment Deduction
       if (paymentMethod === 'wallet') {
         if (!user) {
-          error('กรุณาเข้าสู่ระบบก่อนทำการชำระเงินด้วยยอดเงินในเว็บไซต์');
-          setIsProcessing(false);
-          hideLoading();
-          return;
+          const errMsg = 'กรุณาเข้าสู่ระบบก่อนทำการชำระเงินด้วยยอดเงินในเว็บไซต์';
+          error(errMsg);
+          throw new Error(errMsg);
         }
         if (userCredits < total) {
-          error(`ยอดเงินคงเหลือในเว็บไซต์ไม่เพียงพอ (คงเหลือ ฿${userCredits}) กรุณาเติมเงินก่อนทำรายการ`);
-          setIsProcessing(false);
-          return;
+          const errMsg = `ยอดเงินคงเหลือในเว็บไซต์ไม่เพียงพอ (คงเหลือ ฿${userCredits}) กรุณาเติมเงินก่อนทำรายการ`;
+          error(errMsg);
+          throw new Error(errMsg);
         }
 
         // Deduct user credits in Firestore
@@ -322,13 +322,22 @@ export default function CheckoutPage() {
           : `สร้างคำสั่งซื้อ #${created.orderNumber} สำเร็จแล้ว!`
       );
       router.push(`/orders/${created.id}`);
+      return created;
     } catch (err: any) {
       console.error('Error placing order:', err);
       error(`เกิดข้อผิดพลาดในการสร้างคำสั่งซื้อ: ${err.message || 'กรุณาลองใหม่อีกครั้ง'}`);
+      throw err;
     } finally {
       setIsProcessing(false);
       hideLoading();
     }
+  };
+
+  const handlePlaceOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await executeOrderPayment();
+    } catch {}
   };
 
   const promptpayNumber = storeSettings.promptpay || process.env.NEXT_PUBLIC_PROMPTPAY_NUMBER || '081-234-5678';
@@ -676,6 +685,37 @@ export default function CheckoutPage() {
                     <span>โปรดกดยอมรับเงื่อนไข 1 คีย์ต่อ 1 เครื่อง ด้านซ้ายก่อนดำเนินการชำระเงิน</span>
                   </div>
                 )}
+
+                {/* Slide to Pay Interactive Action */}
+                <div className="pt-2 flex flex-col items-center">
+                  <div className="w-full flex justify-center">
+                    <SlideCommit
+                      label={`เลื่อนเพื่อชำระเงิน (${formatCurrency(total)})`}
+                      doneLabel="ชำระเงินสำเร็จแล้ว!"
+                      errorLabel="ข้อมูลไม่ครบถ้วน หรือมีข้อผิดพลาด"
+                      onConfirm={async () => {
+                        return await executeOrderPayment();
+                      }}
+                      onDone={() => {}}
+                      onError={(err) => {
+                        console.error('Payment rejected:', err);
+                      }}
+                      trackColor="#090d16"
+                      handleColor="#06b6d4"
+                      successColor="#10b981"
+                      dangerColor="#ef4444"
+                      width="100%"
+                      height={54}
+                      radius={27}
+                      disabled={isProcessing || (hasLicenseItem && !isLicenseAgreed)}
+                    />
+                  </div>
+                  <div className="w-full flex items-center gap-3 my-3">
+                    <div className="h-px bg-slate-800 flex-1" />
+                    <span className="text-[11px] text-slate-500 font-medium">หรือกดยืนยันผ่านปุ่ม</span>
+                    <div className="h-px bg-slate-800 flex-1" />
+                  </div>
+                </div>
 
                 <Button
                   type="submit"

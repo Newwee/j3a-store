@@ -81,7 +81,7 @@ export async function getStoreDashboardStats(isAdmin = false): Promise<StoreStat
     // 4. Admin stats (orders list, revenue, pending topups)
     if (isAdmin) {
       try {
-        const orders = await getOrders({ limitCount: 50 });
+        const orders = await getOrders({ limitCount: 500 });
         recentOrders = orders;
         const validOrders = orders.filter((ord) => ord.status !== 'cancelled');
         if (totalOrders === 0) {
