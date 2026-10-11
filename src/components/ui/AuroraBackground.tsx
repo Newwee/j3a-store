@@ -20,11 +20,11 @@ export const AuroraBackground = memo(function AuroraBackground({
 }: AuroraBackgroundProps) {
   return (
     <div
-      className={`aurora-bg fixed inset-0 pointer-events-none z-0 overflow-hidden bg-[#09080e] transition-colors duration-500 ${className}`}
+      className={`aurora-bg fixed inset-0 pointer-events-none -z-50 overflow-hidden bg-[#09080e] transition-colors duration-500 ${className}`}
       aria-hidden="true"
     >
       {/* 3D WebGL Particles Background (Full-screen across the entire page & all scroll views) */}
-      <div className="particles-layer absolute inset-0 pointer-events-none overflow-hidden z-0 opacity-75">
+      <div className="particles-layer absolute inset-0 pointer-events-none overflow-hidden -z-50 opacity-75">
         <Particles
           particleColors={['#6187ff', '#38bdf8', '#818cf8']}
           particleCount={220}
@@ -39,7 +39,7 @@ export const AuroraBackground = memo(function AuroraBackground({
       </div>
 
       {/* Aurora Ambient Glow Blobs (GPU-accelerated, soft & non-distracting) */}
-      <div className="aurora-blobs-layer absolute inset-0 opacity-40 dark:opacity-35 transition-opacity duration-1000">
+      <div className="aurora-blobs-layer absolute inset-0 opacity-40 dark:opacity-35 transition-opacity duration-1000 pointer-events-none">
         {/* Blob 1: Cyan Ambient Top-Left */}
         <div
           className="absolute -top-[10%] -left-[10%] w-[55vw] h-[55vw] max-w-[700px] max-h-[700px] rounded-full bg-gradient-to-tr from-cyan-500/20 via-sky-500/15 to-transparent blur-[120px] will-change-transform animate-[aurora-drift-1_22s_ease-in-out_infinite_alternate]"
@@ -58,11 +58,16 @@ export const AuroraBackground = memo(function AuroraBackground({
           style={{ transform: 'translate3d(0, 0, 0)' }}
         />
 
-        {/* Soft Center Vignette */}
-        {showRadialGradient && (
-          <div className="aurora-vignette absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,transparent_0%,rgba(9,8,14,0.65)_70%,rgba(9,8,14,0.95)_100%)] transition-all duration-500" />
-        )}
+        {/* Blob 4: Hero Center Ambient Glow (Smoothly blended, full width, lowest layer) */}
+        <div
+          className="absolute top-[5%] left-1/2 -translate-x-1/2 w-[75vw] h-[600px] max-w-[950px] rounded-full bg-gradient-to-b from-cyan-500/15 via-indigo-500/10 to-transparent blur-[140px] will-change-transform pointer-events-none"
+        />
       </div>
+
+      {/* Soft Center Vignette (Gentle transition without harsh dark bands) */}
+      {showRadialGradient && (
+        <div className="aurora-vignette absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,transparent_0%,rgba(9,8,14,0.35)_75%,rgba(9,8,14,0.75)_100%)] pointer-events-none transition-all duration-500" />
+      )}
 
       {children}
     </div>
