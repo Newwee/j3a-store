@@ -231,7 +231,7 @@ export default function AdminProductsPage() {
       />
 
       {/* Filter and Search Bar */}
-      <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 sm:p-5 backdrop-blur-md flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+      <div className="relative z-30 bg-slate-900/60 border border-slate-800 rounded-2xl p-4 sm:p-5 backdrop-blur-md flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
         {/* Search */}
         <div className="relative flex-1">
           <input
@@ -255,6 +255,7 @@ export default function AdminProductsPage() {
             ]}
             placeholder="หมวดหมู่"
             menuWidth="w-52"
+            align="right"
           />
 
           <CustomDropdown
@@ -268,6 +269,7 @@ export default function AdminProductsPage() {
             ]}
             placeholder="สถานะ"
             menuWidth="w-56"
+            align="right"
           />
         </div>
       </div>
@@ -303,7 +305,7 @@ export default function AdminProductsPage() {
           )}
         </div>
       ) : (
-        <div className="bg-slate-900/60 border border-slate-800 rounded-3xl overflow-hidden backdrop-blur-md shadow-xl">
+        <div className="relative z-10 bg-slate-900/60 border border-slate-800 rounded-3xl overflow-hidden backdrop-blur-md shadow-xl">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs sm:text-sm text-slate-300">
               <thead className="bg-slate-950/80 text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-800">

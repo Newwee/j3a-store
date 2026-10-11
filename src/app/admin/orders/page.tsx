@@ -101,7 +101,7 @@ export default function AdminOrdersPage() {
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 sm:p-5 backdrop-blur-md flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+      <div className="relative z-30 bg-slate-900/60 border border-slate-800 rounded-2xl p-4 sm:p-5 backdrop-blur-md flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
         <div className="relative flex-1">
           <input
             type="text"
@@ -126,6 +126,7 @@ export default function AdminOrdersPage() {
           ]}
           placeholder="สถานะคำสั่งซื้อ"
           menuWidth="w-60"
+          align="right"
         />
       </div>
 
@@ -142,7 +143,7 @@ export default function AdminOrdersPage() {
           description="ยังไม่มีคำสั่งซื้อที่ตรงกับตัวกรองที่คุณเลือก"
         />
       ) : (
-        <div className="bg-slate-900/60 border border-slate-800 rounded-3xl overflow-hidden backdrop-blur-md shadow-xl">
+        <div className="relative z-10 bg-slate-900/60 border border-slate-800 rounded-3xl overflow-hidden backdrop-blur-md shadow-xl">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs sm:text-sm text-slate-300">
               <thead className="bg-slate-950/80 text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-800">

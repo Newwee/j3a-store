@@ -17,6 +17,7 @@ interface CustomDropdownProps {
   placeholder?: string;
   className?: string;
   menuWidth?: string;
+  align?: 'left' | 'right';
 }
 
 export function CustomDropdown({
@@ -27,6 +28,7 @@ export function CustomDropdown({
   placeholder = 'เลือกตัวเลือก',
   className = '',
   menuWidth = 'w-56',
+  align = 'right',
 }: CustomDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -57,7 +59,10 @@ export function CustomDropdown({
   }, [isOpen]);
 
   return (
-    <div ref={containerRef} className={`relative inline-block text-left ${className}`}>
+    <div
+      ref={containerRef}
+      className={`relative inline-block text-left ${isOpen ? 'z-50' : 'z-10'} ${className}`}
+    >
       {/* Trigger Button */}
       <button
         type="button"
@@ -84,7 +89,7 @@ export function CustomDropdown({
       {/* Dropdown Menu Popover */}
       {isOpen && (
         <div
-          className={`absolute left-0 mt-2 ${menuWidth} max-h-72 overflow-y-auto rounded-2xl bg-slate-900/95 backdrop-blur-xl border border-cyan-500/30 p-1.5 shadow-[0_16px_40px_rgba(0,0,0,0.85),0_0_20px_rgba(6,182,212,0.15)] ring-1 ring-cyan-500/20 z-50 animate-in fade-in zoom-in-95 duration-150 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent`}
+          className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} mt-2 ${menuWidth} max-h-72 overflow-y-auto rounded-2xl bg-slate-900/98 backdrop-blur-2xl border border-cyan-500/40 p-1.5 shadow-[0_20px_50px_rgba(0,0,0,0.9),0_0_25px_rgba(6,182,212,0.2)] ring-1 ring-cyan-500/30 z-[100] animate-in fade-in zoom-in-95 duration-150 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent`}
         >
           {options.map((option) => {
             const isSelected = option.value === value;
