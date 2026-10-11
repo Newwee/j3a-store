@@ -141,30 +141,24 @@ export async function POST(req: Request) {
       });
     }
 
-    if (action === 'seed') {
-      const { data } = await supabaseAdmin
+    if (action === 'delete_all') {
+      const { error } = await supabaseAdmin
         .from('redeem_codes')
-        .select('id')
-        .eq('code', 'J3AOPENING')
-        .limit(1)
-        .maybeSingle();
+        .delete()
+        .neq('id', '');
 
-      if (!data) {
-        await supabaseAdmin.from('redeem_codes').insert([
-          {
-            id: 'code_j3a_opening',
-            code: 'J3AOPENING',
-            credits: 20,
-            max_uses: 0,
-            used_count: 0,
-            used_by: [],
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        ]);
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
       }
 
+      return NextResponse.json({
+        ok: true,
+        success: true,
+      });
+    }
+
+    if (action === 'seed') {
+      // Disabled: do not re-insert any codes automatically
       return NextResponse.json({ ok: true });
     }
 

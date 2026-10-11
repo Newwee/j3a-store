@@ -26,7 +26,7 @@ import {
   createRedeemCode,
   updateRedeemCode,
   deleteRedeemCode,
-  seedOpeningCodeIfNotExists,
+  deleteAllRedeemCodes,
   RedeemCode,
   CodeType,
 } from '@/lib/firestore/redeem';
@@ -58,11 +58,12 @@ export default function AdminCodesPage() {
   // Delete state
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeleteAllModalOpen, setIsDeleteAllModalOpen] = useState(false);
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
 
   const loadCodes = async () => {
     setIsLoading(true);
     try {
-      await seedOpeningCodeIfNotExists();
       const data = await getAllRedeemCodes();
       setCodes(data);
     } catch (err: any) {
@@ -171,6 +172,20 @@ export default function AdminCodesPage() {
     }
   };
 
+  const handleDeleteAll = async () => {
+    setIsDeletingAll(true);
+    try {
+      await deleteAllRedeemCodes();
+      success('ลบโค้ดทั้งหมดเรียบร้อยแล้ว');
+      setIsDeleteAllModalOpen(false);
+      await loadCodes();
+    } catch (err: any) {
+      error(`ไม่สามารถลบโค้ดทั้งหมด: ${err.message || 'เกิดข้อผิดพลาด'}`);
+    } finally {
+      setIsDeletingAll(false);
+    }
+  };
+
   // Filter by category & search
   const filteredCodes = codes.filter((c) => {
     const matchesSearch = c.code.toLowerCase().includes(search.toLowerCase().trim());
@@ -184,8 +199,6 @@ export default function AdminCodesPage() {
   const creditCodesCount = codes.filter((c) => c.codeType === 'credit').length;
   const discountCodesCount = codes.filter((c) => c.codeType === 'discount_percent' || c.codeType === 'discount_fixed').length;
   const totalUsesCount = codes.reduce((sum, c) => sum + (c.usedCount || 0), 0);
-
-  const hasOpeningCode = codes.some((c) => c.code === 'J3AOPENING');
 
   return (
     <div className="space-y-6">
@@ -202,6 +215,18 @@ export default function AdminCodesPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          {codes.length > 0 && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setIsDeleteAllModalOpen(true)}
+              className="border-rose-500/30 text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/60"
+              leftIcon={<Trash2 className="w-4 h-4" />}
+            >
+              ลบโค้ดทั้งหมด
+            </Button>
+          )}
+
           <Button
             variant="secondary"
             size="sm"
@@ -262,35 +287,6 @@ export default function AdminCodesPage() {
           </div>
         </div>
       </div>
-
-      {/* Opening Banner recommendation */}
-      {!hasOpeningCode && (
-        <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/20 via-orange-500/10 to-transparent border border-amber-500/30 flex items-center justify-between gap-4 shadow-lg">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <div>
-              <h4 className="text-sm font-bold text-white">โค้ดเปิดร้าน J3AOPENING</h4>
-              <p className="text-xs text-amber-300/80">
-                ยังไม่มีโค้ด J3AOPENING ในระบบ กดเพื่อสร้างโค้ดแจกฟรี 20 เครดิตทันที
-              </p>
-            </div>
-          </div>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={async () => {
-              await seedOpeningCodeIfNotExists();
-              await loadCodes();
-              success('สร้างโค้ด J3AOPENING (20 เครดิต) เรียบร้อยแล้ว');
-            }}
-            className="bg-amber-400 text-slate-950 font-bold"
-          >
-            สร้างโค้ด J3AOPENING
-          </Button>
-        </div>
-      )}
 
       {/* Filter Tabs and Search Bar */}
       <div className="relative z-30 bg-slate-900/60 border border-slate-800 rounded-2xl p-4 sm:p-5 backdrop-blur-md flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
@@ -563,14 +559,14 @@ export default function AdminCodesPage() {
           {/* Code Name */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-300">
-              รหัสโค้ด (เช่น WELCOME10, DISC50, J3AFREE) *
+              รหัสโค้ด *
             </label>
             <Input
               type="text"
               required
               value={codeName}
               onChange={(e) => setCodeName(e.target.value.toUpperCase())}
-              placeholder="WELCOME10"
+              placeholder="ระบุรหัสโค้ด"
               className="font-mono uppercase font-bold tracking-wider"
             />
           </div>
@@ -702,6 +698,16 @@ export default function AdminCodesPage() {
         isLoading={isDeleting}
         title="ยืนยันการลบโค้ด"
         message="คุณแน่ใจหรือไม่ว่าต้องการลบโค้ดนี้? ผู้ใช้งานจะไม่สามารถนำโค้ดนี้มาใช้ได้อีก"
+      />
+
+      {/* Delete All Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={isDeleteAllModalOpen}
+        onClose={() => setIsDeleteAllModalOpen(false)}
+        onConfirm={handleDeleteAll}
+        isLoading={isDeletingAll}
+        title="ยืนยันการลบโค้ดทั้งหมดในระบบ?"
+        message="การดำเนินการนี้จะลบโค้ดส่วนลดและโค้ดของขวัญทั้งหมดออกจากระบบอย่างถาวร ไม่สามารถกู้คืนได้"
       />
     </div>
   );

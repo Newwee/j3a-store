@@ -832,7 +832,7 @@ export default function CheckoutPage() {
                               handleApplyCoupon();
                             }
                           }}
-                          placeholder="กรอกโค้ด เช่น DISCOUNT10, J3AFREE"
+                          placeholder="กรอกโค้ดส่วนลด"
                           className="w-full bg-slate-950 text-xs font-mono font-bold tracking-wider text-white uppercase placeholder:text-slate-500 rounded-xl px-3 py-2.5 border border-slate-800 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 outline-none transition-all"
                         />
                       </div>

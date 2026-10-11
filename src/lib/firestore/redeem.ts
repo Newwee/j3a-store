@@ -418,50 +418,48 @@ export async function deleteRedeemCode(codeId: string): Promise<void> {
 }
 
 /**
- * Auto-seed opening code 'J3AOPENING'
+ * Delete all redeem codes (Admin)
  */
-export async function seedOpeningCodeIfNotExists(): Promise<void> {
+export async function deleteAllRedeemCodes(): Promise<void> {
+  // 1. Try secure Admin API Route first
   try {
     const { data: sessionData } = await supabase.auth.getSession();
     const token = sessionData?.session?.access_token;
     if (token) {
-      await fetch('/api/admin/codes', {
+      const res = await fetch('/api/admin/codes', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ action: 'seed' }),
+        body: JSON.stringify({
+          action: 'delete_all',
+        }),
       });
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        throw new Error(json.error || 'Failed to delete all codes via admin API');
+      }
       return;
     }
-
-    const { data } = await supabase
-      .from('redeem_codes')
-      .select('id')
-      .eq('code', 'J3AOPENING')
-      .limit(1)
-      .maybeSingle();
-
-    if (!data) {
-      await supabase.from('redeem_codes').insert([
-        {
-          id: 'code_j3a_opening',
-          code: 'J3AOPENING',
-          credits: 20,
-          code_type: 'credit',
-          max_uses: 0,
-          used_count: 0,
-          used_by: [],
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-      ]);
+  } catch (apiErr: any) {
+    console.warn('API delete all codes fallback:', apiErr);
+    if (apiErr?.message && !apiErr.message.includes('fetch')) {
+      throw apiErr;
     }
-  } catch (err) {
-    console.warn('seedOpeningCodeIfNotExists note:', err);
   }
+
+  // 2. Direct authenticated supabase client fallback
+  const { error } = await supabase.from('redeem_codes').delete().neq('id', '');
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Auto-seed opening code: disabled to allow complete user deletion
+ */
+export async function seedOpeningCodeIfNotExists(): Promise<void> {
+  // Disabled: do not re-insert deleted codes automatically
+  return;
 }
 
 /**

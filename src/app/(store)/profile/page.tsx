@@ -883,7 +883,7 @@ function ProfileContent() {
                         type="text"
                         value={redeemCodeInput}
                         onChange={(e) => setRedeemCodeInput(e.target.value.toUpperCase())}
-                        placeholder="เช่น J3A-WELCOME, NEWYEAR2026"
+                        placeholder="กรอกรหัสโค้ดของขวัญ"
                         className="flex-1 bg-slate-950/80 text-white font-mono font-bold tracking-wider uppercase text-sm rounded-xl px-4 py-3 border border-slate-800 focus:border-amber-400 outline-none"
                       />
                       <Button
