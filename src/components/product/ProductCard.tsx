@@ -98,10 +98,17 @@ export function ProductCard({ product }: { product: Product }) {
           <div className="flex items-center justify-between gap-2 mb-1.5">
             <span className="text-xs text-slate-400 line-clamp-1">{product.category}</span>
             <div className="flex items-center gap-1.5">
-              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-400">
-                <Star className="w-3 h-3 fill-amber-400" />
-                {(product.rating || 5.0).toFixed(1)}
-              </span>
+              {product.reviewCount && product.reviewCount > 0 ? (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-400">
+                  <Star className="w-3 h-3 fill-amber-400" />
+                  {(product.rating || 5.0).toFixed(1)}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500">
+                  <Star className="w-3 h-3 text-slate-600" />
+                  0.0
+                </span>
+              )}
               <ProductStatusBadge status={product.status} />
             </div>
           </div>

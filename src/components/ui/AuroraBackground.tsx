@@ -1,6 +1,11 @@
 'use client';
 
 import React, { memo } from 'react';
+import dynamic from 'next/dynamic';
+
+const Particles = dynamic(() => import('@/components/ui/Particles'), {
+  ssr: false,
+});
 
 export interface AuroraBackgroundProps {
   className?: string;
@@ -18,6 +23,21 @@ export const AuroraBackground = memo(function AuroraBackground({
       className={`aurora-bg fixed inset-0 pointer-events-none z-0 overflow-hidden bg-[#09080e] transition-colors duration-500 ${className}`}
       aria-hidden="true"
     >
+      {/* 3D WebGL Particles Background (Full-screen across the entire page & all scroll views) */}
+      <div className="particles-layer absolute inset-0 pointer-events-none overflow-hidden z-0 opacity-75">
+        <Particles
+          particleColors={['#6187ff', '#38bdf8', '#818cf8']}
+          particleCount={220}
+          particleSpread={14}
+          speed={0.18}
+          particleBaseSize={100}
+          moveParticlesOnHover={false}
+          alphaParticles={false}
+          disableRotation={false}
+          pixelRatio={1}
+        />
+      </div>
+
       {/* Aurora Ambient Glow Blobs (GPU-accelerated, soft & non-distracting) */}
       <div className="aurora-blobs-layer absolute inset-0 opacity-40 dark:opacity-35 transition-opacity duration-1000">
         {/* Blob 1: Cyan Ambient Top-Left */}

@@ -39,10 +39,6 @@ const ElectricLogo = dynamic(() => import('@/components/ui/ElectricLogo'), {
   ),
 });
 
-const Particles = dynamic(() => import('@/components/ui/Particles'), {
-  ssr: false,
-});
-
 export function HeroSection() {
   const { t } = useLanguage();
   const [settings, setSettings] = useState<StoreSettings | null>(null);
@@ -63,21 +59,6 @@ export function HeroSection() {
 
   return (
     <section className="relative overflow-hidden pt-8 pb-16 lg:pt-16 lg:pb-24">
-      {/* 3D WebGL Particles Background (Settings matched with user Image 4) */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 opacity-70">
-        <Particles
-          particleColors={['#6187ff']}
-          particleCount={200}
-          particleSpread={10}
-          speed={0.2}
-          particleBaseSize={100}
-          moveParticlesOnHover={false}
-          alphaParticles={false}
-          disableRotation={false}
-          pixelRatio={1}
-        />
-      </div>
-
       {/* Soft ambient atmospheric glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[500px] bg-gradient-to-tr from-cyan-500/10 via-indigo-500/10 to-transparent rounded-full blur-[140px] pointer-events-none" />
 

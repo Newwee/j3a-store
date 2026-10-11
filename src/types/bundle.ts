@@ -28,6 +28,8 @@ export interface BundlePackage {
   tags?: string[];
   hasOutOfStockItems?: boolean; // มีสินค้าในบันเดิลหมดสต็อก
   outOfStockItemNames?: string[]; // รายชื่อสินค้าในบันเดิลที่หมด
+  rating?: number;
+  reviewCount?: number;
   createdAt: string;
   updatedAt: string;
 }

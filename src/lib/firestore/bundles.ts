@@ -65,6 +65,8 @@ function mapRowToBundle(row: any): BundlePackage {
     status: (row.status as BundleStatus) || 'active',
     featured: Boolean(row.featured),
     tags,
+    rating: typeof row.rating === 'number' ? Number(row.rating) : 0,
+    reviewCount: typeof row.review_count === 'number' ? Number(row.review_count) : 0,
     createdAt: row.created_at || new Date().toISOString(),
     updatedAt: row.updated_at || new Date().toISOString(),
   };
@@ -389,8 +391,8 @@ export function bundleToProduct(bundle: BundlePackage): Product {
         ? `มีสินค้าใน Bundle หมด (${bundle.outOfStockItemNames?.join(', ') || ''})`
         : 'สินค้าครบทุกชิ้นพร้อมส่ง',
     },
-    rating: (bundle as any).rating || 5.0,
-    reviewCount: (bundle as any).reviewCount || 0,
+    rating: typeof bundle.rating === 'number' ? bundle.rating : 0,
+    reviewCount: typeof bundle.reviewCount === 'number' ? bundle.reviewCount : 0,
     createdAt: bundle.createdAt,
     updatedAt: bundle.updatedAt,
   };

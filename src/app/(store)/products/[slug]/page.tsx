@@ -68,6 +68,32 @@ export default function ProductDetailPage({
             item = bundleToProduct(bundle);
           }
         }
+
+        // Sync live reviews directly from database to guarantee 100% consistency with review list
+        if (item) {
+          try {
+            const { data: revList } = await supabase
+              .from('reviews')
+              .select('rating')
+              .eq('product_id', item.id);
+
+            if (revList && revList.length > 0) {
+              const totalRev = revList.length;
+              const sumRev = revList.reduce((acc, curr) => {
+                const r = Number(curr.rating) || 5;
+                return acc + (r > 5 ? r / 2 : r);
+              }, 0);
+              item.reviewCount = totalRev;
+              item.rating = Number((sumRev / totalRev).toFixed(1));
+            } else {
+              item.reviewCount = 0;
+              item.rating = 0;
+            }
+          } catch (syncErr) {
+            console.warn('Could not sync live review stats:', syncErr);
+          }
+        }
+
         if (isMounted) {
           setProduct(item);
         }
@@ -94,6 +120,13 @@ export default function ProductDetailPage({
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'bundles' },
+        () => {
+          loadProduct();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'reviews' },
         () => {
           loadProduct();
         }
@@ -303,26 +336,42 @@ export default function ProductDetailPage({
             )}
 
             {/* Rating Stars Summary */}
-            <div className="flex items-center gap-2.5 text-xs">
-              <div className="flex items-center gap-0.5">
-                {[1, 2, 3, 4, 5].map((s) => (
-                  <Star
-                    key={s}
-                    className={`w-4 h-4 ${
-                      s <= Math.round(product.rating || 5)
-                        ? 'fill-amber-400 text-amber-400'
-                        : 'text-slate-700'
-                    }`}
-                  />
-                ))}
-              </div>
-              <span className="font-bold text-amber-400">
-                {(product.rating || 5.0).toFixed(1)}
-              </span>
-              <span className="text-slate-500">
-                ({product.reviewCount || 0} รีวิวจากผู้ซื้อจริง)
-              </span>
-            </div>
+            {(() => {
+              const hasReviews = typeof product.reviewCount === 'number' && product.reviewCount > 0;
+              const displayRating = hasReviews ? Number(product.rating || 0) : 0;
+              const starCount = hasReviews ? Math.round(displayRating) : 0;
+
+              return (
+                <div className="flex items-center gap-2.5 text-xs">
+                  <div className="flex items-center gap-0.5">
+                    {[1, 2, 3, 4, 5].map((s) => (
+                      <Star
+                        key={s}
+                        className={`w-4 h-4 ${
+                          s <= starCount
+                            ? 'fill-amber-400 text-amber-400'
+                            : 'text-slate-700'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  {hasReviews ? (
+                    <>
+                      <span className="font-bold text-amber-400">
+                        {displayRating.toFixed(1)}
+                      </span>
+                      <span className="text-slate-400 font-medium">
+                        ({product.reviewCount} รีวิวจากผู้ซื้อจริง)
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-slate-500 font-medium">
+                      (ยังไม่มีรีวิวจากผู้ซื้อจริง)
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Pricing Section */}
             <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur-sm flex items-center justify-between">

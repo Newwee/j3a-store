@@ -133,19 +133,32 @@ export function BundleCard({ bundle }: BundleCardProps) {
             )}
 
             {/* Bundle Rating & Review Link */}
-            <div className="flex items-center gap-2 mt-1.5">
-              <Link
-                href={`/products/${bundle.slug || bundle.id}?openReview=true`}
-                className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-400 hover:text-amber-300 transition-colors group/rate"
-                title="กดเพื่อให้คะแนนหรือดูรีวิวแพ็กเกจนี้"
-              >
-                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                <span>{((bundle as any).rating || 5.0).toFixed(1)}</span>
-                <span className="text-[10px] text-slate-400 font-normal group-hover/rate:text-cyan-400 underline ml-0.5">
-                  ({(bundle as any).reviewCount || 0} รีวิว • ให้คะแนน ⭐)
-                </span>
-              </Link>
-            </div>
+            {(() => {
+              const hasReviews = typeof bundle.reviewCount === 'number' && bundle.reviewCount > 0;
+              const displayRating = hasReviews ? Number(bundle.rating || 0) : 0;
+
+              return (
+                <div className="flex items-center gap-2 mt-1.5">
+                  <Link
+                    href={`/products/${bundle.slug || bundle.id}?openReview=true`}
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-400 hover:text-amber-300 transition-colors group/rate"
+                    title="กดเพื่อให้คะแนนหรือดูรีวิวแพ็กเกจนี้"
+                  >
+                    <Star
+                      className={`w-3.5 h-3.5 ${
+                        hasReviews ? 'fill-amber-400 text-amber-400' : 'text-slate-600'
+                      }`}
+                    />
+                    <span>{hasReviews ? displayRating.toFixed(1) : '0.0'}</span>
+                    <span className="text-[10px] text-slate-400 font-normal group-hover/rate:text-cyan-400 underline ml-0.5">
+                      {hasReviews
+                        ? `(${bundle.reviewCount} รีวิว • ดูรีวิว ⭐)`
+                        : '(ยังไม่มีรีวิว • ให้คะแนนคนแรก ⭐)'}
+                    </span>
+                  </Link>
+                </div>
+              );
+            })()}
 
             <p className="text-xs text-slate-400 line-clamp-2 mt-1 leading-relaxed">
               {bundle.description || 'แพ็กเกจรวมสินค้าสุดคุ้มในราคาพิเศษ'}
