@@ -1,9 +1,14 @@
 import { supabase } from '@/lib/supabase/client';
 
+export type CodeType = 'credit' | 'discount_percent' | 'discount_fixed';
+
 export interface RedeemCode {
   id: string;
   code: string;
+  codeType: CodeType;
   amount: number;
+  discountPercent?: number;
+  minSpend?: number;
   maxUses: number;
   usedCount: number;
   usedByUsers: string[];
@@ -21,6 +26,18 @@ export interface RedeemResult {
   usedCount?: number;
 }
 
+export interface ValidateDiscountResult {
+  valid: boolean;
+  message: string;
+  code?: string;
+  codeType?: CodeType;
+  discountAmount?: number;
+  discountPercent?: number;
+  minSpend?: number;
+  isCreditCode?: boolean;
+  creditAmount?: number;
+}
+
 function mapRowToRedeemCode(row: any): RedeemCode {
   const usedBy = Array.isArray(row.used_by)
     ? row.used_by
@@ -28,10 +45,24 @@ function mapRowToRedeemCode(row: any): RedeemCode {
     ? JSON.parse(row.used_by || '[]')
     : [];
 
+  const rawType = row.code_type || 'credit';
+  let codeType: CodeType = 'credit';
+  if (rawType === 'discount_percent' || row.discount_type === 'percent') {
+    codeType = 'discount_percent';
+  } else if (rawType === 'discount_fixed' || row.discount_type === 'fixed') {
+    codeType = 'discount_fixed';
+  }
+
+  const creditsNum = Number(row.credits) || 0;
+  const discountVal = Number(row.discount_value) || creditsNum;
+
   return {
     id: row.id,
     code: row.code,
-    amount: Number(row.credits) || 0,
+    codeType,
+    amount: codeType === 'discount_percent' ? discountVal : (creditsNum || discountVal || 0),
+    discountPercent: codeType === 'discount_percent' ? (discountVal || creditsNum) : undefined,
+    minSpend: Number(row.min_spend) || 0,
     maxUses: Number(row.max_uses) || 0,
     usedCount: Number(row.used_count) || 0,
     usedByUsers: usedBy,
@@ -206,9 +237,13 @@ export async function getAllRedeemCodes(): Promise<RedeemCode[]> {
 
 export interface CreateRedeemCodeInput {
   code: string;
+  codeType?: CodeType;
   amount: number;
+  discountPercent?: number;
+  minSpend?: number;
   maxUses?: number;
   isActive?: boolean;
+  expiresAt?: string;
 }
 
 /**
@@ -217,7 +252,12 @@ export interface CreateRedeemCodeInput {
 export async function createRedeemCode(input: CreateRedeemCodeInput): Promise<RedeemCode> {
   const cleanCode = input.code.trim().toUpperCase();
   if (!cleanCode) throw new Error('กรุณากรอกรหัสโค้ด');
-  if (input.amount <= 0) throw new Error('จำนวนเครดิตต้องมากกว่า 0');
+  if (input.amount <= 0 && (!input.discountPercent || input.discountPercent <= 0)) {
+    throw new Error('มูลค่าส่วนลดหรือจำนวนเครดิตต้องมากกว่า 0');
+  }
+
+  const codeType = input.codeType || 'credit';
+  const discountVal = codeType === 'discount_percent' ? (Number(input.discountPercent) || input.amount) : input.amount;
 
   // 1. Try secure Admin API Route first
   try {
@@ -233,7 +273,11 @@ export async function createRedeemCode(input: CreateRedeemCodeInput): Promise<Re
         body: JSON.stringify({
           action: 'create',
           code: cleanCode,
+          codeType,
           amount: input.amount,
+          discountValue: discountVal,
+          discountPercent: input.discountPercent,
+          minSpend: input.minSpend || 0,
           maxUses: input.maxUses || 0,
           isActive: input.isActive ?? true,
         }),
@@ -256,7 +300,11 @@ export async function createRedeemCode(input: CreateRedeemCodeInput): Promise<Re
   const row = {
     id,
     code: cleanCode,
+    code_type: codeType,
+    discount_type: codeType === 'discount_percent' ? 'percent' : 'fixed',
+    discount_value: discountVal,
     credits: Math.round(input.amount),
+    min_spend: Number(input.minSpend) || 0,
     max_uses: Number(input.maxUses) || 0,
     used_count: 0,
     used_by: [],
@@ -401,6 +449,7 @@ export async function seedOpeningCodeIfNotExists(): Promise<void> {
           id: 'code_j3a_opening',
           code: 'J3AOPENING',
           credits: 20,
+          code_type: 'credit',
           max_uses: 0,
           used_count: 0,
           used_by: [],
@@ -412,5 +461,148 @@ export async function seedOpeningCodeIfNotExists(): Promise<void> {
     }
   } catch (err) {
     console.warn('seedOpeningCodeIfNotExists note:', err);
+  }
+}
+
+/**
+ * Validate a discount coupon code during checkout
+ */
+export async function validateDiscountCode(
+  codeStr: string,
+  subtotal: number,
+  userId?: string
+): Promise<ValidateDiscountResult> {
+  const clean = codeStr.trim().toUpperCase();
+  if (!clean) {
+    return { valid: false, message: 'กรุณากรอกโค้ดส่วนลด' };
+  }
+
+  try {
+    const { data: row, error } = await supabase
+      .from('redeem_codes')
+      .select('*')
+      .eq('code', clean)
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !row) {
+      return { valid: false, message: 'ไม่พบโค้ดนี้ในระบบ หรือโค้ดไม่ถูกต้อง' };
+    }
+
+    const code = mapRowToRedeemCode(row);
+
+    if (!code.isActive) {
+      return { valid: false, message: 'โค้ดนี้หมดอายุหรือถูกปิดการใช้งานแล้ว' };
+    }
+
+    if (code.expiresAt && new Date(code.expiresAt).getTime() < Date.now()) {
+      return { valid: false, message: 'โค้ดนี้หมดอายุการใช้งานแล้ว' };
+    }
+
+    if (code.maxUses > 0 && code.usedCount >= code.maxUses) {
+      return { valid: false, message: 'สิทธิ์การใช้งานโค้ดนี้เต็มแล้ว' };
+    }
+
+    if (userId && code.usedByUsers.includes(userId)) {
+      return { valid: false, message: 'คุณเคยใช้สิทธิ์โค้ดนี้ไปแล้ว' };
+    }
+
+    // Check if this is a general credit code (not checkout discount)
+    if (code.codeType === 'credit') {
+      return {
+        valid: false,
+        isCreditCode: true,
+        code: code.code,
+        creditAmount: code.amount,
+        message: `โค้ด "${code.code}" เป็นโค้ดของขวัญเติมเครดิต ฿${code.amount} เข้ากระเป๋าเงิน (ไม่ใช่โค้ดลดราคาสินค้า)`,
+      };
+    }
+
+    // Checkout Discount code: Check minSpend
+    if (code.minSpend && code.minSpend > 0 && subtotal < code.minSpend) {
+      return {
+        valid: false,
+        message: `ยอดสั่งซื้อไม่ถึงขั้นต่ำสำหรับโค้ดนี้ (ขั้นต่ำ ฿${code.minSpend})`,
+      };
+    }
+
+    let discountAmount = 0;
+    if (code.codeType === 'discount_percent') {
+      const pct = code.discountPercent || code.amount;
+      discountAmount = Math.round((subtotal * pct) / 100);
+    } else {
+      discountAmount = Math.min(subtotal, code.amount);
+    }
+
+    return {
+      valid: true,
+      code: code.code,
+      codeType: code.codeType,
+      discountAmount,
+      discountPercent: code.discountPercent,
+      minSpend: code.minSpend,
+      message: `ใช้โค้ดส่วนลด "${code.code}" สำเร็จ! ลดทันที ฿${discountAmount}`,
+    };
+  } catch (err: any) {
+    console.error('Error validating discount code:', err);
+    return { valid: false, message: 'เกิดข้อผิดพลาดในการตรวจสอบโค้ด' };
+  }
+}
+
+/**
+ * Record usage of a checkout discount code when an order is created
+ */
+export async function recordDiscountUsage(codeStr: string, userId?: string): Promise<void> {
+  const clean = codeStr.trim().toUpperCase();
+  if (!clean) return;
+
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (token) {
+      await fetch('/api/redeem', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ action: 'record_discount', code: clean }),
+      });
+      return;
+    }
+  } catch (apiErr) {
+    console.warn('API record discount usage fallback:', apiErr);
+  }
+
+  // Fallback direct
+  try {
+    const { data: row } = await supabase
+      .from('redeem_codes')
+      .select('id, used_count, used_by')
+      .eq('code', clean)
+      .limit(1)
+      .maybeSingle();
+
+    if (row) {
+      const usedBy: string[] = Array.isArray(row.used_by)
+        ? row.used_by
+        : typeof row.used_by === 'string'
+        ? JSON.parse(row.used_by || '[]')
+        : [];
+
+      const newUsedCount = (Number(row.used_count) || 0) + 1;
+      const newUsedBy = userId ? Array.from(new Set([...usedBy, userId])) : usedBy;
+
+      await supabase
+        .from('redeem_codes')
+        .update({
+          used_count: newUsedCount,
+          used_by: newUsedBy,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', row.id);
+    }
+  } catch (err) {
+    console.warn('Direct record discount usage error:', err);
   }
 }

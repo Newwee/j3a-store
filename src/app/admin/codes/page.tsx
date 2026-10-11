@@ -15,6 +15,10 @@ import {
   Search,
   Calendar,
   AlertCircle,
+  Percent,
+  Tag,
+  DollarSign,
+  Filter,
 } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 import {
@@ -24,11 +28,13 @@ import {
   deleteRedeemCode,
   seedOpeningCodeIfNotExists,
   RedeemCode,
+  CodeType,
 } from '@/lib/firestore/redeem';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { DeleteConfirmModal } from '@/components/admin/DeleteConfirmModal';
+import { formatCurrency, formatNumber } from '@/lib/utils/formatters';
 
 export default function AdminCodesPage() {
   const { success, error, toast } = useToast();
@@ -36,11 +42,15 @@ export default function AdminCodesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [filterType, setFilterType] = useState<'all' | 'credit' | 'discount'>('all');
 
   // Create Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [codeName, setCodeName] = useState('');
+  const [codeType, setCodeType] = useState<CodeType>('credit');
   const [amount, setAmount] = useState('20');
+  const [discountPercent, setDiscountPercent] = useState('10');
+  const [minSpend, setMinSpend] = useState('0');
   const [maxUses, setMaxUses] = useState('0');
   const [isActive, setIsActive] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -52,7 +62,6 @@ export default function AdminCodesPage() {
   const loadCodes = async () => {
     setIsLoading(true);
     try {
-      // Auto seed J3AOPENING if first time
       await seedOpeningCodeIfNotExists();
       const data = await getAllRedeemCodes();
       setCodes(data);
@@ -81,24 +90,49 @@ export default function AdminCodesPage() {
       error('กรุณาระบุรหัสโค้ด');
       return;
     }
-    const numAmount = Number(amount);
-    if (isNaN(numAmount) || numAmount <= 0) {
-      error('จำนวนเครดิตต้องมากกว่า 0 บาท');
-      return;
+
+    let finalAmount = Number(amount);
+    let finalPercent = Number(discountPercent);
+
+    if (codeType === 'discount_percent') {
+      if (isNaN(finalPercent) || finalPercent <= 0 || finalPercent > 100) {
+        error('เปอร์เซ็นต์ส่วนลดต้องอยู่ระหว่าง 1 - 100%');
+        return;
+      }
+      finalAmount = finalPercent;
+    } else {
+      if (isNaN(finalAmount) || finalAmount <= 0) {
+        error('จำนวนเงิน/เครดิตต้องมากกว่า 0 บาท');
+        return;
+      }
     }
 
     setIsSubmitting(true);
     try {
       await createRedeemCode({
         code: clean,
-        amount: numAmount,
+        codeType,
+        amount: finalAmount,
+        discountPercent: codeType === 'discount_percent' ? finalPercent : undefined,
+        minSpend: Number(minSpend) || 0,
         maxUses: Number(maxUses) || 0,
         isActive,
       });
-      success(`สร้างโค้ด "${clean}" สำหรับแจก ${numAmount} เครดิตสำเร็จ`);
+
+      const typeDesc =
+        codeType === 'credit'
+          ? `แจก ${finalAmount} เครดิต`
+          : codeType === 'discount_percent'
+          ? `ลด ${finalPercent}% ตอนชำระเงิน`
+          : `ลด ฿${finalAmount} ตอนชำระเงิน`;
+
+      success(`สร้างโค้ด "${clean}" (${typeDesc}) สำเร็จเรียบร้อย`);
       setIsModalOpen(false);
       setCodeName('');
+      setCodeType('credit');
       setAmount('20');
+      setDiscountPercent('10');
+      setMinSpend('0');
       setMaxUses('0');
       setIsActive(true);
       await loadCodes();
@@ -137,9 +171,19 @@ export default function AdminCodesPage() {
     }
   };
 
-  const filteredCodes = codes.filter((c) =>
-    c.code.toLowerCase().includes(search.toLowerCase().trim())
-  );
+  // Filter by category & search
+  const filteredCodes = codes.filter((c) => {
+    const matchesSearch = c.code.toLowerCase().includes(search.toLowerCase().trim());
+    if (!matchesSearch) return false;
+
+    if (filterType === 'credit') return c.codeType === 'credit';
+    if (filterType === 'discount') return c.codeType === 'discount_percent' || c.codeType === 'discount_fixed';
+    return true;
+  });
+
+  const creditCodesCount = codes.filter((c) => c.codeType === 'credit').length;
+  const discountCodesCount = codes.filter((c) => c.codeType === 'discount_percent' || c.codeType === 'discount_fixed').length;
+  const totalUsesCount = codes.reduce((sum, c) => sum + (c.usedCount || 0), 0);
 
   const hasOpeningCode = codes.some((c) => c.code === 'J3AOPENING');
 
@@ -149,11 +193,11 @@ export default function AdminCodesPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-white tracking-tight flex items-center gap-2.5">
-            <Ticket className="w-7 h-7 text-amber-400" />
-            <span>จัดการโค้ดของขวัญ & เครดิต (Redeem Codes)</span>
+            <Ticket className="w-7 h-7 text-cyan-400" />
+            <span>จัดการโค้ดในระบบ (Code Management)</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            สร้างและจัดการโค้ดแจกเครดิตฟรีให้ลูกค้าใช้แลกรับเครดิตเข้ากระเป๋าในเว็บไซต์
+            แยกประเภทโค้ด 2 รูปแบบ: <strong>โค้ดของขวัญทั่วไป (แจกเครดิต)</strong> และ <strong>โค้ดส่วนลดตอนจ่ายเงิน (ลดราคาสินค้า)</strong>
           </p>
         </div>
 
@@ -173,10 +217,49 @@ export default function AdminCodesPage() {
             size="sm"
             onClick={() => setIsModalOpen(true)}
             leftIcon={<Plus className="w-4 h-4" />}
-            className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold shadow-[0_0_15px_rgba(251,191,36,0.3)]"
+            className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold shadow-[0_0_15px_rgba(6,182,212,0.3)]"
           >
-            เพิ่มโค้ดใหม่
+            สร้างโค้ดใหม่
           </Button>
+        </div>
+      </div>
+
+      {/* 3 Overview Stat Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur-md flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0">
+            <Ticket className="w-5 h-5" />
+          </div>
+          <div>
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+              โค้ดทั้งหมดในระบบ
+            </span>
+            <strong className="text-xl font-black text-white">{codes.length} โค้ด</strong>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur-md flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+            <Coins className="w-5 h-5" />
+          </div>
+          <div>
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+              โค้ดของขวัญทั่วไป (แจกเครดิต)
+            </span>
+            <strong className="text-xl font-black text-amber-300">{creditCodesCount} โค้ด</strong>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur-md flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+            <Percent className="w-5 h-5" />
+          </div>
+          <div>
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+              โค้ดส่วนลดตอนชำระเงิน
+            </span>
+            <strong className="text-xl font-black text-emerald-300">{discountCodesCount} โค้ด</strong>
+          </div>
         </div>
       </div>
 
@@ -209,8 +292,47 @@ export default function AdminCodesPage() {
         </div>
       )}
 
-      {/* Search and Summary */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      {/* Filter Tabs and Search Bar */}
+      <div className="relative z-30 bg-slate-900/60 border border-slate-800 rounded-2xl p-4 sm:p-5 backdrop-blur-md flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+        {/* Category Pills */}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setFilterType('all')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              filterType === 'all'
+                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-[0_0_15px_rgba(6,182,212,0.15)]'
+                : 'bg-slate-950/80 text-slate-400 hover:text-white border border-slate-800'
+            }`}
+          >
+            ทั้งหมด ({codes.length})
+          </button>
+
+          <button
+            onClick={() => setFilterType('credit')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              filterType === 'credit'
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.15)]'
+                : 'bg-slate-950/80 text-slate-400 hover:text-white border border-slate-800'
+            }`}
+          >
+            <Coins className="w-3.5 h-3.5 text-amber-400" />
+            <span>โค้ดของขวัญทั่วไป ({creditCodesCount})</span>
+          </button>
+
+          <button
+            onClick={() => setFilterType('discount')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              filterType === 'discount'
+                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.15)]'
+                : 'bg-slate-950/80 text-slate-400 hover:text-white border border-slate-800'
+            }`}
+          >
+            <Percent className="w-3.5 h-3.5 text-emerald-400" />
+            <span>โค้ดลดตอนจ่ายเงิน ({discountCodesCount})</span>
+          </button>
+        </div>
+
+        {/* Search */}
         <div className="relative flex-1 max-w-sm">
           <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
@@ -218,62 +340,58 @@ export default function AdminCodesPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="ค้นหาชื่อโค้ด..."
-            className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 focus:border-amber-400 outline-none"
+            className="w-full bg-slate-950/80 text-sm text-slate-100 placeholder:text-slate-500 rounded-xl pl-10 pr-4 py-2 border border-slate-800 focus:border-cyan-400 outline-none"
           />
-        </div>
-
-        <div className="text-xs text-slate-400">
-          ทั้งหมด <strong className="text-white font-bold">{codes.length}</strong> โค้ด
         </div>
       </div>
 
-      {/* Codes Table / Grid */}
-      <div className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden backdrop-blur-md shadow-xl">
-        {isLoading ? (
-          <div className="p-12 text-center text-slate-400 text-sm">
-            <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-amber-400" />
-            กำลังโหลดข้อมูลโค้ด...
-          </div>
-        ) : filteredCodes.length === 0 ? (
-          <div className="p-12 text-center text-slate-400 text-sm">
-            <Ticket className="w-10 h-10 mx-auto mb-3 text-slate-600" />
-            ไม่พบโค้ดของขวัญในระบบ คลิก "เพิ่มโค้ดใหม่" ด้านบนเพื่อสร้างโค้ด
-          </div>
-        ) : (
+      {/* Codes Table */}
+      {isLoading ? (
+        <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-8 space-y-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-16 rounded-xl bg-slate-950 animate-pulse" />
+          ))}
+        </div>
+      ) : filteredCodes.length === 0 ? (
+        <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-12 text-center space-y-3">
+          <Ticket className="w-12 h-12 text-slate-500 mx-auto" />
+          <h3 className="text-base font-bold text-white">ไม่พบโค้ดในหมวดหมู่นี้</h3>
+          <p className="text-xs text-slate-400 max-w-sm mx-auto">
+            คุณสามารถกดสร้างโค้ดใหม่ด้านบนเพื่อแจกเครดิตหรือมอบส่วนลดให้ลูกค้า
+          </p>
+        </div>
+      ) : (
+        <div className="relative z-10 bg-slate-900/60 border border-slate-800 rounded-3xl overflow-hidden backdrop-blur-md shadow-xl">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs sm:text-sm text-slate-300">
-              <thead className="bg-slate-950/80 text-slate-400 uppercase text-[11px] font-bold tracking-wider border-b border-slate-800">
+              <thead className="bg-slate-950/80 text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-800">
                 <tr>
-                  <th className="py-3.5 px-4">รหัสโค้ด (Code)</th>
-                  <th className="py-3.5 px-4">มูลค่าเครดิต</th>
-                  <th className="py-3.5 px-4">การใช้งาน (Used / Max)</th>
-                  <th className="py-3.5 px-4">สถานะ</th>
-                  <th className="py-3.5 px-4">สร้างเมื่อ</th>
-                  <th className="py-3.5 px-4 text-right">จัดการ</th>
+                  <th className="py-4 px-4 sm:px-6">รหัสโค้ด (Code)</th>
+                  <th className="py-4 px-4">ประเภทโค้ด (Type)</th>
+                  <th className="py-4 px-4">มูลค่า (Value)</th>
+                  <th className="py-4 px-4">ยอดสั่งซื้อขั้นต่ำ</th>
+                  <th className="py-4 px-4">การใช้งาน (Used / Max)</th>
+                  <th className="py-4 px-4">สถานะ</th>
+                  <th className="py-4 px-4 sm:px-6 text-right">การจัดการ</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/80">
                 {filteredCodes.map((item) => {
-                  const isOpening = item.code === 'J3AOPENING';
+                  const isCredit = item.codeType === 'credit';
+                  const isPercent = item.codeType === 'discount_percent';
+
                   return (
-                    <tr
-                      key={item.id}
-                      className="hover:bg-slate-800/30 transition-colors group"
-                    >
-                      <td className="py-3.5 px-4">
+                    <tr key={item.id} className="hover:bg-slate-800/40 transition-colors">
+                      {/* Code with Copy */}
+                      <td className="py-4 px-4 sm:px-6 whitespace-nowrap">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono font-black text-white text-base tracking-wider bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-700/80 shadow-sm flex items-center gap-1.5">
+                          <span className="font-mono text-sm font-black text-white px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800">
                             {item.code}
-                            {isOpening && (
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">
-                                HOT
-                              </span>
-                            )}
                           </span>
                           <button
                             onClick={() => handleCopy(item.code)}
-                            className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition-all cursor-pointer"
                             title="คัดลอกโค้ด"
+                            className="p-1.5 rounded-lg bg-slate-800/60 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer"
                           >
                             {copiedCode === item.code ? (
                               <Check className="w-3.5 h-3.5 text-emerald-400" />
@@ -284,52 +402,84 @@ export default function AdminCodesPage() {
                         </div>
                       </td>
 
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-1.5 font-bold text-amber-400">
-                          <Coins className="w-4 h-4" />
-                          <span>+{item.amount.toLocaleString()} ฿</span>
-                        </div>
+                      {/* Type Badge */}
+                      <td className="py-4 px-4 whitespace-nowrap">
+                        {isCredit ? (
+                          <span className="px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[11px] font-bold flex items-center gap-1.5 w-max">
+                            <Coins className="w-3 h-3 text-amber-400" />
+                            <span>โค้ดของขวัญ (เติม Wallet)</span>
+                          </span>
+                        ) : isPercent ? (
+                          <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[11px] font-bold flex items-center gap-1.5 w-max">
+                            <Percent className="w-3 h-3 text-emerald-400" />
+                            <span>ส่วนลดตอนจ่าย (% ลด)</span>
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-[11px] font-bold flex items-center gap-1.5 w-max">
+                            <Tag className="w-3 h-3 text-cyan-400" />
+                            <span>ส่วนลดตอนจ่าย (บาท ฿)</span>
+                          </span>
+                        )}
                       </td>
 
-                      <td className="py-3.5 px-4">
-                        <div className="flex flex-col gap-0.5">
-                          <span className="font-bold text-slate-200">
-                            {item.usedCount} ครั้ง
+                      {/* Value */}
+                      <td className="py-4 px-4 whitespace-nowrap">
+                        {isCredit ? (
+                          <span className="font-bold text-amber-300 font-mono">
+                            +{formatCurrency(item.amount)}
                           </span>
-                          <span className="text-[11px] text-slate-400">
-                            {item.maxUses > 0
-                              ? `จำกัดสูงสุด ${item.maxUses} สิทธิ์`
-                              : 'ไม่จำกัดสิทธิ์ (1 คน / 1 ครั้ง)'}
+                        ) : isPercent ? (
+                          <span className="font-bold text-emerald-300 font-mono">
+                            ลด {item.discountPercent || item.amount}%
                           </span>
-                        </div>
+                        ) : (
+                          <span className="font-bold text-cyan-300 font-mono">
+                            ลด {formatCurrency(item.amount)}
+                          </span>
+                        )}
                       </td>
 
-                      <td className="py-3.5 px-4">
+                      {/* Min Spend */}
+                      <td className="py-4 px-4 whitespace-nowrap text-slate-400">
+                        {item.minSpend && item.minSpend > 0 ? (
+                          <span className="font-mono text-slate-200">
+                            ขั้นต่ำ {formatCurrency(item.minSpend)}
+                          </span>
+                        ) : (
+                          <span className="text-slate-500 text-xs">ไม่มีขั้นต่ำ</span>
+                        )}
+                      </td>
+
+                      {/* Usage */}
+                      <td className="py-4 px-4 whitespace-nowrap">
+                        <span className="font-mono text-slate-200">
+                          {item.usedCount}
+                          <span className="text-slate-500">
+                            {' '}
+                            / {item.maxUses === 0 ? '∞ ไม่จำกัด' : `${item.maxUses} สิทธิ์`}
+                          </span>
+                        </span>
+                      </td>
+
+                      {/* Status */}
+                      <td className="py-4 px-4 whitespace-nowrap">
                         <button
                           onClick={() => handleToggleActive(item)}
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          className={`px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors cursor-pointer ${
                             item.isActive
-                              ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.15)]'
-                              : 'bg-slate-800 text-slate-400 border border-slate-700'
+                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
+                              : 'bg-rose-500/10 text-rose-400 border-rose-500/30 hover:bg-rose-500/20'
                           }`}
                         >
-                          <span
-                            className={`w-2 h-2 rounded-full ${
-                              item.isActive ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
-                            }`}
-                          />
-                          {item.isActive ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}
+                          {item.isActive ? '● ใช้งานอยู่' : '○ ปิดใช้งาน'}
                         </button>
                       </td>
 
-                      <td suppressHydrationWarning className="py-3.5 px-4 text-xs text-slate-400">
-                        {item.createdAt ? new Date(item.createdAt).toLocaleDateString('th-TH') : '-'}
-                      </td>
-
-                      <td className="py-3.5 px-4 text-right">
+                      {/* Actions */}
+                      <td className="py-4 px-4 sm:px-6 text-right whitespace-nowrap">
                         <button
                           onClick={() => setDeleteId(item.id)}
-                          className="p-2 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-all cursor-pointer"
+                          className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
                           title="ลบโค้ด"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -341,74 +491,202 @@ export default function AdminCodesPage() {
               </tbody>
             </table>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Create Code Modal */}
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title="เพิ่มโค้ดของขวัญ / เครดิตฟรี"
-      >
-        <form onSubmit={handleCreateCode} className="space-y-4 pt-2">
-          <Input
-            label="รหัสโค้ด (Code) *"
-            value={codeName}
-            onChange={(e) => setCodeName(e.target.value.toUpperCase())}
-            placeholder="เช่น J3AOPENING, PROMO50, GIFT2026"
-            required
-            helperText="ตัวอักษรภาษาอังกฤษพิมพ์ใหญ่และตัวเลข"
-          />
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="สร้างโค้ดใหม่">
+        <form onSubmit={handleCreateCode} className="space-y-4">
+          {/* Select Code Type */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-300 block">เลือกประเภทของโค้ด (Code Type)</label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <label
+                className={`p-3 rounded-xl border flex flex-col items-center text-center gap-1 cursor-pointer transition-all ${
+                  codeType === 'credit'
+                    ? 'bg-amber-500/15 border-amber-500/50 text-amber-200 shadow-[0_0_15px_rgba(245,158,11,0.2)]'
+                    : 'bg-slate-950/80 border-slate-800 text-slate-400 hover:border-slate-700'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="code_type"
+                  checked={codeType === 'credit'}
+                  onChange={() => setCodeType('credit')}
+                  className="hidden"
+                />
+                <Coins className="w-5 h-5 text-amber-400 mb-0.5" />
+                <strong className="text-xs">โค้ดของขวัญ</strong>
+                <span className="text-[10px] text-slate-400">แจกเครดิตเข้า Wallet</span>
+              </label>
 
-          <Input
-            label="จำนวนเครดิตที่ได้รับ (฿) *"
-            type="number"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="20"
-            required
-            min="1"
-            helperText="เครดิตจะถูกโอนเข้าบัญชีผู้ใช้งานทันทีที่แลกโค้ดสำเร็จ"
-          />
+              <label
+                className={`p-3 rounded-xl border flex flex-col items-center text-center gap-1 cursor-pointer transition-all ${
+                  codeType === 'discount_percent'
+                    ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-200 shadow-[0_0_15px_rgba(16,185,129,0.2)]'
+                    : 'bg-slate-950/80 border-slate-800 text-slate-400 hover:border-slate-700'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="code_type"
+                  checked={codeType === 'discount_percent'}
+                  onChange={() => setCodeType('discount_percent')}
+                  className="hidden"
+                />
+                <Percent className="w-5 h-5 text-emerald-400 mb-0.5" />
+                <strong className="text-xs">ส่วนลด %</strong>
+                <span className="text-[10px] text-slate-400">ลดเป็นเปอร์เซ็นต์ตอนจ่าย</span>
+              </label>
 
-          <Input
-            label="จำกัดจำนวนสิทธิ์ทั้งหมด (คน)"
-            type="number"
-            value={maxUses}
-            onChange={(e) => setMaxUses(e.target.value)}
-            placeholder="0 = ไม่จำกัดจำนวนสิทธิ์"
-            min="0"
-            helperText="กรอก 0 เพื่อให้ใช้งานได้ไม่จำกัด (แต่ละคนจะแลกได้ 1 ครั้ง)"
-          />
+              <label
+                className={`p-3 rounded-xl border flex flex-col items-center text-center gap-1 cursor-pointer transition-all ${
+                  codeType === 'discount_fixed'
+                    ? 'bg-cyan-500/15 border-cyan-500/50 text-cyan-200 shadow-[0_0_15px_rgba(6,182,212,0.2)]'
+                    : 'bg-slate-950/80 border-slate-800 text-slate-400 hover:border-slate-700'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="code_type"
+                  checked={codeType === 'discount_fixed'}
+                  onChange={() => setCodeType('discount_fixed')}
+                  className="hidden"
+                />
+                <Tag className="w-5 h-5 text-cyan-400 mb-0.5" />
+                <strong className="text-xs">ส่วนลด บาท ฿</strong>
+                <span className="text-[10px] text-slate-400">ลดเป็นเงินบาทตอนจ่าย</span>
+              </label>
+            </div>
+          </div>
 
-          <div className="flex items-center gap-2 pt-2">
-            <input
-              type="checkbox"
-              id="isActiveToggle"
-              checked={isActive}
-              onChange={(e) => setIsActive(e.target.checked)}
-              className="w-4 h-4 rounded border-slate-700 bg-slate-900 text-amber-500 focus:ring-amber-400"
+          {/* Code Name */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-slate-300">
+              รหัสโค้ด (เช่น WELCOME10, DISC50, J3AFREE) *
+            </label>
+            <Input
+              type="text"
+              required
+              value={codeName}
+              onChange={(e) => setCodeName(e.target.value.toUpperCase())}
+              placeholder="WELCOME10"
+              className="font-mono uppercase font-bold tracking-wider"
             />
-            <label htmlFor="isActiveToggle" className="text-xs sm:text-sm text-slate-300 cursor-pointer">
-              เปิดให้ใช้งานโค้ดนี้ทันทีหลังสร้าง
+          </div>
+
+          {/* Value Input depends on type */}
+          {codeType === 'credit' && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-300">
+                จำนวนเครดิตที่จะได้รับ (บาท) *
+              </label>
+              <Input
+                type="number"
+                min="1"
+                required
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="20"
+              />
+              <span className="text-[11px] text-slate-400">
+                เมื่อผู้ใช้แลกโค้ดนี้ จะได้รับเครดิตเข้ากระเป๋าเงินทันที
+              </span>
+            </div>
+          )}
+
+          {codeType === 'discount_percent' && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-300">
+                เปอร์เซ็นต์ส่วนลด (%) *
+              </label>
+              <Input
+                type="number"
+                min="1"
+                max="100"
+                required
+                value={discountPercent}
+                onChange={(e) => setDiscountPercent(e.target.value)}
+                placeholder="10"
+              />
+              <span className="text-[11px] text-slate-400">
+                ลด {discountPercent || '0'}% จากยอดรวมของสินค้าในหน้าชำระเงิน
+              </span>
+            </div>
+          )}
+
+          {codeType === 'discount_fixed' && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-300">
+                จำนวนเงินที่ลด (บาท ฿) *
+              </label>
+              <Input
+                type="number"
+                min="1"
+                required
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="50"
+              />
+              <span className="text-[11px] text-slate-400">
+                ลด ฿{amount || '0'} จากยอดรวมในหน้าชำระเงิน
+              </span>
+            </div>
+          )}
+
+          {/* Min Spend for discounts */}
+          {(codeType === 'discount_percent' || codeType === 'discount_fixed') && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-300">
+                ยอดสั่งซื้อขั้นต่ำ (บาท) (0 = ไม่มีขั้นต่ำ)
+              </label>
+              <Input
+                type="number"
+                min="0"
+                value={minSpend}
+                onChange={(e) => setMinSpend(e.target.value)}
+                placeholder="0"
+              />
+            </div>
+          )}
+
+          {/* Max Uses */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-slate-300">
+              จำนวนสิทธิ์สูงสุด (0 = ไม่จำกัดจำนวนสิทธิ์)
+            </label>
+            <Input
+              type="number"
+              min="0"
+              value={maxUses}
+              onChange={(e) => setMaxUses(e.target.value)}
+              placeholder="0"
+            />
+          </div>
+
+          {/* Is Active checkbox */}
+          <div className="pt-2">
+            <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={isActive}
+                onChange={(e) => setIsActive(e.target.checked)}
+                className="accent-cyan-500 rounded"
+              />
+              <span>เปิดใช้งานทันทีหลังจากสร้าง</span>
             </label>
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
-            <Button
-              type="button"
-              variant="secondary"
-              size="md"
-              onClick={() => setIsModalOpen(false)}
-            >
+            <Button type="button" variant="ghost" size="sm" onClick={() => setIsModalOpen(false)}>
               ยกเลิก
             </Button>
             <Button
               type="submit"
               variant="primary"
-              size="md"
+              size="sm"
               isLoading={isSubmitting}
-              className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold"
+              className="bg-cyan-500 text-slate-950 font-bold"
             >
               บันทึกโค้ด
             </Button>
@@ -421,9 +699,9 @@ export default function AdminCodesPage() {
         isOpen={Boolean(deleteId)}
         onClose={() => setDeleteId(null)}
         onConfirm={handleDeleteConfirm}
-        title="ยืนยันการลบโค้ดของขวัญ"
-        itemName={deleteId || 'โค้ดนี้'}
         isLoading={isDeleting}
+        title="ยืนยันการลบโค้ด"
+        message="คุณแน่ใจหรือไม่ว่าต้องการลบโค้ดนี้? ผู้ใช้งานจะไม่สามารถนำโค้ดนี้มาใช้ได้อีก"
       />
     </div>
   );

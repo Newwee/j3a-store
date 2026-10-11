@@ -31,6 +31,7 @@ export interface Order {
   subtotal: number;
   shipping: number;
   discount: number;
+  discountCode?: string;
   total: number;
   paymentMethod: PaymentMethod;
   status: OrderStatus;
@@ -47,6 +48,8 @@ export interface CreateOrderInput {
   subtotal: number;
   shipping: number;
   discount: number;
+  discountCode?: string;
+  transactionRef?: string;
   total: number;
   paymentMethod: PaymentMethod;
   status?: OrderStatus;

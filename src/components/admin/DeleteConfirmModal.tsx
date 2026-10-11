@@ -11,6 +11,7 @@ interface DeleteConfirmModalProps {
   onConfirm: () => Promise<void> | void;
   title?: string;
   itemName?: string;
+  message?: string;
   isLoading?: boolean;
 }
 
@@ -20,6 +21,7 @@ export function DeleteConfirmModal({
   onConfirm,
   title = 'ยืนยันการลบสินค้า?',
   itemName,
+  message,
   isLoading = false,
 }: DeleteConfirmModalProps) {
   return (
@@ -38,7 +40,7 @@ export function DeleteConfirmModal({
         )}
 
         <p className="text-xs text-slate-400 mb-6 leading-relaxed">
-          การดำเนินการนี้จะไม่สามารถย้อนกลับได้ ระบบจะลบข้อมูลสินค้าและรูปภาพที่เกี่ยวข้องออกจากระบบทันที
+          {message || 'การดำเนินการนี้จะไม่สามารถย้อนกลับได้ ระบบจะลบข้อมูลสินค้าและรูปภาพที่เกี่ยวข้องออกจากระบบทันที'}
         </p>
 
         <div className="grid grid-cols-2 gap-3 w-full">

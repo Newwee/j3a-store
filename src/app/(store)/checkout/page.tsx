@@ -18,6 +18,13 @@ import {
   AlertTriangle,
   ShieldCheck,
   ShoppingBag,
+  Ticket,
+  Tag,
+  Gift,
+  Check,
+  Percent,
+  X,
+  Sparkles,
 } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
@@ -25,6 +32,7 @@ import { useToast } from '@/context/ToastContext';
 import { useLoading } from '@/context/LoadingContext';
 import { createOrder } from '@/lib/firestore/orders';
 import { deductUserCredits } from '@/lib/firestore/users';
+import { validateDiscountCode, redeemCodeForUser, recordDiscountUsage, CodeType } from '@/lib/firestore/redeem';
 import { PaymentMethod } from '@/types/order';
 import { PaymentService } from '@/lib/services/payment';
 import { formatCurrency } from '@/lib/utils/formatters';
@@ -40,7 +48,7 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { items, subtotal, shipping, total, clearCart } = useCart();
   const { user, profile, refreshProfile } = useAuth();
-  const { success, error, toast } = useToast();
+  const { success, error, info, toast } = useToast();
   const { showLoading, hideLoading } = useLoading();
 
   const [storeSettings, setStoreSettings] = useState<StoreSettings>(DEFAULT_STORE_SETTINGS);
@@ -69,6 +77,26 @@ export default function CheckoutPage() {
   const [address, setAddress] = useState('จัดส่งดิจิทัลทันทีผ่านระบบ / Email');
   const [notes, setNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('wallet');
+
+  // Coupon / Discount Code state
+  const [couponInput, setCouponInput] = useState('');
+  const [appliedDiscount, setAppliedDiscount] = useState<{
+    code: string;
+    codeType: CodeType;
+    amount: number;
+    percent?: number;
+    minSpend?: number;
+  } | null>(null);
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
+  const [couponMessage, setCouponMessage] = useState<{
+    type: 'success' | 'error' | 'info';
+    text: string;
+  } | null>(null);
+  const [creditOffer, setCreditOffer] = useState<{
+    code: string;
+    amount: number;
+  } | null>(null);
+  const [isRedeemingCredit, setIsRedeemingCredit] = useState(false);
 
   // Sync profile when auth state updates
   useEffect(() => {
@@ -112,7 +140,119 @@ export default function CheckoutPage() {
   const [isLicenseAgreed, setIsLicenseAgreed] = useState(false);
 
   const userCredits = profile?.credits || 0;
-  const canPayWithWallet = userCredits >= total;
+
+  // Calculate discount and final payable total
+  const discountAmount = appliedDiscount
+    ? (appliedDiscount.codeType === 'discount_percent' && appliedDiscount.percent
+        ? Math.round((subtotal * appliedDiscount.percent) / 100)
+        : Math.min(subtotal, appliedDiscount.amount))
+    : 0;
+
+  const finalTotal = Math.max(0, subtotal + shipping - discountAmount);
+  const canPayWithWallet = userCredits >= finalTotal;
+
+  // Coupon Handlers
+  const handleApplyCoupon = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const clean = couponInput.trim().toUpperCase();
+    if (!clean) {
+      setCouponMessage({ type: 'error', text: 'กรุณากรอกรหัสโค้ด' });
+      return;
+    }
+
+    setIsApplyingCoupon(true);
+    setCouponMessage(null);
+    setCreditOffer(null);
+
+    try {
+      const res = await validateDiscountCode(clean, subtotal, user?.uid);
+      if (res.valid && res.discountAmount !== undefined) {
+        setAppliedDiscount({
+          code: res.code || clean,
+          codeType: res.codeType || 'discount_fixed',
+          amount: res.discountAmount,
+          percent: res.discountPercent,
+          minSpend: res.minSpend,
+        });
+        setCouponMessage({
+          type: 'success',
+          text: res.message || `ใช้โค้ดส่วนลด "${clean}" สำเร็จ!`,
+        });
+        success(`ใช้โค้ดส่วนลดสำเร็จ! คุณได้รับส่วนลด ฿${res.discountAmount}`);
+      } else if (res.isCreditCode && res.creditAmount) {
+        setCreditOffer({
+          code: res.code || clean,
+          amount: res.creditAmount,
+        });
+        setCouponMessage({
+          type: 'info',
+          text: `โค้ดนี้คือ "โค้ดของขวัญแจกเครดิต" (มูลค่า ฿${res.creditAmount}) สามารถกดปุ่มด้านล่างเพื่อแลกรับเข้ากระเป๋าเงินทันที!`,
+        });
+      } else {
+        setCouponMessage({
+          type: 'error',
+          text: res.message || 'โค้ดส่วนลดไม่ถูกต้องหรือไม่สามารถใช้งานได้',
+        });
+      }
+    } catch (err: any) {
+      setCouponMessage({
+        type: 'error',
+        text: err.message || 'เกิดข้อผิดพลาดในการตรวจสอบโค้ด',
+      });
+    } finally {
+      setIsApplyingCoupon(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedDiscount(null);
+    setCouponInput('');
+    setCouponMessage(null);
+    setCreditOffer(null);
+    info('ลบโค้ดส่วนลดออกจากคำสั่งซื้อนี้แล้ว');
+  };
+
+  const handleDirectRedeemCredit = async () => {
+    if (!user) {
+      error('กรุณาเข้าสู่ระบบก่อนแลกโค้ดของขวัญ');
+      return;
+    }
+    if (!creditOffer) return;
+
+    setIsRedeemingCredit(true);
+    try {
+      const res = await redeemCodeForUser(creditOffer.code, user.uid);
+      if (res.success) {
+        success(res.message || `แลกเครดิตสำเร็จ ฿${res.amount || creditOffer.amount} เข้ากระเป๋าแล้ว!`);
+        if (refreshProfile) {
+          await refreshProfile();
+        }
+        setCreditOffer(null);
+        setCouponInput('');
+        setCouponMessage({
+          type: 'success',
+          text: `แลกรับเครดิต ฿${res.amount || creditOffer.amount} เข้ากระเป๋าสำเร็จแล้ว! นำยอดเงินนี้มาจ่ายบิลนี้ได้ทันที`,
+        });
+        try {
+          confetti({
+            particleCount: 80,
+            spread: 60,
+            origin: { y: 0.7 },
+          });
+        } catch {}
+      } else {
+        error(res.message || 'แลกโค้ดไม่สำเร็จ');
+        setCouponMessage({
+          type: 'error',
+          text: res.message || 'แลกโค้ดไม่สำเร็จ',
+        });
+      }
+    } catch (err: any) {
+      error(err.message || 'เกิดข้อผิดพลาดในการแลกโค้ด');
+    } finally {
+      setIsRedeemingCredit(false);
+    }
+  };
 
   if (!mounted) {
     return (
@@ -203,14 +343,16 @@ export default function CheckoutPage() {
           error(errMsg);
           throw new Error(errMsg);
         }
-        if (userCredits < total) {
+        if (userCredits < finalTotal) {
           const errMsg = `ยอดเงินคงเหลือในเว็บไซต์ไม่เพียงพอ (คงเหลือ ฿${userCredits}) กรุณาเติมเงินก่อนทำรายการ`;
           error(errMsg);
           throw new Error(errMsg);
         }
 
         // Deduct user credits in Firestore
-        await deductUserCredits(user.uid, total);
+        if (finalTotal > 0) {
+          await deductUserCredits(user.uid, finalTotal);
+        }
         if (refreshProfile) {
           await refreshProfile();
         }
@@ -293,16 +435,24 @@ export default function CheckoutPage() {
         items: resolvedItems,
         subtotal,
         shipping,
-        discount: 0,
-        total,
+        discount: discountAmount,
+        ...(appliedDiscount ? { discountCode: appliedDiscount.code } : {}),
+        total: finalTotal,
         paymentMethod,
-        status: paymentMethod === 'wallet' ? 'completed' : 'pending',
+        status: (paymentMethod === 'wallet' || finalTotal === 0) ? 'completed' : 'pending',
         ...(claimedKey ? { transactionRef: claimedKey } : {}),
         ...(slipUrl ? { paymentProofUrl: slipUrl } : {}),
       };
 
       // 5. Save order to Firestore
       const created = await createOrder(orderData);
+
+      // Record coupon usage if discount applied
+      if (appliedDiscount?.code) {
+        recordDiscountUsage(appliedDiscount.code, user?.uid).catch((err) =>
+          console.warn('Failed to record discount code usage:', err)
+        );
+      }
 
       // 6. Trigger celebration
       try {
@@ -553,7 +703,7 @@ export default function CheckoutPage() {
                         </div>
                       ) : !canPayWithWallet ? (
                         <div className="mt-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center justify-between">
-                          <span>ยอดเงินในบัญชีไม่พอ (ขาดอีก {formatCurrency(total - userCredits)})</span>
+                          <span>ยอดเงินในบัญชีไม่พอ (ขาดอีก {formatCurrency(finalTotal - userCredits)})</span>
                           <Link href="/profile?tab=topup">
                             <Button variant="neon" size="sm" className="text-xs">
                               เติมเงินเข้าเว็บ
@@ -652,6 +802,130 @@ export default function CheckoutPage() {
                   ))}
                 </div>
 
+                {/* Coupon Code Section */}
+                <div className="pt-3 border-t border-slate-800 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                      <Ticket className="w-4 h-4 text-cyan-400" />
+                      <span>โค้ดส่วนลด / โค้ดของขวัญ</span>
+                    </label>
+                    {appliedDiscount && (
+                      <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <Check className="w-3 h-3" /> ใช้งานอยู่
+                      </span>
+                    )}
+                  </div>
+
+                  {!appliedDiscount ? (
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <input
+                          type="text"
+                          value={couponInput}
+                          onChange={(e) => {
+                            setCouponInput(e.target.value.toUpperCase());
+                            if (couponMessage) setCouponMessage(null);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleApplyCoupon();
+                            }
+                          }}
+                          placeholder="กรอกโค้ด เช่น DISCOUNT10, J3AFREE"
+                          className="w-full bg-slate-950 text-xs font-mono font-bold tracking-wider text-white uppercase placeholder:text-slate-500 rounded-xl px-3 py-2.5 border border-slate-800 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 outline-none transition-all"
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        disabled={isApplyingCoupon || !couponInput.trim()}
+                        isLoading={isApplyingCoupon}
+                        onClick={() => handleApplyCoupon()}
+                        className="px-4 text-xs font-bold border-cyan-500/30 hover:border-cyan-400 text-cyan-300 hover:text-white shrink-0"
+                      >
+                        ใช้โค้ด
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-emerald-950/40 via-cyan-950/20 to-slate-950 border border-emerald-500/30">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30">
+                          <Tag className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono font-bold text-xs text-emerald-300 tracking-wider">
+                              {appliedDiscount.code}
+                            </span>
+                            {appliedDiscount.percent && (
+                              <span className="text-[10px] text-cyan-300 bg-cyan-500/10 px-1.5 py-0.2 rounded font-bold">
+                                -{appliedDiscount.percent}%
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-300">
+                            ลดทันที {formatCurrency(discountAmount)}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleRemoveCoupon}
+                        className="text-xs text-rose-400 hover:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 rounded-lg px-2.5 py-1.5 flex items-center gap-1 transition-all"
+                        title="ยกเลิกโค้ดนี้"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span>ยกเลิก</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Feedback Message */}
+                  {couponMessage && (
+                    <div
+                      className={`text-xs p-2.5 rounded-xl border flex items-start gap-2 ${
+                        couponMessage.type === 'success'
+                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                          : couponMessage.type === 'error'
+                          ? 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+                          : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-300'
+                      }`}
+                    >
+                      {couponMessage.type === 'success' ? (
+                        <Check className="w-4 h-4 shrink-0 text-emerald-400 mt-0.5" />
+                      ) : couponMessage.type === 'error' ? (
+                        <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
+                      ) : (
+                        <Gift className="w-4 h-4 shrink-0 text-cyan-400 mt-0.5" />
+                      )}
+                      <div className="flex-1 space-y-1">
+                        <p>{couponMessage.text}</p>
+
+                        {/* Direct Credit Redeem Offer Button */}
+                        {creditOffer && (
+                          <div className="pt-1.5">
+                            <button
+                              type="button"
+                              onClick={handleDirectRedeemCredit}
+                              disabled={isRedeemingCredit}
+                              className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/20 transition-all disabled:opacity-50"
+                            >
+                              <Gift className="w-3.5 h-3.5" />
+                              <span>
+                                {isRedeemingCredit
+                                  ? 'กำลังแลกเครดิต...'
+                                  : `กดแลก ฿${creditOffer.amount} เข้ากระเป๋าตอนนี้`}
+                              </span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* Subtotals & Fees */}
                 <div className="space-y-2 pt-3 border-t border-slate-800 text-xs text-slate-400">
                   <div className="flex justify-between">
@@ -670,10 +944,19 @@ export default function CheckoutPage() {
                       )}
                     </span>
                   </div>
+                  {discountAmount > 0 && (
+                    <div className="flex justify-between text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-1 rounded-lg border border-emerald-500/20">
+                      <span className="flex items-center gap-1.5">
+                        <Tag className="w-3.5 h-3.5" />
+                        <span>ส่วนลดจากโค้ด ({appliedDiscount?.code})</span>
+                      </span>
+                      <span>-{formatCurrency(discountAmount)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-sm font-bold text-white pt-2 border-t border-slate-800">
                     <span>ยอดชำระสุทธิ</span>
                     <span className="text-2xl font-black text-cyan-400">
-                      {formatCurrency(total)}
+                      {formatCurrency(finalTotal)}
                     </span>
                   </div>
                 </div>
@@ -690,7 +973,7 @@ export default function CheckoutPage() {
                 <div className="pt-2 flex flex-col items-center">
                   <div className="w-full flex justify-center">
                     <SlideCommit
-                      label={`เลื่อนเพื่อชำระเงิน (${formatCurrency(total)})`}
+                      label={`เลื่อนเพื่อชำระเงิน (${formatCurrency(finalTotal)})`}
                       doneLabel="ชำระเงินสำเร็จแล้ว!"
                       errorLabel="ข้อมูลไม่ครบถ้วน หรือมีข้อผิดพลาด"
                       onConfirm={async () => {
@@ -730,7 +1013,7 @@ export default function CheckoutPage() {
                       : ''
                   }`}
                 >
-                  ดำเนินการชำระเงิน ({formatCurrency(total)})
+                  ดำเนินการชำระเงิน ({formatCurrency(finalTotal)})
                 </Button>
 
                 <div className="flex items-center justify-center gap-2 text-[11px] text-slate-400 pt-1">

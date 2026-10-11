@@ -49,10 +49,17 @@ export async function POST(req: Request) {
       }
 
       const id = `code_${Date.now()}`;
+      const codeType = body.codeType || 'credit';
+      const discountVal = codeType === 'discount_percent' ? (Number(body.discountPercent) || amount) : amount;
+
       const row = {
         id,
         code: cleanCode,
         credits: Math.round(amount),
+        code_type: codeType,
+        discount_type: codeType === 'discount_percent' ? 'percent' : 'fixed',
+        discount_value: discountVal,
+        min_spend: Number(body.minSpend) || 0,
         max_uses: Number(body.maxUses) || 0,
         used_count: 0,
         used_by: [],
@@ -89,6 +96,10 @@ export async function POST(req: Request) {
       };
 
       if (updatesData?.amount !== undefined) updates.credits = Math.round(Number(updatesData.amount));
+      if (updatesData?.codeType !== undefined) updates.code_type = updatesData.codeType;
+      if (updatesData?.discountType !== undefined) updates.discount_type = updatesData.discountType;
+      if (updatesData?.discountValue !== undefined) updates.discount_value = Number(updatesData.discountValue);
+      if (updatesData?.minSpend !== undefined) updates.min_spend = Number(updatesData.minSpend);
       if (updatesData?.maxUses !== undefined) updates.max_uses = Number(updatesData.maxUses);
       if (updatesData?.isActive !== undefined) updates.is_active = Boolean(updatesData.isActive);
 

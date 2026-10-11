@@ -22,6 +22,40 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'กรุณากรอกโค้ดของขวัญ' }, { status: 400 });
     }
 
+    // Support recording usage for checkout discount code
+    if (body.action === 'record_discount') {
+      const { data: discRow, error: discErr } = await supabaseAdmin
+        .from('redeem_codes')
+        .select('*')
+        .eq('code', cleanCode)
+        .limit(1)
+        .maybeSingle();
+
+      if (discErr || !discRow) {
+        return NextResponse.json({ error: 'ไม่พบโค้ดนี้' }, { status: 404 });
+      }
+
+      const usedBy: string[] = Array.isArray(discRow.used_by)
+        ? discRow.used_by
+        : typeof discRow.used_by === 'string'
+        ? JSON.parse(discRow.used_by || '[]')
+        : [];
+
+      const newUsedCount = (Number(discRow.used_count) || 0) + 1;
+      const newUsedBy = Array.from(new Set([...usedBy, user.id]));
+
+      await supabaseAdmin
+        .from('redeem_codes')
+        .update({
+          used_count: newUsedCount,
+          used_by: newUsedBy,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', discRow.id);
+
+      return NextResponse.json({ ok: true, success: true });
+    }
+
     // 1. Fetch code
     const { data: codeRow, error: codeErr } = await supabaseAdmin
       .from('redeem_codes')
@@ -32,6 +66,13 @@ export async function POST(req: Request) {
 
     if (codeErr || !codeRow) {
       return NextResponse.json({ error: 'ไม่พบโค้ดนี้ในระบบ หรือโค้ดไม่ถูกต้อง' }, { status: 404 });
+    }
+
+    // Prevent discount coupons from being redeemed as credit
+    if (codeRow.code_type && codeRow.code_type !== 'credit') {
+      return NextResponse.json({
+        error: 'โค้ดนี้เป็นโค้ดส่วนลดสำหรับใช้ลดราคาสินค้าในขั้นตอนชำระเงิน (Checkout) ไม่สามารถแลกเป็นเครดิตเข้ากระเป๋าเงินได้',
+      }, { status: 400 });
     }
 
     if (!codeRow.is_active) {
