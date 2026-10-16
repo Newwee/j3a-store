@@ -110,10 +110,29 @@ export function HeroSection() {
                   {t('hero_shop_now', 'เลือกซื้อสินค้า (Shop Now)')}
                 </Button>
               </Link>
-              <Link href="/profile?tab=topup">
-                <Button variant="secondary" size="lg" className="px-6 cursor-target">
-                  {t('hero_topup_wallet', 'เติมเครดิตบัญชี')}
-                </Button>
+              
+              {/* Highlighted Eye-Catching Top-up CTA */}
+              <Link href="/profile?tab=topup" className="group relative inline-block">
+                {/* Pulsing ambient glow */}
+                <span className="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 opacity-60 blur-md group-hover:opacity-100 group-hover:blur-lg transition-all duration-300 animate-pulse" />
+                <div className="relative px-6 py-3.5 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-amber-400/60 group-hover:border-amber-300 flex items-center gap-3 transition-all duration-200 group-hover:scale-[1.02] shadow-[0_0_20px_rgba(245,158,11,0.3)]">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-400/50 flex items-center justify-center text-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.4)] group-hover:rotate-12 transition-transform">
+                    <Sparkles className="w-4 h-4 text-amber-300" />
+                  </div>
+                  <div className="text-left">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-extrabold text-amber-300 group-hover:text-amber-200 tracking-wide">
+                        {t('hero_topup_wallet', 'เติมเครดิตบัญชี')}
+                      </span>
+                      <span className="text-[10px] font-bold bg-amber-400 text-slate-950 px-1.5 py-0.2 rounded-full uppercase tracking-wider animate-bounce">
+                        AUTO
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-slate-400 group-hover:text-amber-200/80 block">
+                      ซองอังเปา • พร้อมเพย์ • โค้ด
+                    </span>
+                  </div>
+                </div>
               </Link>
             </div>
 

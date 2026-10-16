@@ -17,6 +17,8 @@ import {
   Moon,
   Sun,
   Laptop,
+  CreditCard,
+  Wallet,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/context/CartContext';
@@ -178,6 +180,17 @@ export function Navbar() {
                 )}
               </button>
 
+              {/* Quick Top-Up Button (Desktop & Tablet) */}
+              <Link
+                href="/profile?tab=topup"
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-500/15 via-yellow-500/20 to-amber-500/15 hover:from-amber-500/30 hover:to-yellow-500/30 border border-amber-400/50 hover:border-amber-300 text-amber-300 hover:text-amber-200 text-xs font-bold transition-all shadow-[0_0_14px_rgba(245,158,11,0.25)] hover:shadow-[0_0_20px_rgba(245,158,11,0.4)] group active:scale-95 cursor-pointer"
+                title="เติมเครดิตเข้ากระเป๋าเงิน (Top-up)"
+              >
+                <CreditCard className="w-3.5 h-3.5 text-amber-400 group-hover:rotate-12 transition-transform" />
+                <span>{language === 'th' ? 'เติมเงิน' : 'Top-Up'}</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+              </Link>
+
               {/* User Profile Dropdown */}
               <UserDropdown />
 
@@ -233,6 +246,19 @@ export function Navbar() {
             >
               <Layers className="w-4 h-4 text-slate-400" />
               <span>หมวดหมู่สินค้า</span>
+            </Link>
+            <Link
+              href="/profile?tab=topup"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-bold text-amber-300 bg-amber-500/15 border border-amber-400/40 hover:bg-amber-500/25 shadow-[0_0_15px_rgba(245,158,11,0.2)]"
+            >
+              <div className="flex items-center gap-3">
+                <CreditCard className="w-4 h-4 text-amber-400" />
+                <span>เติมเครดิตบัญชี (Top-up Wallet)</span>
+              </div>
+              <span className="text-[10px] uppercase font-extrabold bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full">
+                AUTO
+              </span>
             </Link>
             {isAdmin && (
               <Link

@@ -20,12 +20,15 @@ import {
   CreditCard,
   Gift,
   HelpCircle,
+  Wallet,
 } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/context/CartContext';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { Button } from '@/components/ui/Button';
 
 export default function CartPage() {
+  const { user, profile } = useAuth();
   const {
     items,
     removeItem,
@@ -349,14 +352,36 @@ export default function CartPage() {
 
               {/* Total Row */}
               <div className="flex justify-between items-baseline pt-1">
-                <div>
-                  <span className="text-sm font-black text-white block">ยอดสุทธิที่ต้องชำระ</span>
-                  <span className="text-[10px] text-slate-500">รวมภาษีและค่าบริการแล้ว</span>
+                 <div>
+                   <span className="text-sm font-black text-white block">ยอดสุทธิที่ต้องชำระ</span>
+                   <span className="text-[10px] text-slate-500">รวมภาษีและค่าบริการแล้ว</span>
+                 </div>
+                 <span className="text-2xl sm:text-3xl font-black text-cyan-400 drop-shadow-[0_0_20px_rgba(6,182,212,0.45)] font-mono">
+                   {formatCurrency(total)}
+                 </span>
+               </div>
+
+              {/* Quick Wallet Topup Box */}
+              {user && (
+                <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800/90 flex items-center justify-between text-xs shadow-inner">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0">
+                      <Wallet className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px] leading-tight">เครดิตคงเหลือในกระเป๋า</span>
+                      <span className="font-extrabold text-cyan-300 font-mono text-xs">{formatCurrency(profile?.credits || 0)}</span>
+                    </div>
+                  </div>
+                  <Link
+                    href="/profile?tab=topup"
+                    className="px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/40 text-amber-300 hover:text-amber-200 font-bold text-xs flex items-center gap-1.5 shadow-[0_0_10px_rgba(245,158,11,0.2)] transition-all hover:scale-105"
+                  >
+                    <CreditCard className="w-3.5 h-3.5" />
+                    <span>เติมเงินเข้ากระเป๋า</span>
+                  </Link>
                 </div>
-                <span className="text-2xl sm:text-3xl font-black text-cyan-400 drop-shadow-[0_0_20px_rgba(6,182,212,0.45)] font-mono">
-                  {formatCurrency(total)}
-                </span>
-              </div>
+              )}
 
               {/* Checkout CTA */}
               {items.some(

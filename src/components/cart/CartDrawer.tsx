@@ -16,13 +16,17 @@ import {
   Package,
   Layers,
   ChevronRight,
+  Wallet,
+  CreditCard,
 } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/context/CartContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { Button } from '@/components/ui/Button';
 
 export function CartDrawer() {
+  const { user, profile } = useAuth();
   const {
     items,
     removeItem,
@@ -303,6 +307,27 @@ export function CartDrawer() {
                   </div>
                 </div>
               </div>
+
+              {/* Wallet Top-up Quick Banner */}
+              {user && (
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs shadow-inner">
+                  <div className="flex items-center gap-2">
+                    <Wallet className="w-4 h-4 text-cyan-400 shrink-0" />
+                    <div>
+                      <span className="text-[10px] text-slate-400 block leading-tight">เครดิตกระเป๋าเงิน</span>
+                      <span className="font-extrabold text-cyan-300 font-mono">{formatCurrency(profile?.credits || 0)}</span>
+                    </div>
+                  </div>
+                  <Link
+                    href="/profile?tab=topup"
+                    onClick={() => setIsCartOpen(false)}
+                    className="text-[11px] font-extrabold text-amber-300 hover:text-amber-200 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/40 px-2.5 py-1 rounded-lg flex items-center gap-1 transition-all shadow-[0_0_8px_rgba(245,158,11,0.2)]"
+                  >
+                    <CreditCard className="w-3 h-3 text-amber-400" />
+                    <span>เติมเงิน</span>
+                  </Link>
+                </div>
+              )}
 
               {/* Action Buttons */}
               <div className="space-y-2 pt-1">

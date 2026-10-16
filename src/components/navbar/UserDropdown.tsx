@@ -150,15 +150,26 @@ export function UserDropdown() {
             </div>
           </div>
 
-          {/* Credits Balance Card */}
-          <div className="my-2.5 p-3 rounded-xl bg-slate-800/80 border border-slate-700/60 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-slate-300">
-              <Wallet className="w-4 h-4 text-cyan-400" />
-              <span className="text-xs font-medium">{t('user_balance', 'เครดิตคงเหลือ')}</span>
+          {/* Credits Balance Card with Quick Top-up Button */}
+          <div className="my-2.5 p-3 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-slate-700/80 shadow-inner flex items-center justify-between gap-2">
+            <div>
+              <div className="flex items-center gap-1.5 text-slate-400">
+                <Wallet className="w-3.5 h-3.5 text-cyan-400" />
+                <span className="text-[11px] font-semibold">{t('user_balance', 'เครดิตคงเหลือ')}</span>
+              </div>
+              <div className="text-base font-black text-cyan-400 mt-0.5 tracking-tight">
+                {formatCurrency(credits)}
+              </div>
             </div>
-            <span className="text-sm font-extrabold text-cyan-400">
-              {formatCurrency(credits)}
-            </span>
+            
+            <Link
+              href="/profile?tab=topup"
+              onClick={() => setIsOpen(false)}
+              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-extrabold text-xs shadow-[0_0_12px_rgba(245,158,11,0.4)] flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95 shrink-0 cursor-pointer"
+            >
+              <CreditCard className="w-3.5 h-3.5" />
+              <span>เติมเงิน</span>
+            </Link>
           </div>
 
           {/* Nav Items */}
@@ -186,10 +197,15 @@ export function UserDropdown() {
             <Link
               href="/profile?tab=topup"
               onClick={() => setIsOpen(false)}
-              className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-slate-800/80 hover:text-white transition-colors"
+              className="flex items-center justify-between px-3 py-2 rounded-xl text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition-colors font-bold shadow-[0_0_12px_rgba(245,158,11,0.15)]"
             >
-              <CreditCard className="w-4 h-4 text-slate-400" />
-              <span>{t('user_topup', 'เติมเงิน')}</span>
+              <div className="flex items-center gap-2.5">
+                <CreditCard className="w-4 h-4 text-amber-400" />
+                <span>{t('user_topup', 'เติมเงินเข้าระบบ (Top-up)')}</span>
+              </div>
+              <span className="text-[9px] uppercase font-black bg-amber-400 text-slate-950 px-1.5 py-0.5 rounded">
+                AUTO
+              </span>
             </Link>
 
             <Link

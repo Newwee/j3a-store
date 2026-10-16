@@ -80,70 +80,90 @@ export default function CustomerPublicProfilePage({
                 window.location.assign('/shop');
               }
             }}
-            className="inline-flex items-center gap-2 text-xs font-medium text-slate-400 hover:text-cyan-400 transition-colors cursor-pointer"
+            className="inline-flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-cyan-400 transition-colors px-3 py-1.5 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-cyan-500/30 cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>ย้อนกลับ</span>
           </button>
           <Link
             href="/shop"
-            className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+            className="text-xs font-semibold text-slate-400 hover:text-cyan-300 transition-colors px-3 py-1.5 rounded-xl bg-slate-900/40 border border-slate-800"
           >
-            ไปที่ร้านค้า
+            ไปที่ร้านค้า (Shop)
           </Link>
         </div>
 
-        <div className="bg-slate-900/60 border border-slate-800 rounded-3xl overflow-hidden backdrop-blur-md shadow-2xl">
-          <div className="h-40 sm:h-52 bg-gradient-to-r from-cyan-600/30 via-indigo-600/30 to-purple-600/30 relative flex items-start justify-between p-6 border-b border-slate-800/80">
-            <span className="text-xs font-bold text-cyan-300 uppercase tracking-wider bg-slate-950/70 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-cyan-500/30 flex items-center gap-2 shadow-sm">
+        {/* Profile Card Container */}
+        <div className="relative bg-slate-900/70 border border-slate-800/90 rounded-3xl overflow-hidden backdrop-blur-2xl shadow-2xl">
+          {/* Top Cyber Accent Line */}
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-400 via-indigo-500 to-fuchsia-500 shadow-[0_0_15px_rgba(6,182,212,0.6)] z-10" />
+
+          {/* Cover Banner */}
+          <div className="h-44 sm:h-56 bg-gradient-to-r from-cyan-900/40 via-indigo-900/40 to-purple-900/40 relative flex items-start justify-between p-6 border-b border-slate-800/80 overflow-hidden">
+            {/* Background Grid Accent */}
+            <div className="absolute inset-0 bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:16px_16px] opacity-15" />
+            <div className="absolute -right-16 -top-16 w-64 h-64 bg-cyan-500/20 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -left-16 -bottom-16 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
+
+            <span className="relative z-10 text-xs font-bold text-cyan-300 uppercase tracking-wider bg-slate-950/80 backdrop-blur-md px-4 py-2 rounded-full border border-cyan-500/40 flex items-center gap-2 shadow-[0_0_15px_rgba(6,182,212,0.25)]">
               <ShieldCheck className="w-4 h-4 text-cyan-400" />
-              โปรไฟล์ลูกค้า (Customer Profile)
+              <span>โปรไฟล์ลูกค้า (Customer Profile)</span>
             </span>
 
             <button
               onClick={handleCopyLink}
-              className="text-xs text-slate-300 hover:text-white transition-colors flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-950/70 border border-slate-700/60 backdrop-blur-md shadow-sm"
+              className="relative z-10 text-xs font-semibold text-slate-300 hover:text-white transition-all flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-950/80 hover:bg-slate-900 border border-slate-700/80 hover:border-cyan-400/50 backdrop-blur-md shadow-lg active:scale-95 cursor-pointer"
             >
               {copied ? (
                 <>
                   <Check className="w-4 h-4 text-emerald-400" />
-                  <span className="text-emerald-400 font-semibold">คัดลอกลิงก์แล้ว</span>
+                  <span className="text-emerald-400 font-bold">คัดลอกลิงก์แล้ว!</span>
                 </>
               ) : (
                 <>
-                  <Copy className="w-4 h-4" />
+                  <Copy className="w-4 h-4 text-cyan-400" />
                   <span>แชร์โปรไฟล์นี้</span>
                 </>
               )}
             </button>
           </div>
 
-          <div className="px-6 sm:px-8 pb-8 pt-0 space-y-8">
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 -mt-16 sm:-mt-20">
-              <div className="flex items-end gap-4">
-                <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-3xl bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-600 p-1 shadow-2xl shadow-cyan-500/20">
-                  <div className="w-full h-full rounded-[22px] bg-slate-900 flex items-center justify-center overflow-hidden">
-                    {profile?.photoURL ? (
-                      <img
-                        src={profile.photoURL}
-                        alt={displayName}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <span className="text-4xl sm:text-5xl font-black text-cyan-400">
-                        {initial}
-                      </span>
-                    )}
+          <div className="px-6 sm:px-8 pb-8 pt-0 space-y-8 relative">
+            {/* Avatar & Main Identity Row */}
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-5 -mt-16 sm:-mt-20">
+              <div className="flex flex-col sm:flex-row sm:items-end gap-5">
+                {/* Avatar with Neon Gradient Frame */}
+                <div className="relative group">
+                  <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-3xl bg-gradient-to-br from-cyan-400 via-indigo-500 to-fuchsia-500 p-1 shadow-[0_0_30px_rgba(6,182,212,0.35)] transition-transform duration-300 group-hover:scale-105">
+                    <div className="w-full h-full rounded-[22px] bg-slate-950 flex items-center justify-center overflow-hidden relative">
+                      {profile?.photoURL ? (
+                        <img
+                          src={profile.photoURL}
+                          alt={displayName}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-4xl sm:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-tr from-cyan-400 to-indigo-300">
+                          {initial}
+                        </span>
+                      )}
+                    </div>
                   </div>
+                  {/* Verified Online Green Ring */}
+                  <span
+                    className="absolute bottom-1 right-1 w-5 h-5 rounded-full bg-emerald-400 border-3 border-slate-950 shadow-[0_0_10px_#34d399]"
+                    title="สมาชิกพร้อมใช้งาน"
+                  />
                 </div>
 
-                <div className="pb-2">
-                  <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                    {displayName}
+                <div className="pb-1 space-y-2">
+                  <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-3">
+                    <span>{displayName}</span>
                   </h1>
-                  <div className="flex flex-wrap items-center gap-2 mt-2">
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-0.5 rounded-full">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
+                  
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-3 py-1 rounded-full shadow-sm">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
                       ผู้ซื้อที่ยืนยันแล้ว
                     </span>
                     {profile && <TierBadge tier={profile.tier || 'Bronze'} />}
@@ -152,14 +172,14 @@ export default function CustomerPublicProfilePage({
 
                   {/* Customer Bio */}
                   {profile?.bio && (
-                    <p className="text-xs sm:text-sm text-slate-300 mt-2 line-clamp-2 max-w-xl">
-                      {profile.bio}
-                    </p>
+                    <div className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800/80 text-xs sm:text-sm text-slate-300 max-w-xl italic">
+                      "{profile.bio}"
+                    </div>
                   )}
 
                   {/* Customer Social Links */}
                   {profile?.socialLinks && Object.values(profile.socialLinks).some((v) => v && v.trim()) && (
-                    <div className="flex flex-wrap items-center gap-2 mt-3 pt-1">
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
                       {profile.socialLinks.discord && (
                         <a
                           href={
@@ -171,10 +191,10 @@ export default function CustomerPublicProfilePage({
                           }
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-[#5865F2]/10 hover:bg-[#5865F2]/20 text-[#7983F5] border border-[#5865F2]/30 transition-all hover:scale-105 shadow-sm"
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-[#5865F2]/15 hover:bg-[#5865F2]/25 text-[#99a2fe] border border-[#5865F2]/40 transition-all hover:scale-105 shadow-sm"
                           title={`Discord: ${profile.socialLinks.discord}`}
                         >
-                          <span className="w-2 h-2 rounded-full bg-[#5865F2]" />
+                          <span className="w-2 h-2 rounded-full bg-[#5865F2] animate-pulse" />
                           <span>Discord</span>
                           <ExternalLink className="w-3 h-3 opacity-60" />
                         </a>
@@ -188,7 +208,7 @@ export default function CustomerPublicProfilePage({
                           }
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-[#1877F2]/10 hover:bg-[#1877F2]/20 text-[#3B82F6] border border-[#1877F2]/30 transition-all hover:scale-105 shadow-sm"
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-[#1877F2]/15 hover:bg-[#1877F2]/25 text-[#60a5fa] border border-[#1877F2]/40 transition-all hover:scale-105 shadow-sm"
                           title="Facebook Profile"
                         >
                           <span className="w-2 h-2 rounded-full bg-[#1877F2]" />
@@ -205,7 +225,7 @@ export default function CustomerPublicProfilePage({
                           }
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all hover:scale-105 shadow-sm"
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all hover:scale-105 shadow-sm"
                           title="X / Twitter"
                         >
                           <span className="w-2 h-2 rounded-full bg-slate-400" />
@@ -222,7 +242,7 @@ export default function CustomerPublicProfilePage({
                           }
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-[#E4405F]/10 hover:bg-[#E4405F]/20 text-[#F43F5E] border border-[#E4405F]/30 transition-all hover:scale-105 shadow-sm"
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-[#E4405F]/15 hover:bg-[#E4405F]/25 text-[#fb7185] border border-[#E4405F]/40 transition-all hover:scale-105 shadow-sm"
                           title="Instagram Profile"
                         >
                           <span className="w-2 h-2 rounded-full bg-[#E4405F]" />
@@ -239,7 +259,7 @@ export default function CustomerPublicProfilePage({
                           }
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-[#FF0000]/10 hover:bg-[#FF0000]/20 text-rose-400 border border-[#FF0000]/30 transition-all hover:scale-105 shadow-sm"
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-[#FF0000]/15 hover:bg-[#FF0000]/25 text-rose-300 border border-[#FF0000]/40 transition-all hover:scale-105 shadow-sm"
                           title="YouTube Channel"
                         >
                           <span className="w-2 h-2 rounded-full bg-[#FF0000]" />
@@ -256,7 +276,7 @@ export default function CustomerPublicProfilePage({
                           }
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 transition-all hover:scale-105 shadow-sm"
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/40 transition-all hover:scale-105 shadow-sm"
                           title="Website"
                         >
                           <span className="w-2 h-2 rounded-full bg-cyan-400" />
@@ -277,32 +297,41 @@ export default function CustomerPublicProfilePage({
               </div>
             ) : (
               <>
+                {/* 3 High-Tech HUD Stat Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 text-center space-y-1.5">
-                    <div className="flex items-center justify-center text-indigo-400">
+                  {/* Card 1: Reviews */}
+                  <div className="relative p-5 rounded-2xl bg-gradient-to-br from-slate-950/90 to-slate-900/90 border border-indigo-500/30 text-center space-y-1.5 shadow-[0_0_20px_rgba(99,102,241,0.15)] group hover:border-indigo-400/60 transition-all">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 mx-auto group-hover:scale-110 transition-transform">
                       <MessageSquare className="w-5 h-5" />
                     </div>
-                    <div className="text-2xl font-black text-white">
+                    <div className="text-3xl font-black text-white font-mono tracking-tight">
                       {profile?.reviewCount ?? 1}
                     </div>
-                    <div className="text-xs text-slate-400 font-medium">รีวิวทั้งหมด</div>
+                    <div className="text-xs text-indigo-300 font-bold uppercase tracking-wider">
+                      รีวิวทั้งหมด
+                    </div>
                   </div>
 
-                  <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 text-center space-y-1.5">
-                    <div className="flex items-center justify-center text-amber-400">
-                      <Star className="w-5 h-5 fill-amber-400" />
+                  {/* Card 2: Rating */}
+                  <div className="relative p-5 rounded-2xl bg-gradient-to-br from-slate-950/90 to-slate-900/90 border border-amber-500/30 text-center space-y-1.5 shadow-[0_0_20px_rgba(245,158,11,0.15)] group hover:border-amber-400/60 transition-all">
+                    <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mx-auto group-hover:scale-110 transition-transform">
+                      <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
                     </div>
-                    <div className="text-2xl font-black text-amber-300">
-                      {profile?.averageRating ? profile.averageRating.toFixed(1) : '5.0'} / 5.0
+                    <div className="text-3xl font-black text-amber-300 font-mono tracking-tight">
+                      {profile?.averageRating ? profile.averageRating.toFixed(1) : '5.0'}
+                      <span className="text-sm font-semibold text-slate-400"> / 5.0</span>
                     </div>
-                    <div className="text-xs text-slate-400 font-medium">คะแนนเฉลี่ยที่ให้</div>
+                    <div className="text-xs text-amber-300 font-bold uppercase tracking-wider">
+                      คะแนนเฉลี่ยที่ให้
+                    </div>
                   </div>
 
-                  <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 text-center space-y-1.5">
-                    <div className="flex items-center justify-center text-cyan-400">
+                  {/* Card 3: Member Since */}
+                  <div className="relative p-5 rounded-2xl bg-gradient-to-br from-slate-950/90 to-slate-900/90 border border-cyan-500/30 text-center space-y-1.5 shadow-[0_0_20px_rgba(6,182,212,0.15)] group hover:border-cyan-400/60 transition-all">
+                    <div className="w-10 h-10 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 mx-auto group-hover:scale-110 transition-transform">
                       <Clock className="w-5 h-5" />
                     </div>
-                    <div className="text-sm font-bold text-slate-200 truncate">
+                    <div className="text-sm font-black text-slate-100 truncate pt-1">
                       {(() => {
                         if (!profile?.createdAt) return 'ลูกค้าจริง';
                         try {
@@ -311,7 +340,7 @@ export default function CustomerPublicProfilePage({
                             ? 'ลูกค้าจริง'
                             : d.toLocaleDateString('th-TH', {
                                 day: 'numeric',
-                                month: 'long',
+                                month: 'short',
                                 year: 'numeric',
                               });
                         } catch {
@@ -319,7 +348,9 @@ export default function CustomerPublicProfilePage({
                         }
                       })()}
                     </div>
-                    <div className="text-xs text-slate-400 font-medium">เป็นสมาชิกตั้งแต่</div>
+                    <div className="text-xs text-cyan-300 font-bold uppercase tracking-wider">
+                      เป็นสมาชิกตั้งแต่
+                    </div>
                   </div>
                 </div>
 

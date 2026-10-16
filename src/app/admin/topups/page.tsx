@@ -27,6 +27,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Modal } from '@/components/ui/Modal';
 import { CustomDropdown } from '@/components/ui/CustomDropdown';
 import { Button } from '@/components/ui/Button';
+import { triggerMoneyCelebration } from '@/lib/utils/moneyConfetti';
 
 export default function AdminTopupsPage() {
   const { success, error } = useToast();
@@ -77,6 +78,7 @@ export default function AdminTopupsPage() {
       setTopups((prev) =>
         prev.map((t) => (t.id === topup.id ? { ...t, status: 'approved' } : t))
       );
+      triggerMoneyCelebration();
       success(`อนุมัติเงิน ${formatCurrency(topup.amount)} เข้าบัญชี ${topup.userEmail} สำเร็จแล้ว! ยอดรวมใหม่: ${formatCurrency(res.newCredits)}`);
     } catch (err: any) {
       error(`เกิดข้อผิดพลาด: ${err.message || 'ไม่สามารถอนุมัติได้'}`);
