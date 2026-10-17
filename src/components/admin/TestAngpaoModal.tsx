@@ -148,7 +148,7 @@ export function TestAngpaoModal({ isOpen, onClose, onTopupSuccess }: TestAngpaoM
         throw new Error(json.error || 'ทดสอบแลกซองล้มเหลว');
       }
 
-      triggerMoneyCelebration();
+      triggerMoneyCelebration(voucher.amount);
       success(`🎉 ทดสอบสำเร็จ! ได้รับเครดิตทดสอบ ฿${voucher.amount} เข้าบัญชีแล้ว (สถานะ TEST - ไม่นับลง Dashboard)`);
 
       // Update state

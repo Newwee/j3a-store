@@ -82,7 +82,7 @@ export default function AdminTopupsPage() {
       setTopups((prev) =>
         prev.map((t) => (t.id === topup.id ? { ...t, status: 'approved' } : t))
       );
-      triggerMoneyCelebration();
+      triggerMoneyCelebration(topup.amount);
       success(`อนุมัติเงิน ${formatCurrency(topup.amount)} เข้าบัญชี ${topup.userEmail} สำเร็จแล้ว! ยอดรวมใหม่: ${formatCurrency(res.newCredits)}`);
     } catch (err: any) {
       error(`เกิดข้อผิดพลาด: ${err.message || 'ไม่สามารถอนุมัติได้'}`);

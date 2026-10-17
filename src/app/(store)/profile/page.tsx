@@ -268,7 +268,7 @@ function ProfileContent() {
       if (res.success) {
         success(res.message);
         setRedeemCodeInput('');
-        triggerMoneyCelebration();
+        triggerMoneyCelebration(res.amount || 50);
         await refreshProfile();
       } else {
         error(res.message);
@@ -295,7 +295,7 @@ function ProfileContent() {
       const result = await redeemAngpaoTopup(cleanLink);
       success(result.message || `เติมเงินสำเร็จ! ได้รับเครดิต ${result.amount} บาท`);
       setAngpaoLinkInput('');
-      triggerMoneyCelebration();
+      triggerMoneyCelebration(result.amount);
       await refreshProfile();
       await loadTopupHistory();
     } catch (err: any) {

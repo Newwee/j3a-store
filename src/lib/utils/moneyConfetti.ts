@@ -2,156 +2,223 @@
 
 import confetti from 'canvas-confetti';
 
-/**
- * Spectacular Money Shower & Celebration Effect
- * Spawns falling banknotes (💵, 💸), gold coins (🪙), and money bags (💰)
- * alongside golden glitter bursts when wallet top-up completes.
- */
-export function triggerMoneyCelebration(options?: { durationMs?: number }) {
-  if (typeof window === 'undefined') return;
-
-  const duration = options?.durationMs || 3500;
-  const animationEnd = Date.now() + duration;
-
-  // 1. Try creating custom emoji shapes from canvas-confetti
-  let moneyShapes: any[] = [];
-  try {
-    if (typeof confetti.shapeFromText === 'function') {
-      const bill = confetti.shapeFromText({ text: '💵', scalar: 2.8 });
-      const flyMoney = confetti.shapeFromText({ text: '💸', scalar: 2.8 });
-      const coin = confetti.shapeFromText({ text: '🪙', scalar: 2.4 });
-      const bag = confetti.shapeFromText({ text: '💰', scalar: 2.8 });
-      moneyShapes = [bill, flyMoney, coin, bag];
-    }
-  } catch (err) {
-    console.warn('Canvas-confetti text shapes fallback:', err);
-  }
-
-  // 2. Play money shower canon intervals
-  const frame = () => {
-    const timeLeft = animationEnd - Date.now();
-    if (timeLeft <= 0) return;
-
-    const particleCount = 25 * (timeLeft / duration);
-
-    // Left cannon (bursting banknotes & gold)
-    confetti({
-      particleCount: Math.floor(particleCount * 0.7),
-      angle: 60,
-      spread: 55,
-      origin: { x: 0, y: 0.8 },
-      shapes: moneyShapes.length > 0 ? moneyShapes : undefined,
-      scalar: 2.2,
-      drift: 0.1,
-      gravity: 0.8,
-      ticks: 300,
-      colors: ['#10b981', '#34d399', '#f59e0b', '#fbbf24', '#38bdf8', '#ffffff'],
-      disableForReducedMotion: true,
-    });
-
-    // Right cannon (bursting banknotes & gold)
-    confetti({
-      particleCount: Math.floor(particleCount * 0.7),
-      angle: 120,
-      spread: 55,
-      origin: { x: 1, y: 0.8 },
-      shapes: moneyShapes.length > 0 ? moneyShapes : undefined,
-      scalar: 2.2,
-      drift: -0.1,
-      gravity: 0.8,
-      ticks: 300,
-      colors: ['#10b981', '#34d399', '#f59e0b', '#fbbf24', '#38bdf8', '#ffffff'],
-      disableForReducedMotion: true,
-    });
-
-    // Center ceiling drop (gentle money rain)
-    confetti({
-      particleCount: Math.floor(particleCount * 0.5),
-      angle: 270,
-      spread: 120,
-      origin: { x: 0.5, y: -0.1 },
-      shapes: moneyShapes.length > 0 ? moneyShapes : undefined,
-      scalar: 2.5,
-      gravity: 0.6,
-      drift: (Math.random() - 0.5) * 0.4,
-      ticks: 350,
-      colors: ['#10b981', '#34d399', '#f59e0b', '#fbbf24'],
-      disableForReducedMotion: true,
-    });
-
-    requestAnimationFrame(frame);
-  };
-
-  // Immediate initial blast from center
-  confetti({
-    particleCount: 50,
-    spread: 100,
-    origin: { y: 0.6 },
-    shapes: moneyShapes.length > 0 ? moneyShapes : undefined,
-    scalar: 2.6,
-    gravity: 0.7,
-    ticks: 250,
-    colors: ['#10b981', '#34d399', '#f59e0b', '#fbbf24', '#06b6d4'],
-  });
-
-  // Start continuous cascade
-  requestAnimationFrame(frame);
-
-  // 3. Complementary floating cash DOM overlay for extra visual pop
-  try {
-    spawnFloatingCashDOM(duration);
-  } catch (err) {
-    // Non-blocking fallback
-  }
+export interface MoneyCelebrationOptions {
+  amount?: number;
+  durationMs?: number;
 }
 
 /**
- * Spawns floating 3D money bills & shiny coins floating down the screen
+ * Injects CSS keyframe for realistic screen rumble / shake effect
  */
-function spawnFloatingCashDOM(durationMs: number) {
+function ensureScreenShakeStyle() {
   if (typeof document === 'undefined') return;
+  if (document.getElementById('money-shake-style')) return;
 
-  const container = document.createElement('div');
-  container.className = 'fixed inset-0 pointer-events-none z-[9999] overflow-hidden select-none';
-  document.body.appendChild(container);
+  const style = document.createElement('style');
+  style.id = 'money-shake-style';
+  style.innerHTML = `
+    @keyframes moneyScreenRumble {
+      0% { transform: translate(0, 0) rotate(0deg); }
+      12% { transform: translate(-6px, 4px) rotate(-0.5deg); }
+      25% { transform: translate(6px, -4px) rotate(0.5deg); }
+      38% { transform: translate(-5px, -3px) rotate(-0.3deg); }
+      50% { transform: translate(5px, 3px) rotate(0.4deg); }
+      65% { transform: translate(-3px, 2px) rotate(-0.2deg); }
+      80% { transform: translate(3px, -2px) rotate(0.1deg); }
+      92% { transform: translate(-1px, 1px) rotate(0deg); }
+      100% { transform: translate(0, 0) rotate(0deg); }
+    }
+    .money-screen-shake {
+      animation: moneyScreenRumble 0.55s cubic-bezier(0.36, 0.07, 0.19, 0.97) both !important;
+      will-change: transform;
+    }
+    @keyframes moneyPopBadgeAnim {
+      0% { opacity: 0; transform: translate(-50%, -40%) scale(0.6); }
+      20% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+      30% { transform: translate(-50%, -50%) scale(1); }
+      75% { opacity: 1; transform: translate(-50%, -70%) scale(1); }
+      100% { opacity: 0; transform: translate(-50%, -90%) scale(0.9); }
+    }
+    .money-pop-badge {
+      animation: moneyPopBadgeAnim 1.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      pointer-events: none;
+    }
+  `;
+  document.head.appendChild(style);
+}
 
-  const emojis = ['💸', '💵', '🪙', '💰', '✨', '💵', '💸'];
-  const count = 28;
+/**
+ * Triggers screen shake for high impact celebrations (500+ THB)
+ */
+function triggerScreenShake() {
+  if (typeof document === 'undefined') return;
+  ensureScreenShakeStyle();
 
-  for (let i = 0; i < count; i++) {
-    const item = document.createElement('div');
-    const emoji = emojis[Math.floor(Math.random() * emojis.length)];
-    const startX = Math.random() * 100; // % across screen
-    const delay = Math.random() * 1.5; // seconds
-    const duration = 2.2 + Math.random() * 2.2; // seconds
-    const size = 26 + Math.floor(Math.random() * 32); // font size px
-    const rotation = (Math.random() - 0.5) * 720; // total spin
+  const body = document.body;
+  body.classList.remove('money-screen-shake');
+  // Trigger reflow to restart animation
+  void body.offsetWidth;
+  body.classList.add('money-screen-shake');
 
-    item.innerText = emoji;
-    item.style.position = 'absolute';
-    item.style.left = `${startX}%`;
-    item.style.top = '-60px';
-    item.style.fontSize = `${size}px`;
-    item.style.filter = 'drop-shadow(0 0 12px rgba(245, 158, 11, 0.4))';
-    item.style.opacity = '0';
-    item.style.transition = `transform ${duration}s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease`;
-    item.style.transform = `translateY(0px) rotate(0deg) scale(0.6)`;
-
-    container.appendChild(item);
-
-    // Trigger animation
-    setTimeout(() => {
-      item.style.opacity = '1';
-      const endY = window.innerHeight + 120;
-      const swayX = (Math.random() - 0.5) * 200;
-      item.style.transform = `translate(${swayX}px, ${endY}px) rotate(${rotation}deg) scale(1.1)`;
-    }, delay * 1000);
+  // Haptic feedback on mobile if supported
+  if (typeof window !== 'undefined' && 'navigator' in window && window.navigator.vibrate) {
+    try {
+      window.navigator.vibrate([50, 40, 80]);
+    } catch {}
   }
 
-  // Auto clean-up DOM container
   setTimeout(() => {
-    if (container.parentNode) {
-      container.parentNode.removeChild(container);
+    body.classList.remove('money-screen-shake');
+  }, 600);
+}
+
+/**
+ * Spawns a lightweight floating money badge pop-up in the center
+ */
+function spawnPopBadge(amount: number, isLarge: boolean) {
+  if (typeof document === 'undefined') return;
+  ensureScreenShakeStyle();
+
+  const badge = document.createElement('div');
+  badge.className = 'fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[99999] money-pop-badge';
+
+  if (isLarge) {
+    badge.innerHTML = `
+      <div class="px-6 py-3 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-slate-950 font-black text-lg sm:text-2xl shadow-[0_0_40px_rgba(245,158,11,0.8),0_10px_25px_rgba(0,0,0,0.5)] border-2 border-yellow-200 flex items-center gap-2.5">
+        <span class="text-2xl sm:text-3xl animate-bounce">💰</span>
+        <span>+฿${amount.toLocaleString()}</span>
+        <span class="text-xs bg-slate-950/20 text-slate-950 px-2 py-0.5 rounded-full uppercase tracking-wider font-extrabold">SUPER TOP-UP</span>
+      </div>
+    `;
+  } else {
+    badge.innerHTML = `
+      <div class="px-4 py-2 rounded-xl bg-slate-900/90 text-cyan-300 font-black text-sm sm:text-base shadow-[0_0_20px_rgba(6,182,212,0.5)] border border-cyan-400/50 flex items-center gap-2 backdrop-blur-md">
+        <span class="text-base sm:text-lg">🪙</span>
+        <span>+฿${amount > 0 ? amount.toLocaleString() : '50'}</span>
+        <span class="text-[10px] text-emerald-400 font-bold bg-emerald-500/20 px-1.5 py-0.2 rounded">SUCCESS</span>
+      </div>
+    `;
+  }
+
+  document.body.appendChild(badge);
+  setTimeout(() => {
+    if (badge.parentNode) {
+      badge.parentNode.removeChild(badge);
     }
-  }, durationMs + 2000);
+  }, 1500);
+}
+
+/**
+ * Cache text shapes to avoid re-rendering canvases repeatedly
+ */
+let cachedShapes: any[] | null = null;
+function getMoneyShapes() {
+  if (cachedShapes) return cachedShapes;
+  if (typeof confetti.shapeFromText === 'function') {
+    try {
+      const bill = confetti.shapeFromText({ text: '💵', scalar: 2.2 });
+      const coin = confetti.shapeFromText({ text: '🪙', scalar: 2.0 });
+      const bag = confetti.shapeFromText({ text: '💰', scalar: 2.2 });
+      cachedShapes = [bill, coin, bag];
+      return cachedShapes;
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Smart Celebration Effect:
+ * - Small amounts (< 500 THB): Single clean pop burst from center, disappears in ~1s (0 lag).
+ * - Large amounts (>= 500 THB): Screen shake + dual side cannons + high impact golden explosion.
+ */
+export function triggerMoneyCelebration(
+  amountOrOptions?: number | MoneyCelebrationOptions
+) {
+  if (typeof window === 'undefined') return;
+
+  const rawAmount =
+    typeof amountOrOptions === 'number'
+      ? amountOrOptions
+      : typeof amountOrOptions === 'object' && amountOrOptions !== null
+      ? amountOrOptions.amount
+      : 50;
+
+  const amount = Number(rawAmount) || 50;
+  const isLarge = amount >= 500;
+  const shapes = getMoneyShapes();
+
+  // Show center pop badge
+  spawnPopBadge(amount, isLarge);
+
+  // -------------------------------------------------------------
+  // 1. SMALL AMOUNT (< 500 THB): Clean single pop, vanishes quickly
+  // -------------------------------------------------------------
+  if (!isLarge) {
+    // Single burst from center, low particle count, fast drop (ticks: 80)
+    confetti({
+      particleCount: 24,
+      spread: 60,
+      origin: { x: 0.5, y: 0.55 },
+      shapes: shapes,
+      scalar: 1.8,
+      gravity: 1.3,
+      drift: 0,
+      ticks: 85, // Disappears in < 1 second!
+      colors: ['#10b981', '#f59e0b', '#fbbf24', '#06b6d4'],
+      disableForReducedMotion: true,
+    });
+    return;
+  }
+
+  // -------------------------------------------------------------
+  // 2. LARGE AMOUNT (>= 500 THB): Screen shake + Grand explosion
+  // -------------------------------------------------------------
+  triggerScreenShake();
+
+  // Central explosive burst
+  confetti({
+    particleCount: 55,
+    spread: 100,
+    origin: { x: 0.5, y: 0.55 },
+    shapes: shapes,
+    scalar: 2.2,
+    gravity: 0.9,
+    ticks: 140,
+    colors: ['#f59e0b', '#fbbf24', '#10b981', '#34d399', '#f43f5e', '#ffffff'],
+    disableForReducedMotion: true,
+  });
+
+  // Left cannon (150ms delay for punchy sequential feel)
+  setTimeout(() => {
+    confetti({
+      particleCount: 30,
+      angle: 60,
+      spread: 60,
+      origin: { x: 0.08, y: 0.7 },
+      shapes: shapes,
+      scalar: 2.0,
+      gravity: 0.9,
+      ticks: 140,
+      colors: ['#fbbf24', '#f59e0b', '#10b981'],
+      disableForReducedMotion: true,
+    });
+  }, 120);
+
+  // Right cannon
+  setTimeout(() => {
+    confetti({
+      particleCount: 30,
+      angle: 120,
+      spread: 60,
+      origin: { x: 0.92, y: 0.7 },
+      shapes: shapes,
+      scalar: 2.0,
+      gravity: 0.9,
+      ticks: 140,
+      colors: ['#fbbf24', '#f59e0b', '#10b981'],
+      disableForReducedMotion: true,
+    });
+  }, 220);
 }
