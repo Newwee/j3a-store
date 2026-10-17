@@ -12,6 +12,7 @@ export async function GET(req: Request) {
     const { data, error } = await supabaseAdmin
       .from('redeem_codes')
       .select('*')
+      .neq('code_type', 'angpao_test')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -145,7 +146,7 @@ export async function POST(req: Request) {
       const { error } = await supabaseAdmin
         .from('redeem_codes')
         .delete()
-        .neq('id', '');
+        .neq('code_type', 'angpao_test');
 
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });

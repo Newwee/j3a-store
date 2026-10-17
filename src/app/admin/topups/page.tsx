@@ -17,6 +17,8 @@ import {
   ShieldCheck,
   Gift,
   QrCode,
+  FlaskConical,
+  Zap,
 } from 'lucide-react';
 import { TopupRequest, TopupStatus } from '@/types/topup';
 import { getAllTopups, approveTopup, rejectTopup } from '@/lib/firestore/topups';
@@ -28,6 +30,7 @@ import { Modal } from '@/components/ui/Modal';
 import { CustomDropdown } from '@/components/ui/CustomDropdown';
 import { Button } from '@/components/ui/Button';
 import { triggerMoneyCelebration } from '@/lib/utils/moneyConfetti';
+import { TestAngpaoModal } from '@/components/admin/TestAngpaoModal';
 
 export default function AdminTopupsPage() {
   const { success, error } = useToast();
@@ -37,6 +40,7 @@ export default function AdminTopupsPage() {
   const [search, setSearch] = useState('');
   const [viewingSlip, setViewingSlip] = useState<TopupRequest | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [isTestModalOpen, setIsTestModalOpen] = useState<boolean>(false);
 
   const fetchTopups = async () => {
     setLoading(true);
@@ -114,7 +118,16 @@ export default function AdminTopupsPage() {
         description="ตรวจสอบหลักฐานการโอนเงิน (QR Code Slip) และกดอนุมัติเพื่อเพิ่มเงินเข้าบัญชี User ID อัตโนมัติ"
         actionText=""
         actionHref=""
-      />
+      >
+        <button
+          type="button"
+          onClick={() => setIsTestModalOpen(true)}
+          className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white border border-purple-400/40 transition-all shadow-[0_0_15px_rgba(168,85,247,0.3)] cursor-pointer"
+        >
+          <FlaskConical className="w-4 h-4 text-purple-200" />
+          <span>🧪 จำลองสร้างซองอั่งเปาทดสอบ</span>
+        </button>
+      </AdminHeader>
 
       {/* Pending Alert Banner */}
       {pendingCount > 0 && (
@@ -155,6 +168,7 @@ export default function AdminTopupsPage() {
             { value: 'pending', label: '🟡 รอการตรวจสอบ (Pending)' },
             { value: 'approved', label: '🟢 อนุมัติแล้ว (Approved)' },
             { value: 'rejected', label: '🔴 ปฏิเสธ (Rejected)' },
+            { value: 'test', label: '🧪 รายการทดสอบ (Test Only)' },
           ]}
           placeholder="สถานะการเติมเงิน"
           menuWidth="w-60"
@@ -209,7 +223,12 @@ export default function AdminTopupsPage() {
 
                       {/* Payment Method / Channel */}
                       <td className="py-4 px-4 whitespace-nowrap">
-                        {isAngpao ? (
+                        {topup.paymentMethod === 'truemoney_angpao_test' ? (
+                          <span className="inline-flex items-center gap-1.5 text-[11px] font-black text-purple-300 bg-purple-500/20 border border-purple-500/40 px-2.5 py-1 rounded-full shadow-[0_0_10px_rgba(168,85,247,0.2)]">
+                            <FlaskConical className="w-3.5 h-3.5 text-purple-400" />
+                            <span>TrueMoney ซอง (TEST)</span>
+                          </span>
+                        ) : isAngpao ? (
                           <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-rose-300 bg-rose-500/10 border border-rose-500/30 px-2.5 py-1 rounded-full">
                             <Gift className="w-3.5 h-3.5 text-rose-400" />
                             <span>TrueMoney ซอง (ออโต้)</span>
@@ -280,6 +299,10 @@ export default function AdminTopupsPage() {
                           <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/30 px-2.5 py-1 rounded-full">
                             <XCircle className="w-3 h-3" /> ปฏิเสธ
                           </span>
+                        ) : topup.status === 'test' ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-black text-purple-300 bg-purple-500/20 border border-purple-500/40 px-2.5 py-1 rounded-full shadow-[0_0_10px_rgba(168,85,247,0.25)]">
+                            <FlaskConical className="w-3 h-3 text-purple-400" /> 🧪 TEST (ทดสอบ)
+                          </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-300 bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 rounded-full animate-pulse">
                             <Clock className="w-3 h-3" /> รอตรวจสอบ
@@ -303,7 +326,7 @@ export default function AdminTopupsPage() {
                               disabled={isProcessing}
                               isLoading={isProcessing}
                               leftIcon={<CheckCircle2 className="w-3.5 h-3.5 text-slate-950" />}
-                              className="font-bold text-xs bg-emerald-400 hover:bg-emerald-300 text-slate-950 border-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+                              className="font-bold text-xs bg-emerald-400 hover:bg-emerald-300 text-slate-950 border-emerald-300 shadow-[0_0_15px_rgba(168,85,247,0.3)]"
                             >
                               อนุมัติเงินเข้าบัญชี
                             </Button>
@@ -318,6 +341,11 @@ export default function AdminTopupsPage() {
                               ปฏิเสธ
                             </Button>
                           </div>
+                        ) : topup.status === 'test' ? (
+                          <span className="text-xs font-mono font-bold text-purple-400 inline-flex items-center gap-1">
+                            <FlaskConical className="w-3 h-3" />
+                            <span>รายการจำลอง (TEST)</span>
+                          </span>
                         ) : (
                           <span className="text-xs text-slate-500">ดำเนินการแล้ว</span>
                         )}
@@ -390,6 +418,13 @@ export default function AdminTopupsPage() {
           </div>
         </Modal>
       )}
+
+      {/* Test Angpao Generator Simulation Modal */}
+      <TestAngpaoModal
+        isOpen={isTestModalOpen}
+        onClose={() => setIsTestModalOpen(false)}
+        onTopupSuccess={fetchTopups}
+      />
     </div>
   );
 }

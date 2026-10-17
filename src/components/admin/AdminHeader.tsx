@@ -13,6 +13,7 @@ interface AdminHeaderProps {
   onOpenMobileSidebar?: () => void;
   actionText?: string;
   actionHref?: string;
+  children?: React.ReactNode;
 }
 
 export function AdminHeader({
@@ -21,6 +22,7 @@ export function AdminHeader({
   onOpenMobileSidebar,
   actionText = 'เพิ่มสินค้าใหม่',
   actionHref = '/admin/products/new',
+  children,
 }: AdminHeaderProps) {
   const { user, profile } = useAuth();
   const displayName = profile?.displayName || user?.displayName || 'Admin';
@@ -55,6 +57,8 @@ export function AdminHeader({
             <span>ดูหน้าร้านจริง</span>
             <ExternalLink className="w-3.5 h-3.5" />
           </Link>
+
+          {children}
 
           {actionText && actionHref && (
             <Link href={actionHref}>

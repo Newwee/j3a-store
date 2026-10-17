@@ -16,7 +16,7 @@ export function extractVoucherHash(input: string | null | undefined): string | n
   if (!trimmed) return null;
 
   // 1. Parameter pattern ?v=... or &v=...
-  const paramMatch = trimmed.match(/[?&]v=([a-zA-Z0-9]+)/);
+  const paramMatch = trimmed.match(/[?&]v=([a-zA-Z0-9_-]+)/);
   if (paramMatch && paramMatch[1]) {
     return paramMatch[1];
   }
@@ -26,13 +26,13 @@ export function extractVoucherHash(input: string | null | undefined): string | n
     const parts = trimmed.split('?v=');
     if (parts[1]) {
       const code = parts[1].split('&')[0].trim();
-      const match = code.match(/^[a-zA-Z0-9]+/);
+      const match = code.match(/^[a-zA-Z0-9_-]+/);
       if (match) return match[0];
     }
   }
 
-  // 3. Raw voucher hash (typically 18-36 alphanumeric chars)
-  const rawMatch = trimmed.match(/^[a-zA-Z0-9]{10,}$/);
+  // 3. Raw voucher hash (typically 10+ alphanumeric, underscore or hyphen chars)
+  const rawMatch = trimmed.match(/^[a-zA-Z0-9_-]{8,}$/);
   if (rawMatch) {
     return rawMatch[0];
   }

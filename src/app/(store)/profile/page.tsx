@@ -30,6 +30,7 @@ import {
   Send,
   Ticket,
   LayoutDashboard,
+  FlaskConical,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
@@ -1069,7 +1070,9 @@ function ProfileContent() {
                     </thead>
                     <tbody className="divide-y divide-slate-800/80">
                       {userTopups.map((topup) => {
+                        const isTestAngpao = topup.paymentMethod === 'truemoney_angpao_test';
                         const isAngpao =
+                          isTestAngpao ||
                           topup.paymentMethod === 'truemoney_angpao' ||
                           Boolean(topup.voucherHash) ||
                           Boolean(topup.paymentSlipUrl?.includes('gift.truemoney.com'));
@@ -1080,7 +1083,12 @@ function ProfileContent() {
                               #{topup.topupNumber}
                             </td>
                             <td className="py-3 px-4">
-                              {isAngpao ? (
+                              {isTestAngpao ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-black text-purple-300 bg-purple-500/20 border border-purple-500/40 px-2 py-0.5 rounded-full shadow-[0_0_8px_rgba(168,85,247,0.25)]">
+                                  <FlaskConical className="w-3 h-3 text-purple-400" />
+                                  ซอง TrueMoney (TEST)
+                                </span>
+                              ) : isAngpao ? (
                                 <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/30 px-2 py-0.5 rounded-full">
                                   <Gift className="w-3 h-3 text-rose-400" />
                                   ซอง TrueMoney
@@ -1100,6 +1108,13 @@ function ProfileContent() {
                                 <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full">
                                   <CheckCircle2 className="w-3 h-3" /> อนุมัติเข้ากระเป๋าแล้ว
                                 </span>
+                              ) : topup.status === 'test' ? (
+                                <div className="space-y-0.5">
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-black text-purple-300 bg-purple-500/20 border border-purple-500/40 px-2 py-0.5 rounded-full shadow-[0_0_8px_rgba(168,85,247,0.25)]">
+                                    <FlaskConical className="w-3 h-3 text-purple-400" /> 🧪 ทดสอบ (Test)
+                                  </span>
+                                  <p className="text-[10px] text-purple-300/80">ระบบจำลองเครดิตสำหรับทดสอบ</p>
+                                </div>
                               ) : topup.status === 'rejected' ? (
                                 <div className="space-y-0.5">
                                   <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/30 px-2 py-0.5 rounded-full">

@@ -23,13 +23,14 @@ export async function POST(req: Request) {
     let affectedOrdersCount = 0;
 
     if (mode === 'all_orders') {
-      // Delete all orders
+      // Delete all orders and test topups
       const { data, error } = await supabaseAdmin.from('orders').delete().neq('id', '');
       if (error) {
         console.error('Failed to reset all orders:', error);
       }
+      await supabaseAdmin.from('topups').delete().eq('status', 'test');
     } else if (mode === 'test_orders') {
-      // Delete orders that are marked pending or cancelled or test
+      // Delete orders that are marked pending or cancelled
       const { data, error } = await supabaseAdmin
         .from('orders')
         .delete()
@@ -37,6 +38,8 @@ export async function POST(req: Request) {
       if (error) {
         console.error('Failed to reset test orders:', error);
       }
+      // Also clean up topups marked as 'test'
+      await supabaseAdmin.from('topups').delete().eq('status', 'test');
     }
 
     // Refresh store_stats row

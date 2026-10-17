@@ -1,4 +1,4 @@
-export type TopupStatus = 'pending' | 'approved' | 'rejected';
+export type TopupStatus = 'pending' | 'approved' | 'rejected' | 'test';
 
 export interface TopupRequest {
   id: string;
@@ -9,7 +9,7 @@ export interface TopupRequest {
   amount: number;
   paymentSlipUrl: string;
   status: TopupStatus;
-  paymentMethod?: 'slip' | 'truemoney_angpao';
+  paymentMethod?: 'slip' | 'truemoney_angpao' | 'truemoney_angpao_test';
   voucherHash?: string;
   adminNote?: string;
   createdAt: string;
