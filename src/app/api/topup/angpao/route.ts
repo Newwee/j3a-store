@@ -1,10 +1,101 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { extractVoucherHash, redeemTrueMoneyVoucher, warmAngpaoProviders } from '@/lib/utils/angpao';
+import {
+  extractVoucherHash,
+  redeemTrueMoneyVoucher,
+  warmAngpaoProviders,
+  ANGPAO_PROVIDERS,
+  cleanThaiPhoneNumber,
+  isValidThaiPhoneNumber,
+} from '@/lib/utils/angpao';
 
+/**
+ * GET: Performs live health diagnostic & warm-up for the TrueMoney Angpao system
+ * Returns operational status, configured receiver phone, and provider latency
+ */
 export async function GET() {
-  warmAngpaoProviders().catch(() => {});
-  return NextResponse.json({ ok: true, status: 'ready' });
+  // 1. Retrieve store receiver phone
+  let receiverPhone = '0983892996';
+  try {
+    const { data: storeSetting } = await supabaseAdmin
+      .from('settings')
+      .select('truemoney_phone, promptpay')
+      .eq('id', 'store')
+      .limit(1)
+      .maybeSingle();
+
+    receiverPhone =
+      storeSetting?.truemoney_phone?.trim() ||
+      storeSetting?.promptpay?.trim() ||
+      process.env.TRUEMONEY_PHONE ||
+      '0983892996';
+  } catch (e) {
+    console.warn('Could not read store settings for phone:', e);
+  }
+
+  const cleanedPhone = cleanThaiPhoneNumber(receiverPhone);
+  const isPhoneValid = isValidThaiPhoneNumber(cleanedPhone);
+
+  // 2. Ping providers in parallel with timeout
+  const providerNames: Record<string, string> = {
+    'https://truemoney-voucher-nestjs.vercel.app': 'NestJS Proxy Engine (Primary)',
+    'https://truemoney-voucher-fastapi.vercel.app': 'FastAPI Proxy Engine (Secondary)',
+    'https://truemoney-voucher-go.vercel.app': 'Go Microservice Engine (Fast Fallback)',
+  };
+
+  const providerChecks = await Promise.allSettled(
+    ANGPAO_PROVIDERS.map(async (providerUrl) => {
+      const start = Date.now();
+      const res = await fetch(`${providerUrl}/status`, {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(3500),
+      });
+      const latencyMs = Date.now() - start;
+      return {
+        url: providerUrl,
+        name: providerNames[providerUrl] || providerUrl,
+        status: res.ok ? 'online' : 'error',
+        statusCode: res.status,
+        latencyMs,
+      };
+    })
+  );
+
+  const providers = providerChecks.map((item, index) => {
+    const defaultUrl = ANGPAO_PROVIDERS[index];
+    if (item.status === 'fulfilled') {
+      return item.value;
+    }
+    return {
+      url: defaultUrl,
+      name: providerNames[defaultUrl] || defaultUrl,
+      status: 'offline',
+      statusCode: 500,
+      latencyMs: 3500,
+    };
+  });
+
+  const onlineCount = providers.filter((p) => p.status === 'online').length;
+  const isHealthy = onlineCount > 0 && isPhoneValid;
+  const maskedPhone =
+    cleanedPhone.length >= 10
+      ? `${cleanedPhone.slice(0, 3)}-XXX-${cleanedPhone.slice(-4)}`
+      : cleanedPhone;
+
+  return NextResponse.json({
+    ok: true,
+    status: isHealthy ? 'active' : onlineCount > 0 ? 'warning' : 'offline',
+    isActive: isHealthy,
+    receiverPhone: cleanedPhone,
+    maskedPhone,
+    isPhoneValid,
+    providers,
+    onlineCount,
+    totalProviders: providers.length,
+    testModeAvailable: true,
+    checkedAt: new Date().toISOString(),
+  });
 }
 
 export async function POST(req: Request) {

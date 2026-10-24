@@ -32,12 +32,18 @@ import {
 } from '@/lib/firestore/marketing';
 import { SitePopupModal } from '@/components/marketing/SitePopupModal';
 import { uploadProductImage } from '@/lib/storage/upload';
+import { AdminConfirmModal } from '@/components/admin/AdminConfirmModal';
 
 export default function AdminAnnouncementsPage() {
   const [activeTab, setActiveTab] = useState<'popups' | 'announcements' | 'campaigns'>('popups');
   const [popups, setPopups] = useState<SitePopup[]>([]);
   const [announcements, setAnnouncements] = useState<SiteAnnouncement[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    type: 'popup' | 'announcement';
+    id: string;
+    title?: string;
+  } | null>(null);
 
   // Popup Form State
   const [isEditingPopup, setIsEditingPopup] = useState(false);
@@ -133,11 +139,8 @@ export default function AdminAnnouncementsPage() {
     loadData();
   };
 
-  const handleDeletePopup = async (id: string) => {
-    if (confirm('คุณต้องการลบป๊อปอัปนี้ใช่หรือไม่?')) {
-      await deletePopup(id);
-      loadData();
-    }
+  const handleDeletePopup = (id: string, title?: string) => {
+    setDeleteTarget({ type: 'popup', id, title });
   };
 
   const handleTogglePopupActive = async (p: SitePopup) => {
@@ -167,11 +170,19 @@ export default function AdminAnnouncementsPage() {
     loadData();
   };
 
-  const handleDeleteAnn = async (id: string) => {
-    if (confirm('คุณต้องการลบประกาศนี้ใช่หรือไม่?')) {
-      await deleteAnnouncement(id);
-      loadData();
+  const handleDeleteAnn = (id: string, title?: string) => {
+    setDeleteTarget({ type: 'announcement', id, title });
+  };
+
+  const executeDeleteTarget = async () => {
+    if (!deleteTarget) return;
+    if (deleteTarget.type === 'popup') {
+      await deletePopup(deleteTarget.id);
+    } else {
+      await deleteAnnouncement(deleteTarget.id);
     }
+    setDeleteTarget(null);
+    loadData();
   };
 
   return (
@@ -689,6 +700,18 @@ export default function AdminAnnouncementsPage() {
       {previewPopup && (
         <SitePopupModal forcePopup={previewPopup} onClosePreview={() => setPreviewPopup(null)} />
       )}
+
+      {/* Modern Cyberpunk Confirmation Panel for Marketing Deletions */}
+      <AdminConfirmModal
+        isOpen={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={executeDeleteTarget}
+        title={deleteTarget?.type === 'popup' ? 'ยืนยันการลบป๊อปอัปแจ้งเตือน' : 'ยืนยันการลบประกาศ'}
+        description={`คุณแน่ใจหรือไม่ว่าต้องการลบ${deleteTarget?.type === 'popup' ? 'ป๊อปอัป' : 'ประกาศ'} "${deleteTarget?.title || deleteTarget?.id}" ออกจากระบบ?`}
+        confirmText="ยืนยันลบรายการ"
+        cancelText="ยกเลิก"
+        variant="danger"
+      />
     </div>
   );
 }

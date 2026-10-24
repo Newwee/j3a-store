@@ -31,6 +31,8 @@ import { CustomDropdown } from '@/components/ui/CustomDropdown';
 import { Button } from '@/components/ui/Button';
 import { triggerMoneyCelebration } from '@/lib/utils/moneyConfetti';
 import { TestAngpaoModal } from '@/components/admin/TestAngpaoModal';
+import { AdminConfirmModal } from '@/components/admin/AdminConfirmModal';
+import { AngpaoAdminDebugBanner } from '@/components/topup/AngpaoAdminDebugBanner';
 
 export default function AdminTopupsPage() {
   const { success, error } = useToast();
@@ -41,6 +43,8 @@ export default function AdminTopupsPage() {
   const [viewingSlip, setViewingSlip] = useState<TopupRequest | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [isTestModalOpen, setIsTestModalOpen] = useState<boolean>(false);
+  const [topupToApprove, setTopupToApprove] = useState<TopupRequest | null>(null);
+  const [topupToReject, setTopupToReject] = useState<TopupRequest | null>(null);
 
   const fetchTopups = async () => {
     setLoading(true);
@@ -71,10 +75,9 @@ export default function AdminTopupsPage() {
     });
   }, [topups, search]);
 
-  const handleApprove = async (topup: TopupRequest) => {
-    if (!confirm(`ยืนยันการอนุมัติเงินจำนวน ${formatCurrency(topup.amount)} เข้า User ID: ${topup.userId} (${topup.userEmail}) หรือไม่?`)) {
-      return;
-    }
+  const executeApprove = async () => {
+    if (!topupToApprove) return;
+    const topup = topupToApprove;
 
     setProcessingId(topup.id);
     try {
@@ -88,24 +91,27 @@ export default function AdminTopupsPage() {
       error(`เกิดข้อผิดพลาด: ${err.message || 'ไม่สามารถอนุมัติได้'}`);
     } finally {
       setProcessingId(null);
+      setTopupToApprove(null);
     }
   };
 
-  const handleReject = async (topup: TopupRequest) => {
-    const reason = prompt('กรุณาระบุเหตุผลการปฏิเสธ (เช่น สลิปไม่ตรงยอดเงิน หรือไม่พบรายการ):', 'สลิปไม่ถูกต้อง หรือไม่พบยอดเงินเข้าบัญชี');
-    if (reason === null) return;
+  const executeReject = async (reason?: string) => {
+    if (!topupToReject) return;
+    const topup = topupToReject;
+    const finalReason = reason?.trim() || 'สลิปไม่ถูกต้อง หรือไม่พบยอดเงินเข้าบัญชี';
 
     setProcessingId(topup.id);
     try {
-      await rejectTopup(topup.id, reason);
+      await rejectTopup(topup.id, finalReason);
       setTopups((prev) =>
-        prev.map((t) => (t.id === topup.id ? { ...t, status: 'rejected', adminNote: reason } : t))
+        prev.map((t) => (t.id === topup.id ? { ...t, status: 'rejected', adminNote: finalReason } : t))
       );
       success(`ปฏิเสธคำขอเติมเงิน #${topup.topupNumber} เรียบร้อยแล้ว`);
     } catch (err: any) {
       error(`เกิดข้อผิดพลาด: ${err.message || 'ไม่สามารถปฏิเสธได้'}`);
     } finally {
       setProcessingId(null);
+      setTopupToReject(null);
     }
   };
 
@@ -128,6 +134,9 @@ export default function AdminTopupsPage() {
           <span>🧪 จำลองสร้างซองอั่งเปาทดสอบ</span>
         </button>
       </AdminHeader>
+
+      {/* Admin Debug Mode Diagnostic Panel */}
+      <AngpaoAdminDebugBanner isAdmin={true} onTopupSuccess={fetchTopups} />
 
       {/* Pending Alert Banner */}
       {pendingCount > 0 && (
@@ -178,9 +187,28 @@ export default function AdminTopupsPage() {
 
       {/* Topups Table */}
       {loading ? (
-        <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-8 space-y-4">
+        <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-4 backdrop-blur-md shadow-xl">
+          <div className="flex items-center justify-center gap-3 py-6 text-cyan-400">
+            <div className="relative w-8 h-8 flex items-center justify-center">
+              <span className="absolute inset-0 rounded-full border-2 border-cyan-400/20 border-t-cyan-400 animate-spin" />
+              <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse" />
+            </div>
+            <span className="text-xs font-bold tracking-wider text-slate-300">
+              กำลังเชื่อมต่อและดึงรายการแจ้งเติมเงินล่าสุดจากระบบ...
+            </span>
+          </div>
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-16 rounded-xl bg-slate-950 animate-pulse" />
+            <div
+              key={i}
+              className="relative overflow-hidden h-16 rounded-2xl bg-slate-950/80 border border-slate-850 flex items-center px-4 sm:px-6 gap-4 sm:gap-6"
+            >
+              <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.8s_infinite] bg-gradient-to-r from-transparent via-cyan-500/10 to-transparent" />
+              <div className="w-24 h-4 rounded-md bg-slate-800 animate-pulse" />
+              <div className="w-32 h-4 rounded-md bg-slate-800 animate-pulse hidden sm:block" />
+              <div className="w-48 h-4 rounded-md bg-slate-850 animate-pulse" />
+              <div className="w-20 h-4 rounded-md bg-slate-800 animate-pulse ml-auto" />
+              <div className="w-28 h-8 rounded-xl bg-slate-800 animate-pulse" />
+            </div>
           ))}
         </div>
       ) : filteredTopups.length === 0 ? (
@@ -322,18 +350,18 @@ export default function AdminTopupsPage() {
                             <Button
                               variant="primary"
                               size="sm"
-                              onClick={() => handleApprove(topup)}
+                              onClick={() => setTopupToApprove(topup)}
                               disabled={isProcessing}
-                              isLoading={isProcessing}
+                              isLoading={isProcessing && processingId === topup.id}
                               leftIcon={<CheckCircle2 className="w-3.5 h-3.5 text-slate-950" />}
-                              className="font-bold text-xs bg-emerald-400 hover:bg-emerald-300 text-slate-950 border-emerald-300 shadow-[0_0_15px_rgba(168,85,247,0.3)]"
+                              className="font-bold text-xs bg-emerald-400 hover:bg-emerald-300 text-slate-950 border-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
                             >
                               อนุมัติเงินเข้าบัญชี
                             </Button>
                             <Button
                               variant="danger"
                               size="sm"
-                              onClick={() => handleReject(topup)}
+                              onClick={() => setTopupToReject(topup)}
                               disabled={isProcessing}
                               leftIcon={<XCircle className="w-3.5 h-3.5" />}
                               className="font-bold text-xs"
@@ -406,7 +434,7 @@ export default function AdminTopupsPage() {
                     onClick={() => {
                       const cur = viewingSlip;
                       setViewingSlip(null);
-                      handleApprove(cur);
+                      setTopupToApprove(cur);
                     }}
                     className="bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold"
                   >
@@ -418,6 +446,70 @@ export default function AdminTopupsPage() {
           </div>
         </Modal>
       )}
+
+      {/* Modern Cyberpunk Confirmation Panel for Approval */}
+      <AdminConfirmModal
+        isOpen={Boolean(topupToApprove)}
+        onClose={() => setTopupToApprove(null)}
+        onConfirm={executeApprove}
+        title="ยืนยันการอนุมัติเติมเงินเข้าบัญชี"
+        description="กรุณาตรวจสอบยอดเงินและบัญชีลูกค้าให้เรียบร้อย เมื่อกดยืนยันแล้วระบบจะโอนเครดิตเข้ากระเป๋าของลูกค้าทันที"
+        confirmText="ยืนยันอนุมัติเงิน"
+        cancelText="ยกเลิก"
+        variant="success"
+        itemDetails={
+          topupToApprove
+            ? [
+                { label: 'รหัสคำขอ:', value: `#${topupToApprove.topupNumber}` },
+                {
+                  label: 'ยอดเงินที่ต้องเข้า:',
+                  value: (
+                    <span className="text-emerald-400 font-extrabold text-sm">
+                      {formatCurrency(topupToApprove.amount)}
+                    </span>
+                  ),
+                },
+                {
+                  label: 'ลูกค้าผู้รับเงิน:',
+                  value: `${topupToApprove.userName} (${topupToApprove.userEmail})`,
+                },
+                { label: 'User ID:', value: topupToApprove.userId },
+                {
+                  label: 'ช่องทางการโอน:',
+                  value:
+                    topupToApprove.paymentMethod === 'truemoney_angpao'
+                      ? 'TrueMoney ซองของขวัญ'
+                      : 'โอนผ่านบัญชีธนาคาร / พร้อมเพย์',
+                },
+              ]
+            : []
+        }
+      />
+
+      {/* Modern Cyberpunk Confirmation Panel for Rejection */}
+      <AdminConfirmModal
+        isOpen={Boolean(topupToReject)}
+        onClose={() => setTopupToReject(null)}
+        onConfirm={executeReject}
+        title="ยืนยันการปฏิเสธคำขอเติมเงิน"
+        description="คุณสามารถระบุเหตุผลการปฏิเสธเพื่อแจ้งให้ลูกค้าทราบ โดยข้อความนี้จะแสดงในหน้าประวัติการเติมเงินของลูกค้า"
+        confirmText="ยืนยันปฏิเสธคำขอ"
+        cancelText="ยกเลิก"
+        variant="danger"
+        requireInput={true}
+        inputLabel="เหตุผลการปฏิเสธ (ลูกค้าจะมองเห็นข้อความนี้)"
+        inputPlaceholder="เช่น สลิปไม่ตรงยอดเงิน หรือไม่พบยอดเงินเข้าบัญชี..."
+        defaultValue="สลิปไม่ถูกต้อง หรือไม่พบยอดเงินเข้าบัญชี"
+        itemDetails={
+          topupToReject
+            ? [
+                { label: 'รหัสคำขอ:', value: `#${topupToReject.topupNumber}` },
+                { label: 'ยอดเงิน:', value: formatCurrency(topupToReject.amount) },
+                { label: 'ลูกค้า:', value: `${topupToReject.userName} (${topupToReject.userEmail})` },
+              ]
+            : []
+        }
+      />
 
       {/* Test Angpao Generator Simulation Modal */}
       <TestAngpaoModal

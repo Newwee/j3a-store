@@ -50,12 +50,13 @@ import { compressImageToDataUrl } from '@/lib/utils/image';
 import { uploadProductImage } from '@/lib/storage/upload';
 import { SettingsTabContent } from '@/components/profile/SettingsTabContent';
 import { triggerMoneyCelebration } from '@/lib/utils/moneyConfetti';
+import { AngpaoAdminDebugBanner } from '@/components/topup/AngpaoAdminDebugBanner';
 
 function ProfileContent() {
   const searchParams = useSearchParams();
   const initialTab = searchParams.get('tab') || 'overview';
 
-  const { user, profile, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile, isAdmin } = useAuth();
   const { success, error, toast } = useToast();
   const { showLoading, hideLoading } = useLoading();
 
@@ -835,7 +836,17 @@ function ProfileContent() {
 
             {/* Method 3: Angpao Voucher (Live & Fully Automated) */}
             {topupMethod === 'angpao' && (
-              <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8 backdrop-blur-md max-w-2xl mx-auto space-y-6">
+              <div className="max-w-2xl mx-auto space-y-5">
+                {/* Admin Debug Mode Diagnostic Panel (Visible only to Admin) */}
+                <AngpaoAdminDebugBanner
+                  isAdmin={Boolean(isAdmin || profile?.role === 'admin')}
+                  onTopupSuccess={() => {
+                    if (refreshProfile) refreshProfile();
+                    loadTopupHistory();
+                  }}
+                />
+
+                <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8 backdrop-blur-md space-y-6">
                 {/* Header */}
                 <div className="text-center space-y-2">
                   <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-red-600/20 via-rose-600/30 to-amber-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 mx-auto shadow-lg shadow-rose-500/10">
@@ -971,6 +982,7 @@ function ProfileContent() {
                   </ul>
                 </div>
               </div>
+            </div>
             )}
 
             {/* Method 4: Redeem Code */}

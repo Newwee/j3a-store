@@ -28,6 +28,7 @@ import { AuditLogDetailModal } from '@/components/admin/AuditLogDetailModal';
 import { CustomDropdown } from '@/components/ui/CustomDropdown';
 import { formatDate } from '@/lib/utils/formatters';
 import { Button } from '@/components/ui/Button';
+import { AdminConfirmModal } from '@/components/admin/AdminConfirmModal';
 
 export default function AdminAuditLogsPage() {
   const [logs, setLogs] = useState<AuditLogItem[]>([]);
@@ -38,6 +39,7 @@ export default function AdminAuditLogsPage() {
   const [resultFilter, setResultFilter] = useState<AuditResult | 'all'>('all');
   const [selectedLog, setSelectedLog] = useState<AuditLogItem | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isClearModalOpen, setIsClearModalOpen] = useState(false);
 
   const fetchLogs = async () => {
     try {
@@ -66,10 +68,12 @@ export default function AdminAuditLogsPage() {
   };
 
   const handleClearLogs = async () => {
-    if (confirm('คุณแน่ใจหรือไม่ว่าต้องการล้างประวัติ Audit Logs ทั้งหมด? การกระทำนี้ไม่สามารถย้อนกลับได้')) {
-      await clearAuditLogs();
-      fetchLogs();
-    }
+    setIsClearModalOpen(true);
+  };
+
+  const confirmClearLogs = async () => {
+    await clearAuditLogs();
+    fetchLogs();
   };
 
   // Export audit logs as CSV with UTF-8 BOM
@@ -409,6 +413,18 @@ export default function AdminAuditLogsPage() {
 
       {/* Detail Modal */}
       <AuditLogDetailModal log={selectedLog} onClose={() => setSelectedLog(null)} />
+
+      {/* Confirmation Modal to Clear All Audit Logs */}
+      <AdminConfirmModal
+        isOpen={isClearModalOpen}
+        onClose={() => setIsClearModalOpen(false)}
+        onConfirm={confirmClearLogs}
+        title="ยืนยันการล้างประวัติ Audit Logs ทั้งหมด"
+        description="คุณแน่ใจหรือไม่ว่าต้องการลบประวัติการทำงานของระบบ (Audit Logs) ทั้งหมด? การกระทำนี้ไม่สามารถกู้คืนย้อนหลังได้"
+        confirmText="ยืนยันล้างประวัติทั้งหมด"
+        cancelText="ยกเลิก"
+        variant="danger"
+      />
     </div>
   );
 }

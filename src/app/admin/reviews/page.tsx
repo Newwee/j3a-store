@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/Button';
 import { useToast } from '@/context/ToastContext';
 import { formatDate } from '@/lib/utils/formatters';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { AdminConfirmModal } from '@/components/admin/AdminConfirmModal';
 
 export default function AdminReviewsPage() {
   const { success, error } = useToast();
@@ -32,6 +33,7 @@ export default function AdminReviewsPage() {
   const [typeFilter, setTypeFilter] = useState<'all' | 'store' | 'product'>('all');
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [unbanningId, setUnbanningId] = useState<string | null>(null);
+  const [reviewToDelete, setReviewToDelete] = useState<Review | null>(null);
 
   const fetchReviews = async () => {
     setLoading(true);
@@ -49,20 +51,18 @@ export default function AdminReviewsPage() {
     fetchReviews();
   }, []);
 
-  const handleDelete = async (review: Review) => {
-    if (!confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบรีวิวของ "${review.userName}"?`)) {
-      return;
-    }
-
-    setDeletingId(review.id);
+  const confirmDeleteReview = async () => {
+    if (!reviewToDelete) return;
+    setDeletingId(reviewToDelete.id);
     try {
-      await deleteReview(review.id, review.productId);
-      setReviews((prev) => prev.filter((r) => r.id !== review.id));
+      await deleteReview(reviewToDelete.id, reviewToDelete.productId);
+      setReviews((prev) => prev.filter((r) => r.id !== reviewToDelete.id));
       success('ลบรีวิวเรียบร้อยแล้ว และอัปเดตคะแนนเฉลี่ยให้อัตโนมัติ');
     } catch (err: any) {
       error(`เกิดข้อผิดพลาดในการลบรีวิว: ${err.message || 'กรุณาลองใหม่อีกครั้ง'}`);
     } finally {
       setDeletingId(null);
+      setReviewToDelete(null);
     }
   };
 
@@ -264,9 +264,31 @@ export default function AdminReviewsPage() {
       {/* Reviews Table / List */}
       <div className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden backdrop-blur-md">
         {loading ? (
-          <div className="p-12 text-center text-slate-400 text-xs">
-            <div className="w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-            กำลังโหลดรายการรีวิว...
+          <div className="p-8 space-y-4">
+            <div className="flex items-center justify-center gap-3 py-6 text-cyan-400">
+              <div className="relative w-8 h-8 flex items-center justify-center">
+                <span className="absolute inset-0 rounded-full border-2 border-cyan-400/20 border-t-cyan-400 animate-spin" />
+                <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse" />
+              </div>
+              <span className="text-xs font-bold tracking-wider text-slate-300">
+                กำลังดึงข้อมูลรีวิวล่าสุดจากเซิร์ฟเวอร์...
+              </span>
+            </div>
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div
+                key={i}
+                className="relative overflow-hidden p-5 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-3"
+              >
+                <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.8s_infinite] bg-gradient-to-r from-transparent via-cyan-500/5 to-transparent" />
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-slate-800 animate-pulse" />
+                  <div className="h-4 w-32 rounded bg-slate-800 animate-pulse" />
+                  <div className="h-4 w-20 rounded bg-slate-800 animate-pulse ml-auto" />
+                </div>
+                <div className="h-3 w-3/4 rounded bg-slate-850 animate-pulse" />
+                <div className="h-3 w-1/2 rounded bg-slate-850 animate-pulse" />
+              </div>
+            ))}
           </div>
         ) : filteredReviews.length === 0 ? (
           <div className="p-12">
@@ -365,7 +387,7 @@ export default function AdminReviewsPage() {
                     <Button
                       variant="danger"
                       size="sm"
-                      onClick={() => handleDelete(rev)}
+                      onClick={() => setReviewToDelete(rev)}
                       isLoading={deletingId === rev.id}
                       leftIcon={<Trash2 className="w-3.5 h-3.5" />}
                       className="text-xs"
@@ -391,6 +413,37 @@ export default function AdminReviewsPage() {
           </div>
         )}
       </div>
+
+      {/* Modern Cyberpunk Confirmation Panel for Review Deletion */}
+      <AdminConfirmModal
+        isOpen={Boolean(reviewToDelete)}
+        onClose={() => setReviewToDelete(null)}
+        onConfirm={confirmDeleteReview}
+        title="ยืนยันการลบรีวิวของลูกค้า"
+        description="คุณแน่ใจหรือไม่ว่าต้องการลบความคิดเห็นนี้ออกจากระบบ? ระบบจะคำนวณคะแนนเฉลี่ยของสินค้าใหม่ให้อัตโนมัติ"
+        confirmText="ยืนยันลบรีวิว"
+        cancelText="ยกเลิก"
+        variant="danger"
+        itemDetails={
+          reviewToDelete
+            ? [
+                { label: 'ผู้เขียนรีวิว:', value: reviewToDelete.userName || 'ไม่ระบุชื่อ' },
+                {
+                  label: 'คะแนนที่ให้:',
+                  value: `${reviewToDelete.rating > 5 ? (reviewToDelete.rating / 2).toFixed(1) : reviewToDelete.rating} / 5.0 ⭐`,
+                },
+                {
+                  label: 'ข้อความรีวิว:',
+                  value: reviewToDelete.comment ? `"${reviewToDelete.comment}"` : '(ไม่มีข้อความ)',
+                },
+                {
+                  label: 'สินค้า / บริการ:',
+                  value: reviewToDelete.productId === 'store_overall' ? 'รีวิวร้านค้าโดยรวม' : reviewToDelete.productId,
+                },
+              ]
+            : []
+        }
+      />
     </div>
   );
 }
