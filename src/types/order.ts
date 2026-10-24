@@ -12,6 +12,8 @@ export interface OrderItem {
   downloadUrl?: string;
   deliveryNote?: string;
   deliveryType?: 'link' | 'key' | 'both';
+  licenseKeys?: string[];
+  licenseKey?: string;
 }
 
 export interface CustomerInfo {

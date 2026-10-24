@@ -375,21 +375,45 @@ export default function CheckoutPage() {
         }
       }
 
-      // 3. Auto-claim License Key if paying via wallet for software license
-      let claimedKey: string | undefined = undefined;
-      if (hasLicenseItem && paymentMethod === 'wallet') {
+      // 3. Auto-claim License Keys (1:1 per product and quantity) if paying via wallet
+      let claimedKeys: any[] = [];
+      let allClaimedKeysString: string | undefined = undefined;
+
+      if (hasLicenseItem && (paymentMethod === 'wallet' || finalTotal === 0)) {
         try {
+          const licenseItemsPayload = items
+            .filter(
+              (it) =>
+                it.product.deliveryType === 'key' ||
+                it.product.deliveryType === 'both' ||
+                it.product.slug.includes('manager') ||
+                it.product.slug.includes('profile')
+            )
+            .map((it) => ({
+              productId: it.product.id,
+              name: it.product.name,
+              slug: it.product.slug,
+              quantity: it.quantity,
+              deliveryType: it.product.deliveryType,
+            }));
+
           const claimRes = await fetch('/api/license/claim', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ customerEmail: email.trim() }),
+            body: JSON.stringify({
+              customerEmail: email.trim(),
+              items: licenseItemsPayload,
+            }),
           });
           const claimData = await claimRes.json();
-          if (claimData.ok && claimData.key) {
-            claimedKey = claimData.key;
+          if (claimData.ok && Array.isArray(claimData.keys) && claimData.keys.length > 0) {
+            claimedKeys = claimData.keys;
+            allClaimedKeysString = claimData.keys.map((k: any) => k.key).join(', ');
+          } else if (claimData.ok && claimData.key) {
+            allClaimedKeysString = claimData.key;
           }
         } catch (claimErr) {
-          console.warn('Could not pre-claim license key during checkout:', claimErr);
+          console.warn('Could not pre-claim license keys during checkout:', claimErr);
         }
       }
 
@@ -409,6 +433,12 @@ export default function CheckoutPage() {
           if (latestUrl && latestUrl.includes('1ozs5fS2Y_cUcKGkuugp-5yuta5VGs385')) {
             latestUrl = 'https://drive.google.com/file/d/1LN_z1lwA-QZOBgYoWpfWQJRii0CPO4ZT/view?usp=sharing';
           }
+
+          // Match keys claimed for this specific product item
+          const itemMatchingKeys = claimedKeys
+            .filter((k) => k.productId === item.product.id || k.productSlug === item.product.slug)
+            .map((k) => k.key);
+
           return {
             productId: item.product.id,
             name: item.product.name,
@@ -419,6 +449,9 @@ export default function CheckoutPage() {
             ...(latestUrl ? { downloadUrl: latestUrl } : {}),
             ...(latestNote ? { deliveryNote: latestNote } : {}),
             ...(latestType ? { deliveryType: latestType } : {}),
+            ...(itemMatchingKeys.length > 0
+              ? { licenseKeys: itemMatchingKeys, licenseKey: itemMatchingKeys[0] }
+              : {}),
           };
         })
       );
@@ -440,7 +473,7 @@ export default function CheckoutPage() {
         total: finalTotal,
         paymentMethod,
         status: (paymentMethod === 'wallet' || finalTotal === 0) ? 'completed' : 'pending',
-        ...(claimedKey ? { transactionRef: claimedKey } : {}),
+        ...(allClaimedKeysString ? { transactionRef: allClaimedKeysString } : {}),
         ...(slipUrl ? { paymentProofUrl: slipUrl } : {}),
       };
 

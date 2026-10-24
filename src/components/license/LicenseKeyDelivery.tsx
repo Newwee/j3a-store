@@ -13,6 +13,8 @@ import {
   RefreshCw,
   Sparkles,
   Terminal,
+  Layers,
+  ShieldCheck,
 } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 import { Button } from '@/components/ui/Button';
@@ -79,9 +81,21 @@ export interface LicenseOrderItem {
   name?: string;
   slug?: string;
   category?: string;
+  quantity?: number;
   downloadUrl?: string;
   deliveryNote?: string;
   deliveryType?: 'link' | 'key' | 'both';
+  licenseKeys?: string[];
+  licenseKey?: string;
+}
+
+export interface DisplayKeyUnit {
+  key: string;
+  productId?: string;
+  productName: string;
+  productType: 'discord_manager' | 'discord_profile';
+  unitLabel: string;
+  downloadUrl: string;
 }
 
 export interface LicenseKeyDeliveryProps {
@@ -107,9 +121,11 @@ export function LicenseKeyDelivery({
 }: LicenseKeyDeliveryProps) {
   const { toast } = useToast();
   const [licenseKey, setLicenseKey] = useState<string>(initialKey || '');
+  const [apiKeys, setApiKeys] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(!initialKey && autoClaim);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [hasCopied, setHasCopied] = useState<boolean>(false);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [hasCopiedAll, setHasCopiedAll] = useState<boolean>(false);
 
   // Detect which software(s) were purchased based on items / product name / downloadUrl
   const [liveProducts, setLiveProducts] = useState<Record<string, { downloadUrl?: string; deliveryNote?: string }>>({});
@@ -273,15 +289,6 @@ export function LicenseKeyDelivery({
     });
   }, [items, productName, downloadUrl, liveProducts]);
 
-  const isMultiple = purchasedSoftware.length > 1;
-  const isManagerOnly = purchasedSoftware.length === 1 && purchasedSoftware[0].id === 'discord-manager';
-
-  const celebrationTitle = isMultiple
-    ? '🎉 ขอบคุณสำหรับการสั่งซื้อซอฟต์แวร์ Discord (J3A STORE)!'
-    : isManagerOnly
-    ? '🎉 ขอบคุณสำหรับการสั่งซื้อ J3A Discord Manager!'
-    : '🎉 ขอบคุณสำหรับการสั่งซื้อ J3A Discord Profile!';
-
   const claimKeyFromApi = async () => {
     setIsLoading(true);
     setErrorMsg(null);
@@ -289,11 +296,24 @@ export function LicenseKeyDelivery({
       const res = await fetch('/api/license/claim', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId, customerEmail }),
+        body: JSON.stringify({
+          orderId,
+          customerEmail,
+          items: items?.map((it) => ({
+            productId: it.productId,
+            name: it.name,
+            slug: it.slug,
+            quantity: it.quantity,
+            deliveryType: it.deliveryType,
+          })),
+        }),
       });
 
       const data = await res.json();
-      if (data.ok && data.key) {
+      if (data.ok && Array.isArray(data.keys) && data.keys.length > 0) {
+        setApiKeys(data.keys);
+        setLicenseKey(data.keys.map((k: any) => k.key).join(', '));
+      } else if (data.ok && data.key) {
         setLicenseKey(data.key);
       } else {
         setErrorMsg(
@@ -315,12 +335,101 @@ export function LicenseKeyDelivery({
     }
   }, [initialKey, autoClaim, orderId]);
 
-  const handleCopyKey = () => {
-    if (!licenseKey) return;
-    navigator.clipboard.writeText(licenseKey);
-    setHasCopied(true);
+  // Combine and structure keys for 1:1 display per purchased product & copy
+  const displayKeyUnits = useMemo<DisplayKeyUnit[]>(() => {
+    // 1. From API claimed keys
+    if (apiKeys && apiKeys.length > 0) {
+      return apiKeys.map((k, idx) => {
+        const isManager = k.productType === 'discord_manager' || (k.key && k.key.includes('ADM'));
+        const pType = isManager ? 'discord_manager' : 'discord_profile';
+        const pName = isManager ? 'J3A Discord Manager' : 'J3A Discord Profile';
+        const download = isManager
+          ? SOFTWARE_DOWNLOADS.DISCORD_MANAGER.downloadUrl
+          : SOFTWARE_DOWNLOADS.DISCORD_PROFILE.downloadUrl;
+
+        return {
+          key: k.key,
+          productId: k.productId,
+          productName: k.productName || pName,
+          productType: pType,
+          unitLabel: `เครื่องที่ ${k.unitIndex || idx + 1}`,
+          downloadUrl: download,
+        };
+      });
+    }
+
+    // 2. From items attached with licenseKeys
+    const fromItems: DisplayKeyUnit[] = [];
+    if (items && items.length > 0) {
+      for (const it of items) {
+        const itKeys = it.licenseKeys || (it.licenseKey ? [it.licenseKey] : []);
+        const isManager =
+          (it.slug || it.name || '').toLowerCase().includes('manager') ||
+          (itKeys[0] && itKeys[0].includes('ADM'));
+
+        const pType = isManager ? 'discord_manager' : 'discord_profile';
+        const pName = it.name || (isManager ? 'J3A Discord Manager' : 'J3A Discord Profile');
+        const download = isManager
+          ? SOFTWARE_DOWNLOADS.DISCORD_MANAGER.downloadUrl
+          : SOFTWARE_DOWNLOADS.DISCORD_PROFILE.downloadUrl;
+
+        itKeys.forEach((k, idx) => {
+          fromItems.push({
+            key: k.trim(),
+            productId: it.productId,
+            productName: pName,
+            productType: pType,
+            unitLabel: itKeys.length > 1 ? `เครื่องที่ ${idx + 1}` : '1 เครื่อง / 1 HWID',
+            downloadUrl: download,
+          });
+        });
+      }
+    }
+
+    if (fromItems.length > 0) return fromItems;
+
+    // 3. Fallback: Parse comma or newline separated initialKey
+    const rawKeys = (licenseKey || initialKey || '')
+      .split(/[\n,]+/)
+      .map((k) => k.trim())
+      .filter(Boolean);
+
+    return rawKeys.map((k, idx) => {
+      const isManager =
+        k.toUpperCase().includes('ADM') ||
+        (purchasedSoftware[idx]?.id === 'discord-manager');
+
+      const pType = isManager ? 'discord_manager' : 'discord_profile';
+      const pName = isManager ? 'J3A Discord Manager' : 'J3A Discord Profile';
+      const download = isManager
+        ? SOFTWARE_DOWNLOADS.DISCORD_MANAGER.downloadUrl
+        : SOFTWARE_DOWNLOADS.DISCORD_PROFILE.downloadUrl;
+
+      return {
+        key: k,
+        productName: pName,
+        productType: pType,
+        unitLabel: rawKeys.length > 1 ? `สิทธิ์ที่ ${idx + 1}` : '1 เครื่อง / 1 HWID',
+        downloadUrl: download,
+      };
+    });
+  }, [apiKeys, items, licenseKey, initialKey, purchasedSoftware]);
+
+  const isMultipleKeys = displayKeyUnits.length > 1;
+
+  const handleCopySingleKey = (keyText: string) => {
+    navigator.clipboard.writeText(keyText);
+    setCopiedKey(keyText);
     toast('✓ คัดลอก License Key สำเร็จแล้ว!', 'success');
-    setTimeout(() => setHasCopied(false), 3000);
+    setTimeout(() => setCopiedKey(null), 2500);
+  };
+
+  const handleCopyAllKeys = () => {
+    const all = displayKeyUnits.map((u) => `${u.productName} (${u.unitLabel}): ${u.key}`).join('\n');
+    navigator.clipboard.writeText(all);
+    setHasCopiedAll(true);
+    toast(`✓ คัดลอก License Keys ทั้งหมด (${displayKeyUnits.length} คีย์) สำเร็จ!`, 'success');
+    setTimeout(() => setHasCopiedAll(false), 2500);
   };
 
   return (
@@ -329,27 +438,43 @@ export function LicenseKeyDelivery({
       <div className="text-center space-y-2 pb-4 border-b border-slate-800/80">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#7c5cff]/15 border border-[#7c5cff]/40 text-[#7c5cff] text-xs font-bold uppercase tracking-wider shadow-[0_0_15px_rgba(124,92,255,0.3)]">
           <Sparkles className="w-3.5 h-3.5" />
-          <span>Automated Key Delivery System</span>
+          <span>Automated 1:1 License Key Delivery</span>
         </div>
         <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white flex items-center justify-center gap-2">
-          <span>{celebrationTitle}</span>
+          <span>🎉 ส่งมอบ License Key แยกโปรแกรมเรียบร้อยแล้ว!</span>
         </h2>
         <p className="text-xs sm:text-sm text-slate-400 max-w-md mx-auto">
-          ระบบได้ดำเนินการจัดส่งสิทธิ์การใช้งาน (License Key) ให้คุณโดยอัตโนมัติเรียบร้อยแล้ว
+          {isMultipleKeys
+            ? `คุณได้รับทั้งหมด ${displayKeyUnits.length} คีย์ แยกตามโปรแกรมและจำนวนที่สั่งซื้อ 1:1`
+            : 'ระบบได้ดำเนินการจัดส่งสิทธิ์การใช้งาน (License Key) เฉพาะโปรแกรมของคุณเรียบร้อยแล้ว'}
         </p>
       </div>
 
-      {/* 2. License Key Display Box */}
-      <div className="space-y-2">
+      {/* 2. License Key Display Box(es) */}
+      <div className="space-y-4">
         <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-300">
           <span className="flex items-center gap-1.5 text-[#22c55e]">
             <Key className="w-4 h-4 text-[#22c55e]" />
-            <span>🔑 License Key ของคุณ:</span>
+            <span>🔑 License Key ของคุณ ({displayKeyUnits.length} รายการ):</span>
           </span>
-          {licenseKey && (
-            <span className="text-[11px] text-slate-500 font-mono">
-              1 เครื่อง / 1 HWID
-            </span>
+          {isMultipleKeys && (
+            <button
+              type="button"
+              onClick={handleCopyAllKeys}
+              className="text-xs font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              {hasCopiedAll ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="text-emerald-400">คัดลอกหมดแล้ว!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>คัดลอกทั้งหมด</span>
+                </>
+              )}
+            </button>
           )}
         </div>
 
@@ -359,7 +484,7 @@ export function LicenseKeyDelivery({
             <p className="text-sm font-bold text-[#7c5cff] animate-pulse">
               กำลังเชื่อมต่อและดึง License Key อัตโนมัติจากระบบ...
             </p>
-            <p className="text-[11px] text-slate-500">กรุณารอสักครู่ ระบบกำลังจัดเตรียมรหัสเฉพาะสำหรับคุณ</p>
+            <p className="text-[11px] text-slate-500">กรุณารอสักครู่ ระบบกำลังจัดเตรียมรหัสเฉพาะ 1:1 สำหรับคุณ</p>
           </div>
         ) : errorMsg ? (
           <div className="p-5 rounded-2xl bg-rose-950/30 border border-rose-500/40 text-center space-y-3">
@@ -382,31 +507,82 @@ export function LicenseKeyDelivery({
               ลองใหม่อีกครั้ง
             </Button>
           </div>
+        ) : displayKeyUnits.length === 0 ? (
+          <div className="p-6 rounded-2xl bg-slate-950 border border-slate-800 text-center text-xs text-slate-400">
+            ไม่พบคีย์ในคำสั่งซื้อนี้ หากชำระเงินแล้วกรุณาติดต่อแอดมิน
+          </div>
         ) : (
-          <div className="relative group rounded-2xl bg-slate-950 border-2 border-[#7c5cff]/60 p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-[0_0_30px_rgba(124,92,255,0.25)]">
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              <div className="w-10 h-10 rounded-xl bg-[#7c5cff]/20 text-[#7c5cff] flex items-center justify-center shrink-0 border border-[#7c5cff]/30">
-                <Terminal className="w-5 h-5" />
-              </div>
-              <span className="font-mono text-lg sm:text-2xl font-black text-white tracking-widest select-all break-all text-center sm:text-left drop-shadow-[0_0_12px_rgba(124,92,255,0.6)]">
-                {licenseKey}
-              </span>
-            </div>
+          <div className="space-y-3">
+            {displayKeyUnits.map((item, idx) => {
+              const isCopied = copiedKey === item.key;
+              const isManager = item.productType === 'discord_manager';
 
-            <Button
-              type="button"
-              variant="primary"
-              size="md"
-              onClick={handleCopyKey}
-              leftIcon={hasCopied ? <Check className="w-4 h-4 text-emerald-950 stroke-[3]" /> : <Copy className="w-4 h-4" />}
-              className={`w-full sm:w-auto font-black shadow-lg cursor-pointer transition-all ${
-                hasCopied
-                  ? 'bg-[#22c55e] hover:bg-[#16a34a] text-slate-950 shadow-[0_0_20px_rgba(34,197,94,0.5)]'
-                  : 'bg-[#7c5cff] hover:bg-[#6c4be8] text-white shadow-[0_0_20px_rgba(124,92,255,0.4)]'
-              }`}
-            >
-              {hasCopied ? 'คัดลอกแล้ว!' : '📋 คัดลอก Key'}
-            </Button>
+              return (
+                <div
+                  key={`${item.key}-${idx}`}
+                  className="rounded-2xl bg-slate-950 border-2 border-[#7c5cff]/50 p-4 sm:p-5 space-y-3 shadow-[0_0_25px_rgba(124,92,255,0.2)] hover:border-[#7c5cff] transition-all"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-[#22c55e] animate-ping" />
+                      <span className="text-xs font-black uppercase text-white tracking-wide">
+                        {isMultipleKeys ? `รายการที่ ${idx + 1}: ` : ''}
+                        {item.productName}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#7c5cff]/20 text-[#a78bfa] border border-[#7c5cff]/30">
+                        {item.unitLabel}
+                      </span>
+                    </div>
+
+                    <span className="text-[10px] text-emerald-400 font-mono font-semibold flex items-center gap-1">
+                      <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                      <span>สิทธิ์เฉพาะโปรแกรมนี้ 1:1</span>
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 w-full sm:w-auto">
+                      <div className="w-9 h-9 rounded-xl bg-[#7c5cff]/20 text-[#7c5cff] flex items-center justify-center shrink-0 border border-[#7c5cff]/30">
+                        <Terminal className="w-4 h-4" />
+                      </div>
+                      <span className="font-mono text-base sm:text-xl font-black text-white tracking-widest select-all break-all drop-shadow-[0_0_10px_rgba(124,92,255,0.6)]">
+                        {item.key}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 justify-end">
+                      <Button
+                        type="button"
+                        variant="primary"
+                        size="sm"
+                        onClick={() => handleCopySingleKey(item.key)}
+                        leftIcon={isCopied ? <Check className="w-3.5 h-3.5 text-slate-950 stroke-[3]" /> : <Copy className="w-3.5 h-3.5" />}
+                        className={`text-xs font-black cursor-pointer transition-all ${
+                          isCopied
+                            ? 'bg-[#22c55e] hover:bg-[#16a34a] text-slate-950 shadow-[0_0_15px_rgba(34,197,94,0.4)]'
+                            : 'bg-[#7c5cff] hover:bg-[#6c4be8] text-white shadow-[0_0_15px_rgba(124,92,255,0.3)]'
+                        }`}
+                      >
+                        {isCopied ? 'คัดลอกแล้ว!' : 'คัดลอก Key'}
+                      </Button>
+
+                      {item.downloadUrl && (
+                        <a
+                          href={item.downloadUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-xs font-bold text-cyan-300 border border-cyan-500/30 flex items-center gap-1.5 transition-colors cursor-pointer"
+                          title="ดาวน์โหลดตัวติดตั้งโปรแกรมนี้"
+                        >
+                          <Download className="w-3.5 h-3.5 text-cyan-400" />
+                          <span>โหลดไฟล์</span>
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -424,13 +600,13 @@ export function LicenseKeyDelivery({
             <div className="flex items-center justify-center gap-2.5">
               <span className="text-lg">⬇️</span>
               <span>
-                {isMultiple
+                {purchasedSoftware.length > 1
                   ? `ดาวน์โหลดไฟล์ติดตั้ง ${software.name} (.zip) ผ่าน Google Drive`
                   : `ดาวน์โหลดไฟล์ติดตั้ง (.zip) ผ่าน Google Drive`}
               </span>
               <ExternalLink className="w-4 h-4 ml-1 opacity-70 group-hover:opacity-100 transition-opacity" />
             </div>
-            {!isMultiple && (
+            {purchasedSoftware.length === 1 && (
               <span className="block text-[11px] font-semibold text-emerald-950/80 mt-0.5">
                 สำหรับโปรแกรม: {software.name}
               </span>
@@ -438,7 +614,6 @@ export function LicenseKeyDelivery({
           </a>
         ))}
 
-        {/* Small guidance note under the button - Exact user specification */}
         <p className="text-[11px] sm:text-xs text-slate-400 text-center flex items-center justify-center gap-1.5 pt-0.5 px-2">
           <span>💡 หมายเหตุ: ไฟล์ zip มีขนาดประมาณ 20-35 MB หากดาวน์โหลดเสร็จแล้วให้แตกไฟล์ (Extract Here) ก่อนเปิดโปรแกรม</span>
         </p>
@@ -449,74 +624,34 @@ export function LicenseKeyDelivery({
         <h4 className="text-xs sm:text-sm font-black text-amber-300 flex items-center gap-2">
           <span>💡 วิธีใช้งาน:</span>
         </h4>
-        <ol className="space-y-2 text-xs sm:text-sm text-slate-300 leading-relaxed list-none pl-0">
-          <li className="flex items-start gap-2.5">
-            <span className="w-5 h-5 rounded-full bg-[#7c5cff]/20 text-[#7c5cff] font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
-              1
-            </span>
-            <span>
-              ดาวน์โหลดและแตกไฟล์{' '}
-              <strong>
-                {isMultiple
-                  ? 'ไฟล์ .zip ของโปรแกรมที่ต้องการ'
-                  : purchasedSoftware[0].zipFileName}
-              </strong>
-            </span>
-          </li>
-          <li className="flex items-start gap-2.5">
-            <span className="w-5 h-5 rounded-full bg-[#7c5cff]/20 text-[#7c5cff] font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
-              2
-            </span>
-            <span>
-              เปิดโปรแกรม{' '}
-              <strong>
-                {isMultiple
-                  ? 'ไฟล์ .exe ของโปรแกรม'
-                  : purchasedSoftware[0].exeFileName}
-              </strong>{' '}
-              นำ Key ด้านบนไปกรอกในหน้าต่างเปิดใช้งานครั้งแรก
-            </span>
-          </li>
-          <li className="flex items-start gap-2.5">
-            <span className="w-5 h-5 rounded-full bg-[#7c5cff]/20 text-[#7c5cff] font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
-              3
-            </span>
-            <span>
-              {isMultiple
-                ? 'ทำตามขั้นตอนการตั้งค่าในโปรแกรม และเริ่มใช้งานฟีเจอร์ระดับพรีเมียมได้ทันที!'
-                : purchasedSoftware[0].guideStep3}
-            </span>
-          </li>
-        </ol>
+        <div className="space-y-2 text-xs text-slate-300 leading-relaxed">
+          <p>
+            1. กดปุ่ม <strong>&quot;ดาวน์โหลดไฟล์ติดตั้ง (.zip)&quot;</strong> ด้านบน และทำการแตกไฟล์ (Extract Files)
+          </p>
+          <p>
+            2. เปิดโปรแกรมขึ้นมา และคัดลอก License Key ประจำโปรแกรมนั้นๆ ไปวางในช่องกรอกคีย์
+          </p>
+          <p>
+            3. โปรแกรมจะผูกสิทธิ์เข้ากับเครื่องคอมพิวเตอร์ของคุณอัตโนมัติ (1 License / 1 เครื่อง 1:1)
+          </p>
+        </div>
       </div>
 
-      {/* 5. Help & Support Buttons at Bottom */}
-      <div className="pt-2 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
-        <span className="flex items-center gap-1.5 text-slate-400">
-          <HelpCircle className="w-4 h-4 text-slate-500" />
-          <span>พบปัญหาในการเปิดใช้งาน?</span>
-        </span>
-
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+      {/* 5. Support Discord Button */}
+      {discordUrl && (
+        <div className="text-center pt-2">
           <a
             href={discordUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#5865F2]/20 hover:bg-[#5865F2]/30 text-[#8ea1e1] hover:text-white border border-[#5865F2]/40 transition-all font-bold text-xs shadow-sm cursor-pointer"
+            className="inline-flex items-center gap-2 text-xs font-semibold text-[#7c5cff] hover:text-[#9375ff] hover:underline"
           >
-            <MessageSquare className="w-4 h-4" />
-            <span>เข้าห้อง Discord ร้านค้า J3ASTORE</span>
-            <ExternalLink className="w-3 h-3 opacity-60" />
-          </a>
-
-          <a
-            href="/contact"
-            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-all font-semibold text-xs cursor-pointer"
-          >
-            <span>ติดต่อแอดมิน</span>
+            <MessageSquare className="w-3.5 h-3.5" />
+            <span>มีปัญหาในการติดตั้งหรือเปิดใช้งาน? ติดต่อทีมงานซัพพอร์ตใน Discord</span>
+            <ExternalLink className="w-3 h-3" />
           </a>
         </div>
-      </div>
+      )}
     </div>
   );
 }
