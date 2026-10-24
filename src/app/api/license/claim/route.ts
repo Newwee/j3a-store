@@ -17,7 +17,7 @@ export interface ClaimedKeyItem {
   productId: string;
   productName: string;
   productSlug: string;
-  productType: 'discord_manager' | 'discord_profile';
+  productType: 'discord_manager' | 'discord_profile' | 'discord_autoquest';
   key: string;
   unitIndex: number;
 }
@@ -25,8 +25,18 @@ export interface ClaimedKeyItem {
 /**
  * Normalizes product name/slug to the corresponding Google Apps Script product identifier
  */
-export function mapProductToLicenseType(nameOrSlug: string = ''): 'discord_manager' | 'discord_profile' {
+export function mapProductToLicenseType(
+  nameOrSlug: string = ''
+): 'discord_manager' | 'discord_profile' | 'discord_autoquest' {
   const s = nameOrSlug.toLowerCase();
+  if (
+    s.includes('quest') ||
+    s.includes('autoquest') ||
+    s.includes('auto-quest') ||
+    s.includes('discord_autoquest')
+  ) {
+    return 'discord_autoquest';
+  }
   if (
     s.includes('manager') ||
     s.includes('bot manager') ||
@@ -127,10 +137,26 @@ export async function POST(req: NextRequest) {
         for (let q = 1; q <= qty; q++) {
           const res = await claimSingleKeyFromGAS(productType, customerEmail);
           if (res.success && res.key) {
+            const resolvedName =
+              pName ||
+              (productType === 'discord_manager'
+                ? 'J3A Discord Manager'
+                : productType === 'discord_autoquest'
+                ? 'J3A Discord AutoQuest'
+                : 'J3A Discord Profile');
+
+            const resolvedSlug =
+              pSlug ||
+              (productType === 'discord_manager'
+                ? 'j3a-discord-manager'
+                : productType === 'discord_autoquest'
+                ? 'j3a-discord-autoquest'
+                : 'j3a-discord-profile');
+
             claimedKeys.push({
               productId: pId,
-              productName: pName || (productType === 'discord_manager' ? 'J3A Discord Manager' : 'J3A Discord Profile'),
-              productSlug: pSlug || (productType === 'discord_manager' ? 'j3a-discord-manager' : 'j3a-discord-profile'),
+              productName: resolvedName,
+              productSlug: resolvedSlug,
               productType,
               key: res.key,
               unitIndex: q,
@@ -145,13 +171,27 @@ export async function POST(req: NextRequest) {
       const productType = mapProductToLicenseType(fallbackProduct || '');
       const qty = Math.max(1, Math.min(20, fallbackQuantity));
 
+      const defaultName =
+        productType === 'discord_manager'
+          ? 'J3A Discord Manager'
+          : productType === 'discord_autoquest'
+          ? 'J3A Discord AutoQuest'
+          : 'J3A Discord Profile';
+
+      const defaultSlug =
+        productType === 'discord_manager'
+          ? 'j3a-discord-manager'
+          : productType === 'discord_autoquest'
+          ? 'j3a-discord-autoquest'
+          : 'j3a-discord-profile';
+
       for (let q = 1; q <= qty; q++) {
         const res = await claimSingleKeyFromGAS(productType, customerEmail);
         if (res.success && res.key) {
           claimedKeys.push({
             productId: fallbackProduct || productType,
-            productName: productType === 'discord_manager' ? 'J3A Discord Manager' : 'J3A Discord Profile',
-            productSlug: productType === 'discord_manager' ? 'j3a-discord-manager' : 'j3a-discord-profile',
+            productName: defaultName,
+            productSlug: defaultSlug,
             productType,
             key: res.key,
             unitIndex: q,

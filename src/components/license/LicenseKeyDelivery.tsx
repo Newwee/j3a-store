@@ -29,7 +29,7 @@ export interface SoftwareDownloadItem {
   guideStep3: string;
 }
 
-export const SOFTWARE_DOWNLOADS: Record<'DISCORD_MANAGER' | 'DISCORD_PROFILE', SoftwareDownloadItem> = {
+export const SOFTWARE_DOWNLOADS: Record<'DISCORD_MANAGER' | 'DISCORD_PROFILE' | 'DISCORD_AUTOQUEST', SoftwareDownloadItem> = {
   DISCORD_MANAGER: {
     id: 'discord-manager',
     name: 'J3A Discord Manager',
@@ -48,6 +48,15 @@ export const SOFTWARE_DOWNLOADS: Record<'DISCORD_MANAGER' | 'DISCORD_PROFILE', S
     exeFileName: 'J3ADiscordProfile.exe',
     guideStep3: '💡 หมายเหตุ: ไฟล์ zip มีขนาดประมาณ 20-35 MB หากดาวน์โหลดเสร็จแล้วให้แตกไฟล์ (Extract Here) ก่อนเปิดโปรแกรม',
   },
+  DISCORD_AUTOQUEST: {
+    id: 'discord-autoquest',
+    name: 'J3A Discord AutoQuest',
+    shortName: 'J3A Discord AutoQuest',
+    downloadUrl: 'https://drive.google.com/file/d/1LN_z1lwA-QZOBgYoWpfWQJRii0CPO4ZT/view?usp=sharing',
+    zipFileName: 'J3ADiscordAutoQuest.zip',
+    exeFileName: 'J3ADiscordAutoQuest.exe',
+    guideStep3: '💡 หมายเหตุ: ไฟล์ zip มีขนาดประมาณ 20-35 MB หากดาวน์โหลดเสร็จแล้วให้แตกไฟล์ (Extract Here) ก่อนเปิดโปรแกรม',
+  },
 };
 
 /**
@@ -55,6 +64,14 @@ export const SOFTWARE_DOWNLOADS: Record<'DISCORD_MANAGER' | 'DISCORD_PROFILE', S
  */
 export function getDownloadUrlForProduct(nameOrSlugOrId: string = ''): string | null {
   const s = nameOrSlugOrId.toLowerCase();
+  if (
+    s.includes('autoquest') ||
+    s.includes('auto quest') ||
+    s.includes('auto-quest') ||
+    s.includes('quest')
+  ) {
+    return SOFTWARE_DOWNLOADS.DISCORD_AUTOQUEST.downloadUrl;
+  }
   if (
     s.includes('discord manager') ||
     s.includes('discordmanager') ||
@@ -93,7 +110,7 @@ export interface DisplayKeyUnit {
   key: string;
   productId?: string;
   productName: string;
-  productType: 'discord_manager' | 'discord_profile';
+  productType: 'discord_manager' | 'discord_profile' | 'discord_autoquest';
   unitLabel: string;
   downloadUrl: string;
 }
@@ -337,23 +354,41 @@ export function LicenseKeyDelivery({
 
   // Combine and structure keys for 1:1 display per purchased product & copy
   const displayKeyUnits = useMemo<DisplayKeyUnit[]>(() => {
+    // Helper to resolve product metadata
+    const resolveProductMeta = (rawType?: string, rawKey?: string, rawNameOrSlug?: string) => {
+      const s = `${rawType || ''} ${rawKey || ''} ${rawNameOrSlug || ''}`.toLowerCase();
+      if (s.includes('adq') || s.includes('quest') || s.includes('autoquest') || s.includes('auto-quest')) {
+        return {
+          type: 'discord_autoquest' as const,
+          name: 'J3A Discord AutoQuest',
+          download: SOFTWARE_DOWNLOADS.DISCORD_AUTOQUEST.downloadUrl,
+        };
+      }
+      if (s.includes('adm') || s.includes('manager')) {
+        return {
+          type: 'discord_manager' as const,
+          name: 'J3A Discord Manager',
+          download: SOFTWARE_DOWNLOADS.DISCORD_MANAGER.downloadUrl,
+        };
+      }
+      return {
+        type: 'discord_profile' as const,
+        name: 'J3A Discord Profile',
+        download: SOFTWARE_DOWNLOADS.DISCORD_PROFILE.downloadUrl,
+      };
+    };
+
     // 1. From API claimed keys
     if (apiKeys && apiKeys.length > 0) {
       return apiKeys.map((k, idx) => {
-        const isManager = k.productType === 'discord_manager' || (k.key && k.key.includes('ADM'));
-        const pType = isManager ? 'discord_manager' : 'discord_profile';
-        const pName = isManager ? 'J3A Discord Manager' : 'J3A Discord Profile';
-        const download = isManager
-          ? SOFTWARE_DOWNLOADS.DISCORD_MANAGER.downloadUrl
-          : SOFTWARE_DOWNLOADS.DISCORD_PROFILE.downloadUrl;
-
+        const meta = resolveProductMeta(k.productType, k.key, k.productName || k.productSlug);
         return {
           key: k.key,
           productId: k.productId,
-          productName: k.productName || pName,
-          productType: pType,
+          productName: k.productName || meta.name,
+          productType: meta.type,
           unitLabel: `เครื่องที่ ${k.unitIndex || idx + 1}`,
-          downloadUrl: download,
+          downloadUrl: meta.download,
         };
       });
     }
@@ -363,24 +398,16 @@ export function LicenseKeyDelivery({
     if (items && items.length > 0) {
       for (const it of items) {
         const itKeys = it.licenseKeys || (it.licenseKey ? [it.licenseKey] : []);
-        const isManager =
-          (it.slug || it.name || '').toLowerCase().includes('manager') ||
-          (itKeys[0] && itKeys[0].includes('ADM'));
-
-        const pType = isManager ? 'discord_manager' : 'discord_profile';
-        const pName = it.name || (isManager ? 'J3A Discord Manager' : 'J3A Discord Profile');
-        const download = isManager
-          ? SOFTWARE_DOWNLOADS.DISCORD_MANAGER.downloadUrl
-          : SOFTWARE_DOWNLOADS.DISCORD_PROFILE.downloadUrl;
+        const meta = resolveProductMeta(undefined, itKeys[0], `${it.slug} ${it.name}`);
 
         itKeys.forEach((k, idx) => {
           fromItems.push({
             key: k.trim(),
             productId: it.productId,
-            productName: pName,
-            productType: pType,
+            productName: it.name || meta.name,
+            productType: meta.type,
             unitLabel: itKeys.length > 1 ? `เครื่องที่ ${idx + 1}` : '1 เครื่อง / 1 HWID',
-            downloadUrl: download,
+            downloadUrl: meta.download,
           });
         });
       }
@@ -395,22 +422,13 @@ export function LicenseKeyDelivery({
       .filter(Boolean);
 
     return rawKeys.map((k, idx) => {
-      const isManager =
-        k.toUpperCase().includes('ADM') ||
-        (purchasedSoftware[idx]?.id === 'discord-manager');
-
-      const pType = isManager ? 'discord_manager' : 'discord_profile';
-      const pName = isManager ? 'J3A Discord Manager' : 'J3A Discord Profile';
-      const download = isManager
-        ? SOFTWARE_DOWNLOADS.DISCORD_MANAGER.downloadUrl
-        : SOFTWARE_DOWNLOADS.DISCORD_PROFILE.downloadUrl;
-
+      const meta = resolveProductMeta(undefined, k, purchasedSoftware[idx]?.id);
       return {
         key: k,
-        productName: pName,
-        productType: pType,
+        productName: meta.name,
+        productType: meta.type,
         unitLabel: rawKeys.length > 1 ? `สิทธิ์ที่ ${idx + 1}` : '1 เครื่อง / 1 HWID',
-        downloadUrl: download,
+        downloadUrl: meta.download,
       };
     });
   }, [apiKeys, items, licenseKey, initialKey, purchasedSoftware]);
