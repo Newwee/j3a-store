@@ -7,7 +7,7 @@ const DEFAULT_POPUPS: SitePopup[] = [
     title: 'ร้านเปิดใหม่แล้ว! ยินดีต้อนรับสู่ J3A STORE',
     description: 'ขอบคุณที่เข้ามาใช้บริการ รับส่วนลดสำหรับการสั่งซื้อครั้งแรก เพียงกรอกโค้ดส่วนลดด้านล่าง',
     type: 'welcome',
-    imageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1000&auto=format&fit=crop',
+    imageUrl: 'https://cnrjaonjabzvfkvqdtkm.supabase.co/storage/v1/object/public/store-images/popups/welcome-banner.png',
     ctaText: 'เลือกซื้อสินค้าเลย',
     ctaLink: '/shop',
     discountCode: 'WELCOME10',
@@ -98,8 +98,12 @@ export async function getPopups(): Promise<SitePopup[]> {
         createdAt: d.created_at || new Date().toISOString(),
         updatedAt: d.updated_at || new Date().toISOString(),
       }));
+    } else if (error) {
+      console.warn('Supabase getPopups error:', error.message);
     }
-  } catch {}
+  } catch (err: any) {
+    console.warn('Supabase getPopups exception:', err?.message);
+  }
 
   if (typeof window !== 'undefined') {
     try {
@@ -123,9 +127,9 @@ export async function savePopup(popup: SitePopup): Promise<SitePopup> {
     updatedList = [popup, ...current];
   }
 
-  // 1. Try Supabase
+  // 1. Save to Supabase
   try {
-    await supabase.from('site_popups').upsert([
+    const { error } = await supabase.from('site_popups').upsert([
       {
         id: popup.id,
         title: popup.title,
@@ -142,13 +146,20 @@ export async function savePopup(popup: SitePopup): Promise<SitePopup> {
         updated_at: new Date().toISOString(),
       },
     ]);
-  } catch {}
+    if (error) {
+      console.error('Failed to save popup to Supabase:', error.message);
+    }
+  } catch (err: any) {
+    console.error('Exception saving popup to Supabase:', err?.message);
+  }
 
-  // 2. Local storage
+  // 2. Local storage cache (safely handle quota limit)
   if (typeof window !== 'undefined') {
     try {
       localStorage.setItem(LOCAL_POPUPS_KEY, JSON.stringify(updatedList));
-    } catch {}
+    } catch (quotaErr) {
+      console.warn('localStorage quota exceeded for popups cache:', quotaErr);
+    }
   }
 
   return popup;

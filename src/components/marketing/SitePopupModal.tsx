@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { SafeImage } from '@/components/ui/SafeImage';
 import {
   X,
   Sparkles,
@@ -138,14 +139,16 @@ export function SitePopupModal({ forcePopup, onClosePreview }: SitePopupModalPro
         {/* Top Banner Image (Optional) */}
         {activePopup.imageUrl && (
           <div className="relative w-full h-44 sm:h-52 bg-slate-950 overflow-hidden border-b border-slate-800">
-            <Image
+            <SafeImage
               src={activePopup.imageUrl}
+              fallbackSrc="/welcome-banner.png"
               alt={activePopup.title}
               fill
               className="object-cover"
               unoptimized
+              priority
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent pointer-events-none" />
           </div>
         )}
 

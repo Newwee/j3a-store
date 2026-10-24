@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
+import { SafeImage } from '@/components/ui/SafeImage';
 import {
   Megaphone,
   Plus,
@@ -344,8 +345,9 @@ export default function AdminAnnouncementsPage() {
 
                     {currentPopup.imageUrl && (
                       <div className="relative w-full max-w-sm h-32 rounded-xl bg-slate-950 border border-slate-800 overflow-hidden mt-2">
-                        <Image
+                        <SafeImage
                           src={currentPopup.imageUrl}
+                          fallbackSrc="/welcome-banner.png"
                           alt="Banner Preview"
                           fill
                           className="object-cover"
@@ -501,7 +503,7 @@ export default function AdminAnnouncementsPage() {
                   {/* Thumbnail */}
                   {p.imageUrl && (
                     <div className="relative w-full h-32 rounded-2xl bg-slate-950 border border-slate-800 overflow-hidden">
-                      <Image src={p.imageUrl} alt={p.title} fill className="object-cover" unoptimized />
+                      <SafeImage src={p.imageUrl} fallbackSrc="/welcome-banner.png" alt={p.title} fill className="object-cover" unoptimized />
                     </div>
                   )}
 
