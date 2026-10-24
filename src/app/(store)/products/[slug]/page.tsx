@@ -314,7 +314,7 @@ export default function ProductDetailPage({
               <span className="text-xs font-semibold px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-400/30 text-cyan-300">
                 {product.category}
               </span>
-              <ProductStatusBadge status={product.status} />
+              <ProductStatusBadge status={isOutOfStock ? 'out_of_stock' : product.status} />
             </div>
 
             {/* Product Title */}

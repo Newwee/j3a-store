@@ -46,6 +46,14 @@ export function ProductCard({ product }: { product: Product }) {
           className="object-contain p-2 group-hover:scale-105 transition-transform duration-500"
         />
 
+        {isOutOfStock && (
+          <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-[1px] flex items-center justify-center z-10 pointer-events-none">
+            <span className="px-2.5 py-1 rounded-lg bg-rose-500/20 border border-rose-500/40 text-rose-300 text-[11px] font-black uppercase tracking-wider shadow-md">
+              สินค้าหมด
+            </span>
+          </div>
+        )}
+
         {/* Badges on top of card */}
         <div className="absolute top-3 left-3 flex flex-col gap-1.5 z-10">
           {product.featured && (
@@ -109,7 +117,7 @@ export function ProductCard({ product }: { product: Product }) {
                   0.0
                 </span>
               )}
-              <ProductStatusBadge status={product.status} />
+              <ProductStatusBadge status={isOutOfStock ? 'out_of_stock' : product.status} />
             </div>
           </div>
 
@@ -143,7 +151,7 @@ export function ProductCard({ product }: { product: Product }) {
             </div>
             <span className="text-[11px] text-slate-400">
               {isOutOfStock ? (
-                <span className="text-rose-400">หมดชั่วคราว</span>
+                <span className="text-rose-400 font-bold">สินค้าหมด (0 ชิ้น)</span>
               ) : (
                 <span>คงเหลือ {product.stock} ชิ้น</span>
               )}

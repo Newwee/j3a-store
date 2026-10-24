@@ -67,7 +67,10 @@ export async function getProducts(filter: GetProductsFilter = {}): Promise<Produ
   try {
     let query = supabase.from('products').select('*');
 
-    if (filter.status && filter.status !== 'all') {
+    if (filter.status === 'active') {
+      // Storefront queries 'active' to mean published non-draft items (including out_of_stock items)
+      query = query.neq('status', 'draft');
+    } else if (filter.status && filter.status !== 'all') {
       query = query.eq('status', filter.status);
     }
 

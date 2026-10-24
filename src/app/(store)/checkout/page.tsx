@@ -484,8 +484,22 @@ export default function CheckoutPage() {
         ...(slipUrl ? { paymentProofUrl: slipUrl } : {}),
       };
 
-      // 5. Save order to Firestore
+      // 5. Save order to Supabase
       const created = await createOrder(orderData);
+
+      // 5.1 Deduct stock in Supabase (automatically turns to out_of_stock if stock hits 0)
+      try {
+        await fetch('/api/orders/deduct-stock', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderId: created.id,
+            items: resolvedItems,
+          }),
+        });
+      } catch (stockErr) {
+        console.warn('Failed to deduct stock:', stockErr);
+      }
 
       // Record coupon usage if discount applied
       if (appliedDiscount?.code) {

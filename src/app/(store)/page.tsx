@@ -27,12 +27,12 @@ export default function HomePage() {
     setLoadingNew(true);
 
     const unsubscribe = subscribeProducts((prods) => {
-      const active = prods.filter((p) => p.status === 'active');
-      const featured = active.filter((p) => p.featured);
-      setFeaturedProducts(featured.length > 0 ? featured.slice(0, 8) : active.slice(0, 8));
+      const visible = prods.filter((p) => p.status !== 'draft');
+      const featured = visible.filter((p) => p.featured);
+      setFeaturedProducts(featured.length > 0 ? featured.slice(0, 8) : visible.slice(0, 8));
       setLoadingFeatured(false);
 
-      const sortedNew = [...active].sort(
+      const sortedNew = [...visible].sort(
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
       setNewArrivals(sortedNew.slice(0, 8));
