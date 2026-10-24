@@ -21,6 +21,7 @@ import {
   toggleProductStatus,
   toggleProductFeatured,
   createProduct,
+  updateProduct,
 } from '@/lib/firestore/products';
 import { AdminHeader } from '@/components/admin/AdminHeader';
 import { DeleteConfirmModal } from '@/components/admin/DeleteConfirmModal';
@@ -182,11 +183,34 @@ export default function AdminProductsPage() {
   // Status toggle handler
   const handleStatusChange = async (productId: string, newStatus: ProductStatus) => {
     try {
+      const targetProd = products.find((p) => p.id === productId);
+      let updatedStock = targetProd?.stock;
+
+      if (newStatus === 'active' && (!targetProd || targetProd.stock <= 0)) {
+        updatedStock = 5;
+      } else if (newStatus === 'out_of_stock' && targetProd && targetProd.stock > 0) {
+        updatedStock = 0;
+      }
+
       await toggleProductStatus(productId, newStatus);
+      if (updatedStock !== undefined && targetProd && updatedStock !== targetProd.stock) {
+        await updateProduct(productId, { stock: updatedStock });
+      }
+
       setProducts((prev) =>
-        prev.map((p) => (p.id === productId ? { ...p, status: newStatus } : p))
+        prev.map((p) =>
+          p.id === productId
+            ? { ...p, status: newStatus, ...(updatedStock !== undefined ? { stock: updatedStock } : {}) }
+            : p
+        )
       );
-      success('อัปเดตสถานะสินค้าสำเร็จ');
+      success(
+        newStatus === 'active'
+          ? 'เปิดการขายสำเร็จ (พร้อมขาย)'
+          : newStatus === 'out_of_stock'
+          ? 'ปรับสถานะเป็นสินค้าหมดเรียบร้อย'
+          : 'อัปเดตเป็นแบบร่างแล้ว'
+      );
     } catch (err: any) {
       error('ไม่สามารถเปลี่ยนสถานะได้');
     }

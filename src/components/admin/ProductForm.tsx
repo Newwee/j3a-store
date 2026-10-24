@@ -285,6 +285,14 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
         .map((t) => t.trim())
         .filter(Boolean);
 
+      const numStock = Number(stock);
+      let finalStatus = status;
+      if (numStock > 0 && status === 'out_of_stock') {
+        finalStatus = 'active';
+      } else if (numStock <= 0 && status === 'active') {
+        finalStatus = 'out_of_stock';
+      }
+
       const payload: ProductFormData = {
         name: name.trim(),
         slug: slug.trim(),
@@ -292,8 +300,8 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
         price: Number(price),
         ...(comparePrice !== '' && !isNaN(Number(comparePrice)) ? { comparePrice: Number(comparePrice) } : {}),
         category,
-        stock: Number(stock),
-        status,
+        stock: numStock,
+        status: finalStatus,
         featured,
         image: primaryImage,
         images: finalImages,
@@ -459,9 +467,23 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
                 type="number"
                 min="0"
                 value={stock}
-                onChange={(e) => setStock(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setStock(val);
+                  const num = Number(val);
+                  if (num > 0 && status === 'out_of_stock') {
+                    setStatus('active');
+                  } else if (num === 0 && status === 'active') {
+                    setStatus('out_of_stock');
+                  }
+                }}
                 placeholder="100"
                 error={validationErrors.stock}
+                helperText={
+                  Number(stock) > 0
+                    ? '🟢 มีสินค้าพร้อมขาย (ระบบจะเปิดสถานะพร้อมขายให้อัตโนมัติ)'
+                    : '🔴 สินค้าหมด (ระบบจะปรับสถานะเป็นสินค้าหมดให้อัตโนมัติ)'
+                }
                 required
               />
             </div>

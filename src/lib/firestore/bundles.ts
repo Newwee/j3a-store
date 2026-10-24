@@ -111,7 +111,8 @@ export async function enrichBundlesWithLiveProducts(bundles: BundlePackage[]): P
 
         if (matched) {
           const itemStock = typeof matched.stock === 'number' ? matched.stock : 0;
-          const isOutOfStock = itemStock <= 0 || matched.status === 'out_of_stock';
+          // Item is only out of stock if stock is 0 or less (if stock > 0, it is available)
+          const isOutOfStock = itemStock <= 0 || (matched.status === 'out_of_stock' && itemStock <= 0);
           if (isOutOfStock) {
             hasOutOfStockItems = true;
             if (!outOfStockItemNames.includes(matched.name || item.name)) {
