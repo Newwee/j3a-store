@@ -127,6 +127,8 @@ export async function POST(req: NextRequest) {
           dType === 'both' ||
           pSlug.includes('manager') ||
           pSlug.includes('profile') ||
+          pSlug.includes('quest') ||
+          pSlug.includes('autoquest') ||
           pName.toLowerCase().includes('discord');
 
         if (!isLicenseProduct) continue;

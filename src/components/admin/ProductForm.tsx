@@ -583,7 +583,7 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
                 <label className="text-xs font-semibold text-slate-300">
                   ลิงก์สินค้า / ลิงก์ดาวน์โหลดหลังซื้อสำเร็จ (Download URL / Delivery Link)
                 </label>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <button
                     type="button"
                     onClick={() => {
@@ -603,6 +603,16 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
                     className="text-[10px] text-[#7c5cff] hover:text-[#9980ff] bg-[#7c5cff]/10 hover:bg-[#7c5cff]/20 px-2 py-0.5 rounded border border-[#7c5cff]/30 transition-all cursor-pointer font-medium"
                   >
                     + ใส่ลิงก์ Discord Profile
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDownloadUrl('https://drive.google.com/file/d/1LN_z1lwA-QZOBgYoWpfWQJRii0CPO4ZT/view?usp=sharing');
+                      setDeliveryNote('💡 หมายเหตุ: ไฟล์ zip มีขนาดประมาณ 20-35 MB หากดาวน์โหลดเสร็จแล้วให้แตกไฟล์ (Extract Here) ก่อนเปิดโปรแกรม');
+                    }}
+                    className="text-[10px] text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 px-2 py-0.5 rounded border border-emerald-500/30 transition-all cursor-pointer font-medium"
+                  >
+                    + ใส่ลิงก์ Discord AutoQuest
                   </button>
                 </div>
               </div>

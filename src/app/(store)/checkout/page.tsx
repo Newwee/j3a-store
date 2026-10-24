@@ -121,6 +121,8 @@ export default function CheckoutPage() {
 
   // Check if any cart item requires software license agreement
   const hasLicenseItem = items.some((item) => {
+    const dType = item.product.deliveryType;
+    if (dType === 'key' || dType === 'both') return true;
     const name = (item.product.name || '').toLowerCase();
     const slug = (item.product.slug || '').toLowerCase();
     const cat = (item.product.category || '').toLowerCase();
@@ -130,6 +132,9 @@ export default function CheckoutPage() {
       name.includes('license') ||
       slug.includes('discord') ||
       slug.includes('license') ||
+      slug.includes('quest') ||
+      slug.includes('manager') ||
+      slug.includes('profile') ||
       cat.includes('ซอฟต์แวร์') ||
       cat.includes('software') ||
       tags.includes('license') ||
@@ -387,7 +392,9 @@ export default function CheckoutPage() {
                 it.product.deliveryType === 'key' ||
                 it.product.deliveryType === 'both' ||
                 it.product.slug.includes('manager') ||
-                it.product.slug.includes('profile')
+                it.product.slug.includes('profile') ||
+                it.product.slug.includes('quest') ||
+                it.product.slug.includes('autoquest')
             )
             .map((it) => ({
               productId: it.product.id,
