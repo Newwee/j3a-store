@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import {
   notifyDiscordSlipSubmitted,
+  notifyDiscordSlipApproved,
+  notifyDiscordSlipRejected,
   notifyDiscordNewMember,
   notifyDiscordOrderPlaced,
   notifyDiscordTopupApproved,
@@ -30,6 +32,32 @@ export async function POST(req: Request) {
           userEmail,
           amount: Number(amount),
           slipUrl,
+        });
+        return NextResponse.json({ ok: true, sent: success });
+      }
+
+      case 'slip_approved': {
+        const { topupNumber, userName, userEmail, amount, slipUrl, adminNote } = data;
+        const success = await notifyDiscordSlipApproved({
+          topupNumber,
+          userName,
+          userEmail,
+          amount: Number(amount) || 0,
+          slipUrl,
+          adminNote,
+        });
+        return NextResponse.json({ ok: true, sent: success });
+      }
+
+      case 'slip_rejected': {
+        const { topupNumber, userName, userEmail, amount, slipUrl, adminNote } = data;
+        const success = await notifyDiscordSlipRejected({
+          topupNumber,
+          userName,
+          userEmail,
+          amount: Number(amount) || 0,
+          slipUrl,
+          adminNote,
         });
         return NextResponse.json({ ok: true, sent: success });
       }

@@ -194,6 +194,24 @@ export async function approveTopup(topupId: string): Promise<{ success: boolean;
 
   if (updateErr) throw new Error(updateErr.message);
 
+  // Trigger discord approved notifications as fallback
+  try {
+    fetch('/api/notifications/discord', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        event: 'slip_approved',
+        data: {
+          topupNumber: topupRow.topup_number || `TOP-${topupId.slice(-6)}`,
+          userName: topupRow.user_name || 'ลูกค้า',
+          userEmail: topupRow.user_email || undefined,
+          amount,
+          slipUrl: topupRow.payment_slip_url || undefined,
+        },
+      }),
+    }).catch(() => {});
+  } catch (e) {}
+
   return { success: true, newCredits };
 }
 
@@ -238,6 +256,21 @@ export async function rejectTopup(topupId: string, reason?: string): Promise<voi
     .eq('id', topupId);
 
   if (error) throw new Error(error.message);
+
+  // Trigger discord rejected notification as fallback
+  try {
+    fetch('/api/notifications/discord', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        event: 'slip_rejected',
+        data: {
+          topupNumber: `TOP-${topupId.slice(-6)}`,
+          adminNote: reason,
+        },
+      }),
+    }).catch(() => {});
+  } catch (e) {}
 }
 
 /**

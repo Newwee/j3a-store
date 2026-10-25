@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { verifyAdminRequest } from '@/lib/auth/adminAuth';
-import { notifyDiscordTopupApproved } from '@/lib/services/discord';
+import {
+  notifyDiscordTopupApproved,
+  notifyDiscordSlipApproved,
+  notifyDiscordSlipRejected,
+} from '@/lib/services/discord';
 
 export async function POST(req: Request) {
   try {
@@ -82,13 +86,26 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: `ไม่สามารถอัปเดตสถานะคำขอ: ${updateErr.message}` }, { status: 500 });
       }
 
-      // 5. Dispatch Discord notification to credits channel
+      // 5. Dispatch Discord notifications:
+      // (a) Notify Slip Channel (สลิปรออนุมัติ) that this slip is APPROVED (Success)
+      // (b) Notify Credits Channel (ประวัติเติมเงิน) that user received credits
       try {
-        await notifyDiscordTopupApproved({
-          topupNumber: topupRow.topup_number || `TOP-${topupId.slice(-6)}`,
-          userName: topupRow.user_name || 'ลูกค้า',
-          amount,
-        });
+        const topupNumber = topupRow.topup_number || `TOP-${topupId.slice(-6)}`;
+        await Promise.allSettled([
+          notifyDiscordSlipApproved({
+            topupNumber,
+            userName: topupRow.user_name || 'ลูกค้า',
+            userEmail: topupRow.user_email || undefined,
+            amount,
+            slipUrl: topupRow.payment_slip_url || undefined,
+            adminNote: adminNote || 'อนุมัติการเติมเงินเรียบร้อยแล้ว',
+          }),
+          notifyDiscordTopupApproved({
+            topupNumber,
+            userName: topupRow.user_name || 'ลูกค้า',
+            amount,
+          }),
+        ]);
       } catch (err) {
         console.warn('Failed to send discord topup approved notification:', err);
       }
@@ -112,6 +129,21 @@ export async function POST(req: Request) {
 
       if (rejectErr) {
         return NextResponse.json({ error: `ไม่สามารถปฏิเสธคำขอ: ${rejectErr.message}` }, { status: 500 });
+      }
+
+      // Dispatch Discord notification to Slip Channel that slip is rejected
+      try {
+        const topupNumber = topupRow.topup_number || `TOP-${topupId.slice(-6)}`;
+        await notifyDiscordSlipRejected({
+          topupNumber,
+          userName: topupRow.user_name || 'ลูกค้า',
+          userEmail: topupRow.user_email || undefined,
+          amount: Number(topupRow.amount) || 0,
+          slipUrl: topupRow.payment_slip_url || undefined,
+          adminNote: adminNote || 'สลิปไม่ถูกต้อง หรือไม่พบยอดเงินเข้าบัญชี',
+        });
+      } catch (err) {
+        console.warn('Failed to send discord slip rejected notification:', err);
       }
 
       return NextResponse.json({

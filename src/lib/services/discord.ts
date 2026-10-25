@@ -166,6 +166,87 @@ export async function notifyDiscordSlipSubmitted(data: {
 }
 
 /**
+ * Notify Slip Channel: Slip Approved by Admin (Success)
+ * Sent to private Admin Channel (e.g. ୨-💳-୧-⁺-˖-สลิปรออนุมัติ)
+ */
+export async function notifyDiscordSlipApproved(data: {
+  topupNumber: string;
+  userName: string;
+  userEmail?: string;
+  amount: number;
+  slipUrl?: string;
+  adminNote?: string;
+}): Promise<boolean> {
+  const { slip } = await getDiscordWebhooks();
+
+  const embed: any = {
+    title: '✅ อนุมัติการเติมเงินสำเร็จ (Approved - Success)',
+    description: `แอดมินได้ทำการตรวจสอบหลักฐานสลิปและอนุมัติเครดิตเข้าบัญชีลูกค้าเรียบร้อยแล้ว`,
+    color: 0x10b981, // Emerald Green #10b981
+    fields: [
+      { name: 'รหัสรายการ', value: `\`${data.topupNumber}\``, inline: true },
+      { name: 'ยอดเงินที่อนุมัติ', value: `**+฿${data.amount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}**`, inline: true },
+      { name: 'สถานะ', value: '🟢 **อนุมัติแล้ว (Approved - Success)**', inline: true },
+      { name: 'ชื่อลูกค้า', value: data.userName || 'ลูกค้า', inline: true },
+      { name: 'อีเมล', value: data.userEmail || '-', inline: true },
+      { name: 'หมายเหตุ', value: data.adminNote || 'อนุมัติการเติมเงินเรียบร้อยแล้ว', inline: false },
+    ],
+    footer: { text: 'J3A STORE • ยืนยันการอนุมัติสลิปสำเร็จ' },
+    timestamp: new Date().toISOString(),
+  };
+
+  if (data.slipUrl && data.slipUrl.startsWith('http')) {
+    embed.thumbnail = { url: data.slipUrl };
+  }
+
+  return sendDiscordWebhook(slip, {
+    username: 'J3A STORE - สลิปโอนเงิน (อนุมัติแล้ว)',
+    content: `✅ **อนุมัติเรียบร้อย (Success)! รายการ \`${data.topupNumber}\` ยอด ฿${data.amount.toLocaleString('th-TH', { minimumFractionDigits: 2 })} เข้าบัญชีลูกค้าแล้ว**`,
+    embeds: [embed],
+  });
+}
+
+/**
+ * Notify Slip Channel: Slip Rejected by Admin
+ */
+export async function notifyDiscordSlipRejected(data: {
+  topupNumber: string;
+  userName: string;
+  userEmail?: string;
+  amount: number;
+  slipUrl?: string;
+  adminNote?: string;
+}): Promise<boolean> {
+  const { slip } = await getDiscordWebhooks();
+
+  const embed: any = {
+    title: '❌ ปฏิเสธคำขอสลิปโอนเงิน (Slip Rejected)',
+    description: `แอดมินได้ทำการตรวจสอบหลักฐานแล้วปฏิเสธคำขอนี้`,
+    color: 0xef4444, // Red #ef4444
+    fields: [
+      { name: 'รหัสรายการ', value: `\`${data.topupNumber}\``, inline: true },
+      { name: 'ยอดเงินที่แจ้ง', value: `฿${data.amount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}`, inline: true },
+      { name: 'สถานะ', value: '🔴 **ปฏิเสธแล้ว (Rejected)**', inline: true },
+      { name: 'ชื่อลูกค้า', value: data.userName || 'ลูกค้า', inline: true },
+      { name: 'อีเมล', value: data.userEmail || '-', inline: true },
+      { name: 'เหตุผลที่ปฏิเสธ', value: data.adminNote || 'สลิปไม่ถูกต้อง หรือไม่พบยอดเงินเข้าบัญชี', inline: false },
+    ],
+    footer: { text: 'J3A STORE • จัดการสลิปโอนเงิน' },
+    timestamp: new Date().toISOString(),
+  };
+
+  if (data.slipUrl && data.slipUrl.startsWith('http')) {
+    embed.thumbnail = { url: data.slipUrl };
+  }
+
+  return sendDiscordWebhook(slip, {
+    username: 'J3A STORE - สลิปโอนเงิน (ปฏิเสธ)',
+    content: `⚠️ **รายการสลิป \`${data.topupNumber}\` ถูกปฏิเสธ!**`,
+    embeds: [embed],
+  });
+}
+
+/**
  * 2. Notify Public / Credits: Slip Topup Approved by Admin
  * Sent to Credits Channel (e.g. ୨-💾-୧-⁺-˖-credits)
  */
