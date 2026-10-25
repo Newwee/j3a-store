@@ -83,13 +83,15 @@ export async function POST(req: Request) {
       }
 
       // 5. Dispatch Discord notification to credits channel
-      Promise.resolve(
-        notifyDiscordTopupApproved({
+      try {
+        await notifyDiscordTopupApproved({
           topupNumber: topupRow.topup_number || `TOP-${topupId.slice(-6)}`,
           userName: topupRow.user_name || 'ลูกค้า',
           amount,
-        })
-      ).catch((err) => console.warn('Failed to send discord topup approved notification:', err));
+        });
+      } catch (err) {
+        console.warn('Failed to send discord topup approved notification:', err);
+      }
 
       return NextResponse.json({
         ok: true,

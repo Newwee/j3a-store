@@ -504,7 +504,7 @@ export default function CheckoutPage() {
       // 5.2 Dispatch Discord Order Notification (୨-💾-୧-⁺-˖-credits)
       try {
         const itemsSummary = resolvedItems.map((i: any) => `${i.productName} x${i.quantity || 1}`).join(', ');
-        fetch('/api/notifications/discord', {
+        await fetch('/api/notifications/discord', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -516,8 +516,34 @@ export default function CheckoutPage() {
               totalAmount: finalTotal,
             },
           }),
-        }).catch((orderNotifyErr) => console.warn('Discord order notify error:', orderNotifyErr));
-      } catch {}
+          signal: AbortSignal.timeout(4000),
+        });
+      } catch (orderNotifyErr) {
+        console.warn('Discord order notify error:', orderNotifyErr);
+      }
+
+      // 5.3 If order was paid via bank transfer slip, alert admin slip channel (୨-💳-୧-⁺-˖-สลิปรออนุมัติ)
+      if (slipUrl) {
+        try {
+          await fetch('/api/notifications/discord', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              event: 'slip_submitted',
+              data: {
+                topupNumber: `ORDER-${created.orderNumber || created.id}`,
+                userName: name.trim() || user?.displayName || 'ลูกค้า',
+                userEmail: user?.email || email || '',
+                amount: finalTotal,
+                slipUrl: slipUrl,
+              },
+            }),
+            signal: AbortSignal.timeout(4000),
+          });
+        } catch (slipNotifyErr) {
+          console.warn('Discord order slip notify error:', slipNotifyErr);
+        }
+      }
 
       // Record coupon usage if discount applied
       if (appliedDiscount?.code) {

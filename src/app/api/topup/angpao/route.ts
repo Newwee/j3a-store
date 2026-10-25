@@ -319,15 +319,17 @@ export async function POST(req: Request) {
       Promise.resolve(supabaseAdmin.rpc('recalculate_store_stats')).catch(() => {});
       
       // 11. Dispatch Discord notification to credits log channel
-      Promise.resolve(
-        notifyDiscordAngpaoSuccess({
+      try {
+        await notifyDiscordAngpaoSuccess({
           topupNumber,
           userName: userProfile.display_name || user.user_metadata?.full_name || 'ลูกค้า',
           amount: rewardAmount,
           senderName: senderOwnerName,
           isTest: isTestMode,
-        })
-      ).catch((err) => console.warn('Failed to send discord angpao notification:', err));
+        });
+      } catch (err) {
+        console.warn('Failed to send discord angpao notification:', err);
+      }
     }
 
     console.log(`[Angpao Topup] User ${user.id} credited with +${rewardAmount} THB (New: ${newCredits}) [TestMode: ${isTestMode}]`);

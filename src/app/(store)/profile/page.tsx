@@ -242,20 +242,25 @@ function ProfileContent() {
       });
 
       // Dispatch Discord Webhook Notification to Admin (୨-💳-୧-⁺-˖-สลิปรออนุมัติ)
-      fetch('/api/notifications/discord', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          event: 'slip_submitted',
-          data: {
-            topupNumber: createdTopup.topupNumber,
-            userName: profile?.displayName || user.displayName || 'ลูกค้า',
-            userEmail: user.email || '',
-            amount: effectiveAmount,
-            slipUrl: finalSlipUrl,
-          },
-        }),
-      }).catch((notifyErr) => console.warn('Discord slip notify error:', notifyErr));
+      try {
+        await fetch('/api/notifications/discord', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event: 'slip_submitted',
+            data: {
+              topupNumber: createdTopup.topupNumber,
+              userName: profile?.displayName || user.displayName || 'ลูกค้า',
+              userEmail: user.email || '',
+              amount: effectiveAmount,
+              slipUrl: finalSlipUrl,
+            },
+          }),
+          signal: AbortSignal.timeout(5000),
+        });
+      } catch (notifyErr) {
+        console.warn('Discord slip notify error:', notifyErr);
+      }
 
       success('แจ้งการโอนเงินเรียบร้อยแล้ว! แอดมินจะตรวจสอบและอนุมัติเครดิตเข้าบัญชีของคุณ');
       setSlipFile(null);
