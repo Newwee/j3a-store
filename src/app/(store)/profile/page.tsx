@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
@@ -31,6 +31,13 @@ import {
   Ticket,
   LayoutDashboard,
   FlaskConical,
+  Crown,
+  Award,
+  ChevronDown,
+  ChevronUp,
+  Lock,
+  ArrowRight,
+  Percent,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
@@ -39,7 +46,7 @@ import { updateUserProfile } from '@/lib/firestore/users';
 import { createTopupRequest, getUserTopups, subscribeUserTopups, redeemAngpaoTopup } from '@/lib/firestore/topups';
 import { redeemCodeForUser } from '@/lib/firestore/redeem';
 import { getStoreSettings, DEFAULT_STORE_SETTINGS } from '@/lib/firestore/settings';
-import { StoreSettings } from '@/types/settings';
+import { StoreSettings, RankTier } from '@/types/settings';
 import { TopupRequest } from '@/types/topup';
 import { TierBadge, RoleBadge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -48,6 +55,15 @@ import { Modal } from '@/components/ui/Modal';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
 import { compressImageToDataUrl } from '@/lib/utils/image';
 import { uploadProductImage } from '@/lib/storage/upload';
+import { supabase } from '@/lib/supabase/client';
+
+const DEFAULT_RANKS: RankTier[] = [
+  { id: 'bronze', name: 'Bronze', minSpent: 0, discountPercent: 0, badgeColor: '#cd7f32', description: 'สมาชิกทั่วไป' },
+  { id: 'silver', name: 'Silver', minSpent: 200, discountPercent: 5, badgeColor: '#94a3b8', description: 'ส่วนลด 5% ทุกคำสั่งซื้อ (สะสมครบ ฿200)' },
+  { id: 'gold', name: 'Gold', minSpent: 500, discountPercent: 10, badgeColor: '#eab308', description: 'ส่วนลด 10% ทุกคำสั่งซื้อ (สะสมครบ ฿500)' },
+  { id: 'platinum', name: 'Platinum', minSpent: 1000, discountPercent: 15, badgeColor: '#06b6d4', description: 'ส่วนลด 15% ทุกคำสั่งซื้อ (สะสมครบ ฿1,000)' },
+  { id: 'vip', name: 'VIP', minSpent: 5000, discountPercent: 25, badgeColor: '#a855f7', description: 'ส่วนลดพิเศษ 25% ทุกคำสั่งซื้อ (สะสมครบ ฿5,000)' },
+];
 import { SettingsTabContent } from '@/components/profile/SettingsTabContent';
 import { triggerMoneyCelebration } from '@/lib/utils/moneyConfetti';
 import { AngpaoAdminDebugBanner } from '@/components/topup/AngpaoAdminDebugBanner';
@@ -103,6 +119,33 @@ function ProfileContent() {
   const effectiveAmount = customAmount && Number(customAmount) > 0 ? Number(customAmount) : (selectedPreset || 0);
   const hasSelectedAmount = effectiveAmount > 0;
 
+  // User Cumulative Spending for Rank Progression
+  const [userTotalSpent, setUserTotalSpent] = useState<number>(0);
+  const [showRankDetails, setShowRankDetails] = useState<boolean>(true);
+
+  useEffect(() => {
+    async function loadSpending() {
+      if (!user?.uid) return;
+      try {
+        const { data: orders, error } = await supabase
+          .from('orders')
+          .select('total, status')
+          .eq('user_id', user.uid);
+
+        if (!error && orders) {
+          const validOrders = orders.filter(
+            (o) => o.status !== 'cancelled' && o.status !== 'refunded'
+          );
+          const spent = validOrders.reduce((acc, o) => acc + (Number(o.total) || 0), 0);
+          setUserTotalSpent(spent);
+        }
+      } catch (e) {
+        console.warn('Failed to load user spending for ranks:', e);
+      }
+    }
+    loadSpending();
+  }, [user?.uid]);
+
   // Load Store Settings from Firestore
   useEffect(() => {
     async function loadSettings() {
@@ -115,6 +158,51 @@ function ProfileContent() {
     }
     loadSettings();
   }, []);
+
+  const ranksList: RankTier[] = useMemo(() => {
+    if (storeSettings?.rankSettings?.ranks && storeSettings.rankSettings.ranks.length > 0) {
+      return storeSettings.rankSettings.ranks;
+    }
+    return DEFAULT_RANKS;
+  }, [storeSettings]);
+
+  const sortedRanks = useMemo(() => {
+    return [...ranksList].sort((a, b) => a.minSpent - b.minSpent);
+  }, [ranksList]);
+
+  // Find user's active rank by profile.tier or by spending (whichever is higher)
+  const currentTierName = profile?.tier || 'Bronze';
+  const activeRankIndex = useMemo(() => {
+    const byNameIndex = sortedRanks.findIndex(
+      (r) => r.name.toLowerCase() === currentTierName.toLowerCase() || r.id.toLowerCase() === currentTierName.toLowerCase()
+    );
+    let bySpendIndex = 0;
+    for (let i = sortedRanks.length - 1; i >= 0; i--) {
+      if (userTotalSpent >= sortedRanks[i].minSpent) {
+        bySpendIndex = i;
+        break;
+      }
+    }
+    return Math.max(byNameIndex >= 0 ? byNameIndex : 0, bySpendIndex);
+  }, [sortedRanks, currentTierName, userTotalSpent]);
+
+  const activeRank = sortedRanks[activeRankIndex] || sortedRanks[0];
+  const nextRank = activeRankIndex < sortedRanks.length - 1 ? sortedRanks[activeRankIndex + 1] : null;
+  const isMaxRank = !nextRank;
+
+  // Remaining spend to reach next rank
+  const remainingToNext = nextRank ? Math.max(0, nextRank.minSpent - userTotalSpent) : 0;
+
+  // Percentage progress to next rank
+  const progressPercent = useMemo(() => {
+    if (isMaxRank) return 100;
+    const currentBase = activeRank.minSpent;
+    const target = nextRank.minSpent;
+    const range = target - currentBase;
+    if (range <= 0) return 100;
+    const gained = Math.max(0, userTotalSpent - currentBase);
+    return Math.min(100, Math.max(5, Math.round((gained / range) * 100)));
+  }, [isMaxRank, activeRank, nextRank, userTotalSpent]);
 
   const loadTopupHistory = async () => {
     if (!user) return;
@@ -530,41 +618,263 @@ function ProfileContent() {
 
         {/* Tab 1: Overview */}
         {activeTab === 'overview' && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="relative bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-md space-y-3 overflow-hidden group hover:border-cyan-500/40 transition-colors">
-              <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-cyan-500 to-transparent" />
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">ระดับสิทธิ์ (Role)</span>
-                <Shield className="w-4 h-4 text-cyan-400" />
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="relative bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-md space-y-3 overflow-hidden group hover:border-cyan-500/40 transition-colors">
+                <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-cyan-500 to-transparent" />
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">ระดับสิทธิ์ (Role)</span>
+                  <Shield className="w-4 h-4 text-cyan-400" />
+                </div>
+                <p className="text-xl font-black text-white uppercase tracking-tight">{profile?.role || 'Customer'}</p>
+                <p className="text-xs text-slate-400">บัญชีผู้ใช้งานระบบ J3A STORE</p>
               </div>
-              <p className="text-xl font-black text-white uppercase tracking-tight">{profile?.role || 'Customer'}</p>
-              <p className="text-xs text-slate-400">บัญชีผู้ใช้งานระบบ J3A STORE</p>
+
+              {/* Tier Card with Progress & Discount */}
+              <div className="relative bg-slate-900/60 border border-amber-500/30 rounded-2xl p-6 backdrop-blur-md space-y-3 overflow-hidden group hover:border-amber-500/50 transition-all shadow-[0_0_20px_rgba(245,158,11,0.06)]">
+                <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-amber-500 to-transparent" />
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">ระดับสมาชิก (Tier)</span>
+                  <Sparkles className="w-4 h-4 text-amber-400" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <TierBadge tier={activeRank.name as any} />
+                  <span className="text-xs text-amber-400 font-bold">
+                    {activeRank.discountPercent > 0 ? `ลด ${activeRank.discountPercent}% ทุกคำสั่งซื้อ` : 'สิทธิ์สะสมยอดเลื่อนขั้น'}
+                  </span>
+                </div>
+
+                {!isMaxRank ? (
+                  <div className="space-y-1.5 pt-0.5">
+                    <div className="flex justify-between text-[11px]">
+                      <span className="text-slate-400">
+                        เป้าหมาย: <strong className="text-amber-300 font-bold">{nextRank?.name}</strong>
+                      </span>
+                      <span className="text-amber-400 font-bold font-mono">
+                        ขาดอีก ฿{remainingToNext.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="w-full h-2 rounded-full bg-slate-950 border border-slate-800 overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-300 rounded-full transition-all duration-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]"
+                        style={{ width: `${progressPercent}%` }}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-2 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-300 text-[11px] font-bold flex items-center gap-1.5 shadow-[0_0_10px_rgba(168,85,247,0.2)]">
+                    <Crown className="w-4 h-4 text-purple-400 shrink-0" />
+                    <span>ระดับสูงสุด (VIP) รับส่วนลด 25% ตลอดชีพ</span>
+                  </div>
+                )}
+
+                <div className="pt-1 text-[11px] text-slate-400 flex items-center justify-between border-t border-slate-800/80">
+                  <span>ยอดสะสม: <strong className="text-white font-mono">฿{userTotalSpent.toLocaleString()}</strong></span>
+                  <button
+                    type="button"
+                    onClick={() => setShowRankDetails(!showRankDetails)}
+                    className="text-amber-400 hover:text-amber-300 hover:underline cursor-pointer flex items-center gap-0.5 text-[11px] font-semibold"
+                  >
+                    <span>{showRankDetails ? 'ซ่อนแผนผัง Rank' : 'ดูแผนผัง Rank'}</span>
+                    {showRankDetails ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="relative bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-md space-y-3 overflow-hidden group hover:border-emerald-500/40 transition-colors">
+                <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-500 to-transparent" />
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">สถานะความปลอดภัย</span>
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                </div>
+                <div className="flex items-center gap-1.5 text-emerald-400 text-sm font-bold">
+                  <span>ป้องกันด้วย Supabase Auth</span>
+                </div>
+                <p className="text-xs text-slate-400">ข้อมูลของคุณถูกเข้ารหัสอย่างปลอดภัย 100%</p>
+              </div>
             </div>
 
-            <div className="relative bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-md space-y-3 overflow-hidden group hover:border-amber-500/40 transition-colors">
-              <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-amber-500 to-transparent" />
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">ระดับสมาชิก (Tier)</span>
-                <Sparkles className="w-4 h-4 text-amber-400" />
-              </div>
-              <div className="flex items-center gap-2">
-                <TierBadge tier={profile?.tier || 'Bronze'} />
-                <span className="text-xs text-amber-400 font-bold">รับสิทธิ์สะสมส่วนลด</span>
-              </div>
-              <p className="text-xs text-slate-400">อัปเกรดอัตโนมัติเมื่อสั่งซื้อต่อเนื่อง</p>
-            </div>
+            {/* Detailed Rank Progression & VIP Milestones Container */}
+            {showRankDetails && (
+              <div className="bg-slate-900/70 border border-amber-500/20 rounded-2xl p-6 backdrop-blur-md space-y-6 shadow-[0_0_30px_rgba(245,158,11,0.05)]">
+                {/* Header row */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Crown className="w-5 h-5 text-amber-400" />
+                      <h3 className="text-base font-bold text-white">
+                        เส้นทางความคืบหน้าระดับสมาชิก (Rank Progression)
+                      </h3>
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      สะสมยอดสั่งซื้อเพื่อปลดล็อกส่วนลดพิเศษถาวร ยิ่งระดับสูง ยิ่งลดมาก ระบบหักส่วนลดที่หน้า Checkout อัตโนมัติ
+                    </p>
+                  </div>
 
-            <div className="relative bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-md space-y-3 overflow-hidden group hover:border-emerald-500/40 transition-colors">
-              <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-500 to-transparent" />
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">สถานะความปลอดภัย</span>
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <div className="flex items-center gap-3 bg-slate-950/80 px-4 py-2 rounded-xl border border-slate-800 shrink-0">
+                    <div>
+                      <p className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">ยอดซื้อสะสมของคุณ</p>
+                      <p className="text-base font-black text-cyan-300 font-mono">฿{userTotalSpent.toLocaleString()} THB</p>
+                    </div>
+                    <div className="h-8 w-px bg-slate-800" />
+                    <div>
+                      <p className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">สิทธิ์ส่วนลดปัจจุบัน</p>
+                      <p className="text-base font-black text-amber-400 font-mono">
+                        {activeRank.discountPercent > 0 ? `ลด ${activeRank.discountPercent}%` : 'ไม่มีส่วนลด'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Visual Milestone Stepper (5 Ranks) */}
+                <div className="py-2">
+                  <div className="grid grid-cols-5 gap-2 relative">
+                    {/* Background track line */}
+                    <div className="hidden sm:block absolute top-5 left-[10%] right-[10%] h-1 bg-slate-800 -z-0" />
+                    {/* Active progress fill line */}
+                    <div
+                      className="hidden sm:block absolute top-5 left-[10%] h-1 bg-gradient-to-r from-amber-500 via-yellow-400 to-purple-500 -z-0 transition-all duration-700 shadow-[0_0_12px_rgba(245,158,11,0.6)]"
+                      style={{
+                        width: isMaxRank
+                          ? '80%'
+                          : `${Math.min(80, (activeRankIndex / (sortedRanks.length - 1)) * 80 + (progressPercent / 100) * (80 / (sortedRanks.length - 1)))}%`,
+                      }}
+                    />
+
+                    {sortedRanks.map((rank, idx) => {
+                      const isAchieved = userTotalSpent >= rank.minSpent || activeRankIndex >= idx;
+                      const isCurrent = activeRank.id === rank.id;
+                      const isNext = nextRank?.id === rank.id;
+
+                      return (
+                        <div key={rank.id} className="flex flex-col items-center text-center space-y-2 relative z-10">
+                          {/* Circle Node */}
+                          <div
+                            className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-xs transition-all duration-300 ${
+                              isCurrent
+                                ? 'bg-amber-500 text-slate-950 ring-4 ring-amber-500/30 shadow-[0_0_20px_rgba(245,158,11,0.7)] scale-110'
+                                : isAchieved
+                                ? 'bg-slate-800 text-amber-400 border-2 border-amber-400/80 shadow-[0_0_10px_rgba(245,158,11,0.3)]'
+                                : isNext
+                                ? 'bg-slate-900 text-slate-300 border-2 border-slate-600 ring-2 ring-cyan-500/20'
+                                : 'bg-slate-950 text-slate-600 border border-slate-800'
+                            }`}
+                          >
+                            {isCurrent ? (
+                              <Crown className="w-5 h-5 animate-pulse" />
+                            ) : isAchieved ? (
+                              <Check className="w-5 h-5 stroke-[3]" />
+                            ) : (
+                              <Lock className="w-4 h-4 text-slate-500" />
+                            )}
+                          </div>
+
+                          {/* Node Labels */}
+                          <div className="space-y-0.5">
+                            <p className="text-xs font-bold text-white flex items-center justify-center gap-1">
+                              <span>{rank.name}</span>
+                              {isCurrent && (
+                                <span className="hidden md:inline-block w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                              )}
+                            </p>
+                            <p className="text-[10px] font-mono font-semibold text-slate-400">
+                              {rank.minSpent === 0 ? 'เริ่มต้น' : `฿${rank.minSpent.toLocaleString()}`}
+                            </p>
+                            <p className="text-[11px] font-bold text-amber-400">
+                              {rank.discountPercent === 0 ? 'ราคาปกติ' : `ลด ${rank.discountPercent}%`}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Status Announcement Banner */}
+                <div
+                  className={`p-4 rounded-xl border text-xs sm:text-sm flex items-center gap-3 ${
+                    isMaxRank
+                      ? 'bg-purple-500/10 border-purple-500/30 text-purple-200'
+                      : 'bg-amber-500/10 border-amber-500/30 text-amber-200'
+                  }`}
+                >
+                  <Sparkles className="w-5 h-5 shrink-0 text-amber-400" />
+                  <span>
+                    {isMaxRank ? (
+                      <>
+                        <strong>👑 ยินดีด้วยครับ!</strong> คุณอยู่ในระดับสมาชิกสูงสุด <strong>VIP</strong> รับสิทธิ์ส่วนลดพิเศษ <strong>25%</strong> อัตโนมัติทุกคำสั่งซื้อตลอดชีพ
+                      </>
+                    ) : (
+                      <>
+                        ยอดสะสมปัจจุบันของคุณคือ <strong className="font-mono text-white">฿{userTotalSpent.toLocaleString()}</strong> อีกเพียง{' '}
+                        <strong className="font-mono text-amber-300 underline underline-offset-2">฿{remainingToNext.toLocaleString()}</strong>{' '}
+                        จะได้รับการเลื่อนระดับเป็น <strong>{nextRank?.name}</strong> เพื่อรับส่วนลดสินค้าเพิ่มเป็น <strong>{nextRank?.discountPercent}%</strong>!
+                      </>
+                    )}
+                  </span>
+                </div>
+
+                {/* Breakdown Cards of all 5 Tiers */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-1">
+                  {sortedRanks.map((rank, idx) => {
+                    const isCurrent = activeRank.id === rank.id;
+                    const isAchieved = userTotalSpent >= rank.minSpent || activeRankIndex >= idx;
+                    const needed = Math.max(0, rank.minSpent - userTotalSpent);
+
+                    return (
+                      <div
+                        key={rank.id}
+                        className={`rounded-xl p-3.5 border transition-all space-y-2 relative ${
+                          isCurrent
+                            ? 'bg-gradient-to-b from-amber-500/15 to-slate-900/90 border-amber-500/60 shadow-[0_0_20px_rgba(245,158,11,0.15)] ring-1 ring-amber-500/40'
+                            : isAchieved
+                            ? 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                            : 'bg-slate-950/40 border-slate-900 text-slate-500 opacity-80'
+                        }`}
+                      >
+                        {isCurrent && (
+                          <span className="absolute -top-2.5 right-3 bg-amber-500 text-slate-950 text-[9px] font-black uppercase px-2 py-0.5 rounded-full shadow">
+                            ระดับของคุณ
+                          </span>
+                        )}
+
+                        <div className="flex items-center justify-between">
+                          <TierBadge tier={rank.name as any} />
+                          <span className="text-[11px] font-bold text-amber-400">
+                            {rank.discountPercent > 0 ? `ลด ${rank.discountPercent}%` : 'ไม่มีส่วนลด'}
+                          </span>
+                        </div>
+
+                        <div className="space-y-0.5 pt-1">
+                          <p className="text-xs font-semibold text-slate-300">
+                            ยอดสะสม: <strong className="text-white font-mono">฿{rank.minSpent.toLocaleString()}</strong>
+                          </p>
+                          <p className="text-[11px] text-slate-400 line-clamp-2">
+                            {rank.description || `ส่วนลด ${rank.discountPercent}% ทุกออเดอร์`}
+                          </p>
+                        </div>
+
+                        <div className="pt-2 border-t border-slate-800/80 text-[10px]">
+                          {isCurrent ? (
+                            <span className="text-amber-400 font-bold flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3" /> ใช้งานอยู่ตอนนี้
+                            </span>
+                          ) : isAchieved ? (
+                            <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                              <Check className="w-3 h-3" /> ปลดล็อคแล้ว
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 flex items-center gap-1">
+                              <Lock className="w-3 h-3" /> ขาดอีก ฿{needed.toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-              <div className="flex items-center gap-1.5 text-emerald-400 text-sm font-bold">
-                <span>ป้องกันด้วย Supabase Auth</span>
-              </div>
-              <p className="text-xs text-slate-400">ข้อมูลของคุณถูกเข้ารหัสอย่างปลอดภัย 100%</p>
-            </div>
+            )}
           </div>
         )}
 

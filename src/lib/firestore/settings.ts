@@ -33,10 +33,10 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
     enabled: true,
     ranks: [
       { id: 'bronze', name: 'Bronze', minSpent: 0, discountPercent: 0, badgeColor: '#cd7f32', description: 'สมาชิกทั่วไป' },
-      { id: 'silver', name: 'Silver', minSpent: 500, discountPercent: 3, badgeColor: '#94a3b8', description: 'ส่วนลด 3% ทุกคำสั่งซื้อ' },
-      { id: 'gold', name: 'Gold', minSpent: 1500, discountPercent: 5, badgeColor: '#eab308', description: 'ส่วนลด 5% ทุกคำสั่งซื้อ' },
-      { id: 'platinum', name: 'Platinum', minSpent: 5000, discountPercent: 10, badgeColor: '#06b6d4', description: 'ส่วนลด 10% ทุกคำสั่งซื้อ' },
-      { id: 'vip', name: 'VIP', minSpent: 10000, discountPercent: 15, badgeColor: '#a855f7', description: 'ส่วนลดพิเศษ 15% ทุกคำสั่งซื้อ' },
+      { id: 'silver', name: 'Silver', minSpent: 200, discountPercent: 5, badgeColor: '#94a3b8', description: 'ส่วนลด 5% ทุกคำสั่งซื้อ (สะสมครบ ฿200)' },
+      { id: 'gold', name: 'Gold', minSpent: 500, discountPercent: 10, badgeColor: '#eab308', description: 'ส่วนลด 10% ทุกคำสั่งซื้อ (สะสมครบ ฿500)' },
+      { id: 'platinum', name: 'Platinum', minSpent: 1000, discountPercent: 15, badgeColor: '#06b6d4', description: 'ส่วนลด 15% ทุกคำสั่งซื้อ (สะสมครบ ฿1,000)' },
+      { id: 'vip', name: 'VIP', minSpent: 5000, discountPercent: 25, badgeColor: '#a855f7', description: 'ส่วนลดพิเศษ 25% ทุกคำสั่งซื้อ (สะสมครบ ฿5,000)' },
     ],
   },
 };
