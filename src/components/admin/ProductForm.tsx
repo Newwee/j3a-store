@@ -126,16 +126,6 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
         durationDays: 180,
         badge: 'คุ้มค่าที่สุด',
       },
-      {
-        id: 'var_3d',
-        name: 'ทดลองใช้งาน 3 วัน (3 Days Trial)',
-        price: 0,
-        comparePrice: 50,
-        stock: 99,
-        tier: '3d',
-        durationDays: 3,
-        badge: 'ทดลองฟรี',
-      },
     ];
   });
   const [category, setCategory] = useState(initialData?.category || 'ซอฟต์แวร์ Discord');
@@ -287,16 +277,6 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
     setPricingType('multi');
     setVariants([
       {
-        id: 'var_3d',
-        name: 'ทดลองใช้งาน 3 วัน (3 Days Trial)',
-        price: 0,
-        comparePrice: 50,
-        stock: 99,
-        tier: '3d',
-        durationDays: 3,
-        badge: 'ทดลองฟรี',
-      },
-      {
         id: 'var_1w',
         name: '1 สัปดาห์ (1 Week)',
         price: 150,
@@ -327,7 +307,30 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
         badge: 'คุ้มค่าที่สุด',
       },
     ]);
-    toast('ใส่เทมเพลตราคา AutoQuest (3 วัน / 1 สัปดาห์ 150฿ / 4 สัปดาห์ 500฿ / 6 เดือน 2000฿) สำเร็จ', 'success');
+    toast('ใส่เทมเพลตราคาคีย์ (1 สัปดาห์ 150฿ / 4 สัปดาห์ 500฿ / 6 เดือน 2000฿) สำเร็จ', 'success');
+  };
+
+  const handleAddTrialOption = () => {
+    setVariants((prev) => {
+      if (prev.some((v) => v.id === 'var_3d' || v.tier === '3d')) {
+        toast('มีตัวเลือกทดลองใช้งาน 3 วันอยู่ในรายการแล้ว', 'info');
+        return prev;
+      }
+      return [
+        ...prev,
+        {
+          id: 'var_3d',
+          name: 'ทดลองใช้งาน 3 วัน (3 Days Trial)',
+          price: 0,
+          comparePrice: 50,
+          stock: 99,
+          tier: '3d',
+          durationDays: 3,
+          badge: 'ทดลองฟรี',
+        },
+      ];
+    });
+    toast('เพิ่มตัวเลือกทดลองใช้งาน 3 วัน (0฿) สำเร็จ', 'info');
   };
 
   // Validation
@@ -689,13 +692,20 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
                   <div className="text-xs text-purple-200">
                     💡 <strong>โหมดหลายราคา (Multi-Tier Options):</strong> ให้ลูกค้าเลือกแพ็กเกจ (เช่น 1 สัปดาห์ 150฿, 4 สัปดาห์ 500฿, 6 เดือน 2000฿, ทดลอง 3 วัน)
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
                       onClick={handleApplyAutoQuestPreset}
                       className="px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-600/30 hover:bg-purple-600/50 text-purple-300 border border-purple-500/40 transition-colors cursor-pointer"
                     >
-                      ⚡ โหลดเทมเพลต AutoQuest
+                      ⚡ โหลดเทมเพลตคีย์ (1w / 4w / 6m)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAddTrialOption}
+                      className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition-colors cursor-pointer"
+                    >
+                      🎁 + ตัวเลือกทดลอง 3 วัน
                     </button>
                     <button
                       type="button"
