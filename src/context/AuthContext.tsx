@@ -316,6 +316,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         displayName: name.trim(),
       });
       setProfile(newProfile);
+
+      // Dispatch Discord Welcome Notification (►-ยินดีต้อนรับ)
+      fetch('/api/notifications/discord', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event: 'member_registered',
+          data: {
+            userName: name.trim(),
+            userEmail: appUser.email || '',
+          },
+        }),
+      }).catch((notifyErr) => console.warn('Discord new member notify error:', notifyErr));
     }
   };
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { notifyDiscordAngpaoSuccess } from '@/lib/services/discord';
 import {
   extractVoucherHash,
   redeemTrueMoneyVoucher,
@@ -316,6 +317,17 @@ export async function POST(req: Request) {
     // 10. Recalculate store stats ONLY for real transactions (test transactions DO NOT affect dashboard)
     if (!isTestMode) {
       Promise.resolve(supabaseAdmin.rpc('recalculate_store_stats')).catch(() => {});
+      
+      // 11. Dispatch Discord notification to credits log channel
+      Promise.resolve(
+        notifyDiscordAngpaoSuccess({
+          topupNumber,
+          userName: userProfile.display_name || user.user_metadata?.full_name || 'ลูกค้า',
+          amount: rewardAmount,
+          senderName: senderOwnerName,
+          isTest: isTestMode,
+        })
+      ).catch((err) => console.warn('Failed to send discord angpao notification:', err));
     }
 
     console.log(`[Angpao Topup] User ${user.id} credited with +${rewardAmount} THB (New: ${newCredits}) [TestMode: ${isTestMode}]`);

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { verifyAdminRequest } from '@/lib/auth/adminAuth';
+import { notifyDiscordTopupApproved } from '@/lib/services/discord';
 
 export async function POST(req: Request) {
   try {
@@ -80,6 +81,15 @@ export async function POST(req: Request) {
       if (updateErr) {
         return NextResponse.json({ error: `ไม่สามารถอัปเดตสถานะคำขอ: ${updateErr.message}` }, { status: 500 });
       }
+
+      // 5. Dispatch Discord notification to credits channel
+      Promise.resolve(
+        notifyDiscordTopupApproved({
+          topupNumber: topupRow.topup_number || `TOP-${topupId.slice(-6)}`,
+          userName: topupRow.user_name || 'ลูกค้า',
+          amount,
+        })
+      ).catch((err) => console.warn('Failed to send discord topup approved notification:', err));
 
       return NextResponse.json({
         ok: true,

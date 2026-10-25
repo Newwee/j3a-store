@@ -501,6 +501,24 @@ export default function CheckoutPage() {
         console.warn('Failed to deduct stock:', stockErr);
       }
 
+      // 5.2 Dispatch Discord Order Notification (୨-💾-୧-⁺-˖-credits)
+      try {
+        const itemsSummary = resolvedItems.map((i: any) => `${i.productName} x${i.quantity || 1}`).join(', ');
+        fetch('/api/notifications/discord', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event: 'order_placed',
+            data: {
+              orderNumber: created.orderNumber || created.id,
+              userName: name.trim() || user?.displayName || 'ลูกค้า',
+              itemsSummary,
+              totalAmount: finalTotal,
+            },
+          }),
+        }).catch((orderNotifyErr) => console.warn('Discord order notify error:', orderNotifyErr));
+      } catch {}
+
       // Record coupon usage if discount applied
       if (appliedDiscount?.code) {
         recordDiscountUsage(appliedDiscount.code, user?.uid).catch((err) =>

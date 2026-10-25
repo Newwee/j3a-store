@@ -24,5 +24,11 @@ export interface StoreSettings {
   privacyPolicy?: string;
   /** รูป 3: คำอธิบายร้านค้าท้ายเว็บ (Footer Description) */
   footerDescription?: string;
+  /** Discord Webhook สำหรับแจ้งเตือนสลิปรออนุมัติ (Admin Channel) */
+  discordWebhookSlip?: string;
+  /** Discord Webhook สำหรับแจ้งเตือนประวัติการเติมเงิน & คำสั่งซื้อ (Credits Channel) */
+  discordWebhookCredits?: string;
+  /** Discord Webhook สำหรับแจ้งเตือนสมาชิกใหม่ (Welcome Channel) */
+  discordWebhookWelcome?: string;
   updatedAt?: string;
 }

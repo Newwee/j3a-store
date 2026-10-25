@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Settings, Save, Shield, Store, QrCode, MessageCircle, AlertCircle, CheckCircle2, Sparkles, Truck, Video, Play, ExternalLink, FileText, AlignLeft } from 'lucide-react';
+import { Settings, Save, Shield, Store, QrCode, MessageCircle, AlertCircle, CheckCircle2, Sparkles, Truck, Video, Play, ExternalLink, FileText, AlignLeft, Bell, Send, Loader2 } from 'lucide-react';
 import { AdminHeader } from '@/components/admin/AdminHeader';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -27,6 +27,10 @@ export default function AdminSettingsPage() {
   const [heroDescription, setHeroDescription] = useState(DEFAULT_STORE_SETTINGS.heroDescription || 'สัมผัสประสบการณ์ช้อปปิ้งยุคใหม่ที่ J3A STORE ศูนย์รวมไอเทมเกม บัตรเติมเงิน และบริการดิจิทัลระดับพรีเมียม ทำรายการรวดเร็ว ปลอดภัย ด้วยระบบตรวจสอบอัตโนมัติ');
   const [privacyPolicy, setPrivacyPolicy] = useState(DEFAULT_STORE_SETTINGS.privacyPolicy || '');
   const [footerDescription, setFooterDescription] = useState(DEFAULT_STORE_SETTINGS.footerDescription || 'แพลตฟอร์มศูนย์รวมสินค้าและบริการดิจิทัลชั้นนำ เติมเกม ไอดีเกม บัตรเติมเงิน และอุปกรณ์ระดับพรีเมียม ระบบอัตโนมัติ รวดเร็ว ปลอดภัย 100% พร้อมบริการตลอด 24 ชั่วโมง');
+  const [discordWebhookSlip, setDiscordWebhookSlip] = useState(DEFAULT_STORE_SETTINGS.discordWebhookSlip || '');
+  const [discordWebhookCredits, setDiscordWebhookCredits] = useState(DEFAULT_STORE_SETTINGS.discordWebhookCredits || '');
+  const [discordWebhookWelcome, setDiscordWebhookWelcome] = useState(DEFAULT_STORE_SETTINGS.discordWebhookWelcome || '');
+  const [testingChannel, setTestingChannel] = useState<'slip' | 'credits' | 'welcome' | null>(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -49,6 +53,9 @@ export default function AdminSettingsPage() {
         setHeroDescription(data.heroDescription || DEFAULT_STORE_SETTINGS.heroDescription || '');
         setPrivacyPolicy(data.privacyPolicy || DEFAULT_STORE_SETTINGS.privacyPolicy || '');
         setFooterDescription(data.footerDescription || DEFAULT_STORE_SETTINGS.footerDescription || '');
+        setDiscordWebhookSlip(data.discordWebhookSlip || DEFAULT_STORE_SETTINGS.discordWebhookSlip || '');
+        setDiscordWebhookCredits(data.discordWebhookCredits || DEFAULT_STORE_SETTINGS.discordWebhookCredits || '');
+        setDiscordWebhookWelcome(data.discordWebhookWelcome || DEFAULT_STORE_SETTINGS.discordWebhookWelcome || '');
       } catch (err: any) {
         console.error('Failed to load settings:', err);
       } finally {
@@ -80,12 +87,39 @@ export default function AdminSettingsPage() {
         heroDescription: heroDescription.trim(),
         privacyPolicy: privacyPolicy.trim(),
         footerDescription: footerDescription.trim(),
+        discordWebhookSlip: discordWebhookSlip.trim(),
+        discordWebhookCredits: discordWebhookCredits.trim(),
+        discordWebhookWelcome: discordWebhookWelcome.trim(),
       });
       success('บันทึกการตั้งค่าร้านค้าเรียบร้อยแล้ว! ข้อมูลหน้าแรก, นโยบาย และคำอธิบายร้านค้าอัปเดตทันที');
     } catch (err: any) {
       error(`เกิดข้อผิดพลาดในการบันทึก: ${err.message || 'กรุณาลองใหม่อีกครั้ง'}`);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleTestDiscord = async (channelType: 'slip' | 'credits' | 'welcome') => {
+    setTestingChannel(channelType);
+    try {
+      const res = await fetch('/api/notifications/discord', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event: 'test_channel',
+          data: { channelType },
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.sent) {
+        success(`ส่งข้อความทดสอบไปยังห้อง Discord (${channelType}) สำเร็จแล้ว! ตรวจสอบในดิสคอร์ดได้เลย`);
+      } else {
+        error(`ไม่สามารถส่งการแจ้งเตือนได้: ${data.error || 'ตรวจสอบ Webhook URL'}`);
+      }
+    } catch (e: any) {
+      error(`เกิดข้อผิดพลาด: ${e.message}`);
+    } finally {
+      setTestingChannel(null);
     }
   };
 
@@ -190,6 +224,143 @@ export default function AdminSettingsPage() {
                   value={discordContact}
                   onChange={(e) => setDiscordContact(e.target.value)}
                   placeholder="https://discord.gg/UtWykPvTYF"
+                />
+              </div>
+            </div>
+
+            {/* Discord Webhooks & Logs Notification Card */}
+            <div className="bg-slate-900/60 border border-indigo-500/30 rounded-2xl p-6 backdrop-blur-md space-y-5 shadow-[0_0_25px_rgba(99,102,241,0.08)]">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-4">
+                <div>
+                  <h2 className="text-base font-bold text-white flex items-center gap-2">
+                    <Bell className="w-5 h-5 text-indigo-400" />
+                    <span>ระบบแจ้งเตือน Discord Webhook & Logs</span>
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-1">
+                    ส่งข้อความแจ้งเตือนอัตโนมัติเข้า Discord Server (Server ID: 1555516426599665736) ทันทีที่มีกิจกรรม
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono font-bold px-2.5 py-1 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-300">
+                    BOT: J3ABOT (Connected)
+                  </span>
+                </div>
+              </div>
+
+              {/* 1. Slip Approval Alert */}
+              <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
+                      <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                        1. สลิปโอนเงินรอการอนุมัติ (Admin Slip Alerts)
+                      </h3>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      ห้อง: <span className="text-amber-300 font-mono font-semibold">୨-💳-୧-⁺-˖-สลิปรออนุมัติ</span> (ห้องส่วนตัวเฉพาะแอดมิน — แนบภาพสลิปเต็ม & ลิงก์อนุมัติทันที)
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={testingChannel === 'slip'}
+                    onClick={() => handleTestDiscord('slip')}
+                    className="text-xs border-amber-500/40 text-amber-300 hover:bg-amber-500/10 shrink-0 cursor-pointer"
+                  >
+                    {testingChannel === 'slip' ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                    ) : (
+                      <Send className="w-3.5 h-3.5 mr-1.5" />
+                    )}
+                    <span>ทดสอบส่งสลิป</span>
+                  </Button>
+                </div>
+                <Input
+                  label="Webhook URL (สลิปรออนุมัติ)"
+                  value={discordWebhookSlip}
+                  onChange={(e) => setDiscordWebhookSlip(e.target.value)}
+                  placeholder="https://discord.com/api/webhooks/..."
+                  className="font-mono text-xs"
+                />
+              </div>
+
+              {/* 2. Credits & Order Logs */}
+              <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                      <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                        2. บันทึกประวัติเติมเงิน & การสั่งซื้อ (Credits & Order Logs)
+                      </h3>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      ห้อง: <span className="text-emerald-300 font-mono font-semibold">୨-💾-୧-⁺-˖-credits</span> (แจ้งเตือนเมื่อสลิปอนุมัติ, เติมซองอั่งเปาสำเร็จ, หรือลูกค้าสั่งซื้อสินค้า)
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={testingChannel === 'credits'}
+                    onClick={() => handleTestDiscord('credits')}
+                    className="text-xs border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10 shrink-0 cursor-pointer"
+                  >
+                    {testingChannel === 'credits' ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                    ) : (
+                      <Send className="w-3.5 h-3.5 mr-1.5" />
+                    )}
+                    <span>ทดสอบส่งห้องนี้</span>
+                  </Button>
+                </div>
+                <Input
+                  label="Webhook URL (ประวัติเติมเงิน & คำสั่งซื้อ)"
+                  value={discordWebhookCredits}
+                  onChange={(e) => setDiscordWebhookCredits(e.target.value)}
+                  placeholder="https://discord.com/api/webhooks/..."
+                  className="font-mono text-xs"
+                />
+              </div>
+
+              {/* 3. Welcome New Members */}
+              <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-sky-400" />
+                      <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                        3. ต้อนรับสมาชิกใหม่ (New Member Welcome)
+                      </h3>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      ห้อง: <span className="text-sky-300 font-mono font-semibold">►-ยินดีต้อนรับ</span> (แจ้งเตือนต้อนรับเมื่อมีผู้ใช้สมัครสมาชิกใหม่บนเว็บไซต์)
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={testingChannel === 'welcome'}
+                    onClick={() => handleTestDiscord('welcome')}
+                    className="text-xs border-sky-500/40 text-sky-300 hover:bg-sky-500/10 shrink-0 cursor-pointer"
+                  >
+                    {testingChannel === 'welcome' ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                    ) : (
+                      <Send className="w-3.5 h-3.5 mr-1.5" />
+                    )}
+                    <span>ทดสอบส่งห้องนี้</span>
+                  </Button>
+                </div>
+                <Input
+                  label="Webhook URL (ต้อนรับสมาชิกใหม่)"
+                  value={discordWebhookWelcome}
+                  onChange={(e) => setDiscordWebhookWelcome(e.target.value)}
+                  placeholder="https://discord.com/api/webhooks/..."
+                  className="font-mono text-xs"
                 />
               </div>
             </div>
