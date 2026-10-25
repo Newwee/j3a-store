@@ -117,7 +117,7 @@ async function claimKey(
       const { data: exactLicense } = await supabaseAdmin
         .from('licenses')
         .select('*')
-        .eq('product_slug', 'j3adiscordautoquest')
+        .in('product_slug', ['j3adiscordautoquest', 'j3akeydiscordquestauto', 'key-j3a-discord-quest-auto'])
         .eq('tier', tier)
         .eq('status', 'available')
         .order('created_at', { ascending: true })
@@ -131,7 +131,7 @@ async function claimKey(
         const { data: anyLicense } = await supabaseAdmin
           .from('licenses')
           .select('*')
-          .eq('product_slug', 'j3adiscordautoquest')
+          .in('product_slug', ['j3adiscordautoquest', 'j3akeydiscordquestauto', 'key-j3a-discord-quest-auto'])
           .eq('status', 'available')
           .order('created_at', { ascending: true })
           .limit(1)
