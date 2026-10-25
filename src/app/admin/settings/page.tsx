@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Settings, Save, Shield, Store, QrCode, MessageCircle, AlertCircle, CheckCircle2, Sparkles, Truck, Video, Play, ExternalLink, FileText, AlignLeft, Bell, Send, Loader2 } from 'lucide-react';
+import { Settings, Save, Shield, Store, QrCode, MessageCircle, AlertCircle, CheckCircle2, Sparkles, Truck, Video, Play, ExternalLink, FileText, AlignLeft, Bell, Send, Loader2, Share2, Globe, Palette } from 'lucide-react';
 import { AdminHeader } from '@/components/admin/AdminHeader';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -33,6 +33,10 @@ export default function AdminSettingsPage() {
   const [discordWebhookWelcome, setDiscordWebhookWelcome] = useState(DEFAULT_STORE_SETTINGS.discordWebhookWelcome || '');
   const [discordRoleOwner, setDiscordRoleOwner] = useState(DEFAULT_STORE_SETTINGS.discordRoleOwner || '1555520737975205919');
   const [discordRoleAdmin, setDiscordRoleAdmin] = useState(DEFAULT_STORE_SETTINGS.discordRoleAdmin || '1555520740558897205');
+  const [metaTitle, setMetaTitle] = useState(DEFAULT_STORE_SETTINGS.metaTitle || 'J3A STORE — ซอฟต์แวร์ Discord & บริการดิจิทัลอัตโนมัติ 24 ชม.');
+  const [metaDescription, setMetaDescription] = useState(DEFAULT_STORE_SETTINGS.metaDescription || 'ศูนย์รวมโปรแกรม Discord AutoQuest, เครื่องมือจัดการโปรไฟล์ และบอท Discord ระดับพรีเมียม ส่งมอบ License Key ทันที ปลอดภัย 100%');
+  const [metaImage, setMetaImage] = useState(DEFAULT_STORE_SETTINGS.metaImage || 'https://j3a-store.vercel.app/logo.png');
+  const [themeColor, setThemeColor] = useState(DEFAULT_STORE_SETTINGS.themeColor || '#06b6d4');
   const [testingChannel, setTestingChannel] = useState<'slip' | 'credits' | 'order' | 'welcome' | null>(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -62,6 +66,10 @@ export default function AdminSettingsPage() {
         setDiscordWebhookWelcome(data.discordWebhookWelcome || DEFAULT_STORE_SETTINGS.discordWebhookWelcome || '');
         setDiscordRoleOwner(data.discordRoleOwner || DEFAULT_STORE_SETTINGS.discordRoleOwner || '1555520737975205919');
         setDiscordRoleAdmin(data.discordRoleAdmin || DEFAULT_STORE_SETTINGS.discordRoleAdmin || '1555520740558897205');
+        setMetaTitle(data.metaTitle || DEFAULT_STORE_SETTINGS.metaTitle || 'J3A STORE — ซอฟต์แวร์ Discord & บริการดิจิทัลอัตโนมัติ 24 ชม.');
+        setMetaDescription(data.metaDescription || DEFAULT_STORE_SETTINGS.metaDescription || 'ศูนย์รวมโปรแกรม Discord AutoQuest, เครื่องมือจัดการโปรไฟล์ และบอท Discord ระดับพรีเมียม ส่งมอบ License Key ทันที ปลอดภัย 100%');
+        setMetaImage(data.metaImage || DEFAULT_STORE_SETTINGS.metaImage || 'https://j3a-store.vercel.app/logo.png');
+        setThemeColor(data.themeColor || DEFAULT_STORE_SETTINGS.themeColor || '#06b6d4');
       } catch (err: any) {
         console.error('Failed to load settings:', err);
       } finally {
@@ -99,6 +107,10 @@ export default function AdminSettingsPage() {
         discordWebhookWelcome: discordWebhookWelcome.trim(),
         discordRoleOwner: discordRoleOwner.trim(),
         discordRoleAdmin: discordRoleAdmin.trim(),
+        metaTitle: metaTitle.trim(),
+        metaDescription: metaDescription.trim(),
+        metaImage: metaImage.trim(),
+        themeColor: themeColor.trim(),
       });
       success('บันทึกการตั้งค่าร้านค้าเรียบร้อยแล้ว! ข้อมูลหน้าแรก, นโยบาย และคำอธิบายร้านค้าอัปเดตทันที');
     } catch (err: any) {
@@ -648,35 +660,183 @@ export default function AdminSettingsPage() {
                 </p>
               </div>
             </div>
+
+            {/* Social Share & Discord Link Preview Settings */}
+            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-md space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <Share2 className="w-5 h-5 text-indigo-400" />
+                  <span>การแสดงผลเมื่อแชร์ลิงก์ใน Discord & โซเชียล (Social Share / Embed)</span>
+                </h2>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-300">
+                  Discord Link Preview
+                </span>
+              </div>
+
+              <p className="text-xs text-slate-400 leading-relaxed">
+                กำหนดข้อความ หัวข้อ และรูปภาพที่จะแสดงในกล่องพรีวิวเมื่อนำลิงก์ร้านค้า (<span className="text-cyan-400 font-mono">https://j3a-store.vercel.app</span>) ไปแปะใน Discord หรือโซเชียลมีเดียต่างๆ
+              </p>
+
+              <div className="space-y-4 pt-2">
+                <Input
+                  label="หัวข้อแสดงตอนแชร์ลิงก์ (Meta Title / Embed Title)"
+                  value={metaTitle}
+                  onChange={(e) => setMetaTitle(e.target.value)}
+                  placeholder="J3A STORE — ซอฟต์แวร์ Discord & บริการดิจิทัลอัตโนมัติ 24 ชม."
+                />
+
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-slate-300">
+                    คำอธิบายร้านค้าในกรอบแชร์ลิงก์ (Meta Description / Embed Description)
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={metaDescription}
+                    onChange={(e) => setMetaDescription(e.target.value)}
+                    placeholder="ศูนย์รวมโปรแกรม Discord AutoQuest, เครื่องมือจัดการโปรไฟล์ และบอท Discord ระดับพรีเมียม ส่งมอบ License Key ทันที ปลอดภัย 100%"
+                    className="w-full bg-slate-950/70 text-sm text-slate-100 placeholder:text-slate-600 rounded-xl px-4 py-3 border border-slate-700/80 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 outline-none transition-all"
+                  />
+                  <p className="text-[11px] text-slate-400">
+                    * ข้อความที่จะแสดงใต้ชื่อเรื่องในกล่อง Discord Embed
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input
+                    label="ลิงก์รูปภาพในกล่องแชร์ (Meta Image URL)"
+                    value={metaImage}
+                    onChange={(e) => setMetaImage(e.target.value)}
+                    placeholder="https://j3a-store.vercel.app/logo.png"
+                  />
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                      สีแถบข้าง Discord Embed (Theme Color Hex)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={themeColor.startsWith('#') && themeColor.length === 7 ? themeColor : '#06b6d4'}
+                        onChange={(e) => setThemeColor(e.target.value)}
+                        className="w-10 h-10 rounded-lg cursor-pointer bg-transparent border border-slate-700 p-0.5"
+                      />
+                      <input
+                        type="text"
+                        value={themeColor}
+                        onChange={(e) => setThemeColor(e.target.value)}
+                        placeholder="#06b6d4"
+                        className="flex-1 bg-slate-950/70 text-sm text-slate-100 font-mono rounded-xl px-3 py-2 border border-slate-700/80 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-indigo-950/30 border border-indigo-500/20 rounded-xl p-3 text-xs text-indigo-300 space-y-1">
+                  <p className="font-semibold flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                    วิธีทดสอบใน Discord หลังกดบันทึก:
+                  </p>
+                  <p className="text-slate-300">
+                    เนื่องจาก Discord ทำการจำแคช (Cache) ลิงก์ที่เคยส่งไปแล้ว หากกดบันทึกแล้วลองส่งลิงก์เดิมในห้องแชทแล้วไม่เปลี่ยน ให้ลองส่งโดยเติมพารามิเตอร์ต่อท้าย เช่น <code className="bg-black/50 px-1.5 py-0.5 rounded text-cyan-300 font-mono">https://j3a-store.vercel.app/?v=2</code> เพื่อบังคับให้ Discord ดึงข้อมูลพรีวิวชุดใหม่ทันที!
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Right: Live PromptPay QR Preview */}
-          <div className="lg:col-span-4 bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-md space-y-4 text-center">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-cyan-400">
-              ตัวอย่าง QR Code ที่ลูกค้าจะเห็น
-            </h3>
+          {/* Right Column: Previews */}
+          <div className="lg:col-span-4 space-y-6">
+            {/* Live PromptPay QR Preview */}
+            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-md space-y-4 text-center">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-cyan-400">
+                ตัวอย่าง QR Code ที่ลูกค้าจะเห็น
+              </h3>
 
-            <div className="bg-white p-3 rounded-2xl inline-block shadow-xl mx-auto border-2 border-slate-700">
-              <div className="relative w-44 h-44 mx-auto">
-                <Image
-                  src={previewQrUrl}
-                  alt="PromptPay QR Preview"
-                  fill
-                  className="object-contain"
-                  unoptimized
-                />
+              <div className="bg-white p-3 rounded-2xl inline-block shadow-xl mx-auto border-2 border-slate-700">
+                <div className="relative w-44 h-44 mx-auto">
+                  <Image
+                    src={previewQrUrl}
+                    alt="PromptPay QR Preview"
+                    fill
+                    className="object-contain"
+                    unoptimized
+                  />
+                </div>
+              </div>
+
+              <div className="bg-slate-950/80 rounded-xl p-3 border border-slate-800 text-left text-xs space-y-1.5">
+                <p className="text-slate-400">
+                  ชื่อบัญชี: <strong className="text-white">{storeName || 'J3A STORE'}</strong>
+                </p>
+                <p className="text-slate-400">
+                  เลขพร้อมเพย์: <strong className="text-cyan-300 font-mono">{cleanNumber || '0812345678'}</strong>
+                </p>
+                <p className="text-[10px] text-slate-500">
+                  (ตัวอย่างจำลองยอด 100 บาท)
+                </p>
               </div>
             </div>
 
-            <div className="bg-slate-950/80 rounded-xl p-3 border border-slate-800 text-left text-xs space-y-1.5">
-              <p className="text-slate-400">
-                ชื่อบัญชี: <strong className="text-white">{storeName || 'J3A STORE'}</strong>
-              </p>
-              <p className="text-slate-400">
-                เลขพร้อมเพย์: <strong className="text-cyan-300 font-mono">{cleanNumber || '0812345678'}</strong>
-              </p>
-              <p className="text-[10px] text-slate-500">
-                (ตัวอย่างจำลองยอด 100 บาท)
+            {/* Live Discord Link Preview */}
+            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 backdrop-blur-md space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
+                  <Share2 className="w-3.5 h-3.5" />
+                  ตัวอย่างการแสดงผลใน Discord
+                </h3>
+                <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full border border-indigo-500/30">
+                  Live Preview
+                </span>
+              </div>
+
+              <div className="bg-[#1e1f22] p-3.5 rounded-xl border border-slate-800/80 text-left space-y-2.5 font-sans">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-full bg-cyan-600 flex items-center justify-center text-white text-xs font-bold shrink-0 shadow">
+                    JA
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-white text-xs font-semibold">J3A Admin</span>
+                      <span className="text-[10px] text-slate-400">วันนี้ เวลา 12:00</span>
+                    </div>
+                    <p className="text-xs text-[#00a8fc] hover:underline break-all">
+                      https://j3a-store.vercel.app
+                    </p>
+                  </div>
+                </div>
+
+                {/* Discord Embed Box */}
+                <div
+                  className="rounded-lg p-3 bg-[#2b2d31] border-l-4 space-y-1.5 transition-all"
+                  style={{ borderLeftColor: themeColor || '#06b6d4' }}
+                >
+                  <div className="text-[10px] text-[#b5bac1] font-medium uppercase tracking-wider">
+                    {storeName || 'J3A STORE'}
+                  </div>
+                  <div className="text-xs font-bold text-[#00a8fc] leading-snug line-clamp-2">
+                    {metaTitle || 'J3A STORE — ซอฟต์แวร์ Discord & บริการดิจิทัลอัตโนมัติ 24 ชม.'}
+                  </div>
+                  <p className="text-[11px] text-[#dbdee1] leading-relaxed line-clamp-3">
+                    {metaDescription || 'ศูนย์รวมโปรแกรม Discord AutoQuest, เครื่องมือจัดการโปรไฟล์ และบอท Discord ระดับพรีเมียม ส่งมอบ License Key ทันที ปลอดภัย 100%'}
+                  </p>
+
+                  {metaImage && (
+                    <div className="pt-2">
+                      <div className="relative w-full h-28 rounded-md overflow-hidden bg-black/40 border border-slate-700/60 flex items-center justify-center">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={metaImage}
+                          alt="Discord Embed Preview"
+                          className="w-full h-full object-contain p-1"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <p className="text-[10px] text-slate-400 text-center leading-normal">
+                จำลองกล่องข้อความเมื่อมีคนแชร์ลิงก์ร้านค้าในเซิร์ฟเวอร์ Discord
               </p>
             </div>
           </div>

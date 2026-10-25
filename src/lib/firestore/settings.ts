@@ -15,16 +15,20 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   showcaseYoutubeUrl: '',
   showcaseTitle: 'วิธีใช้งานร้านค้า J3A STORE',
   showcaseSubtitle: 'ชมวิดีโอแนะนำขั้นตอนการสั่งซื้อ เติมเงิน และรับสินค้าแบบอัตโนมัติ 24 ชม.',
-  heroTagline: 'Next-Gen E-Commerce & Digital Store',
-  heroDescription: 'สัมผัสประสบการณ์ช้อปปิ้งยุคใหม่ที่ J3A STORE ศูนย์รวมไอเทมเกม บัตรเติมเงิน และบริการดิจิทัลระดับพรีเมียม ทำรายการรวดเร็ว ปลอดภัย ด้วยระบบตรวจสอบอัตโนมัติ',
+  heroTagline: 'ซอฟต์แวร์ Discord & บอทอัตโนมัติ ระดับพรีเมียม',
+  heroDescription: 'ศูนย์รวมโปรแกรมและเครื่องมือ Discord อัจฉริยะ AutoQuest, จัดการโปรไฟล์, บอทคุมเซิร์ฟเวอร์ พร้อมระบบส่งมอบ License Key อัตโนมัติ 24 ชม.',
   privacyPolicy: '1. ข้อมูลที่เราเก็บรวบรวม\nJ3A STORE เก็บรวบรวมข้อมูลที่จำเป็นต่อการให้บริการ เช่น ชื่อ-นามสกุล, ที่อยู่อีเมล, เบอร์โทรศัพท์, และประวัติการทำรายการ เพื่อใช้ในการจัดส่งสินค้าดิจิทัลและยืนยันสถานะการชำระเงิน\n\n2. การรักษาความปลอดภัยของข้อมูล\nข้อมูลรหัสผ่านทั้งหมดได้รับการจัดการและเข้ารหัสผ่าน Supabase Authentication ซึ่งเป็นไปตามมาตรฐานความปลอดภัยชั้นนำระดับโลก เราไม่มีนโยบายจำหน่ายหรือเปิดเผยข้อมูลส่วนบุคคลของคุณแก่บุคคลภายนอก',
-  footerDescription: 'แพลตฟอร์มศูนย์รวมสินค้าและบริการดิจิทัลชั้นนำ เติมเกม ไอดีเกม บัตรเติมเงิน และอุปกรณ์ระดับพรีเมียม ระบบอัตโนมัติ รวดเร็ว ปลอดภัย 100% พร้อมบริการตลอด 24 ชั่วโมง',
+  footerDescription: 'แพลตฟอร์มจำหน่ายซอฟต์แวร์ Discord เครื่องมือและบอทอัตโนมัติระดับพรีเมียม ส่งมอบ License Key ทันที ปลอดภัย 100% พร้อมบริการและดูแลตลอด 24 ชั่วโมง',
   discordWebhookSlip: 'https://discord.com/api/webhooks/1563838807369977917/zubkvc8V0t7i_-CLIbwMhN9yXsx65-yDw_tslKgiM0l9nHbD9xS_Ki4IFAzt1uOB-2Jp',
   discordWebhookCredits: 'https://discord.com/api/webhooks/1563850107282128906/G7dp9H3KxujiMJWkl013sFiQs7gvZhrzGqvFWWGEtorrYEpecq9bi-MFZz8sctZycrRK',
   discordWebhookOrder: 'https://discord.com/api/webhooks/1563850109241008239/PBBRf4WQju8hFSEB32X9VIDQAUb7hRpIwCWAWjg3VL_6DJcCQKX7P-gfiBlHW3j1x00A',
   discordWebhookWelcome: 'https://discord.com/api/webhooks/1563850111170256917/wrWXMv3d0p4ajxvNPrfN4M-sZx_DuvbqgBpSm8euHWbfojuEHskzwGS_S3-z4rC4nyYO',
   discordRoleOwner: '1555520737975205919',
   discordRoleAdmin: '1555520740558897205',
+  metaTitle: 'J3A STORE — ซอฟต์แวร์ Discord & บริการดิจิทัลอัตโนมัติ 24 ชม.',
+  metaDescription: 'ศูนย์รวมโปรแกรม Discord AutoQuest, เครื่องมือจัดการโปรไฟล์ และบอท Discord ระดับพรีเมียม ส่งมอบ License Key ทันที ปลอดภัย 100%',
+  metaImage: 'https://j3a-store.vercel.app/logo.png',
+  themeColor: '#06b6d4',
 };
 
 /**
@@ -65,6 +69,10 @@ export async function getStoreSettings(): Promise<StoreSettings> {
       discordWebhookWelcome: data.discord_webhook_welcome ?? DEFAULT_STORE_SETTINGS.discordWebhookWelcome,
       discordRoleOwner: data.discord_role_owner ?? DEFAULT_STORE_SETTINGS.discordRoleOwner,
       discordRoleAdmin: data.discord_role_admin ?? DEFAULT_STORE_SETTINGS.discordRoleAdmin,
+      metaTitle: data.meta_title ?? DEFAULT_STORE_SETTINGS.metaTitle,
+      metaDescription: data.meta_description ?? DEFAULT_STORE_SETTINGS.metaDescription,
+      metaImage: data.meta_image ?? DEFAULT_STORE_SETTINGS.metaImage,
+      themeColor: data.theme_color ?? DEFAULT_STORE_SETTINGS.themeColor,
       updatedAt: data.updated_at || undefined,
     };
   } catch (error) {
@@ -129,6 +137,10 @@ export async function updateStoreSettings(settings: Partial<StoreSettings>): Pro
   if (settings.discordWebhookWelcome !== undefined) updates.discord_webhook_welcome = settings.discordWebhookWelcome;
   if (settings.discordRoleOwner !== undefined) updates.discord_role_owner = settings.discordRoleOwner;
   if (settings.discordRoleAdmin !== undefined) updates.discord_role_admin = settings.discordRoleAdmin;
+  if (settings.metaTitle !== undefined) updates.meta_title = settings.metaTitle;
+  if (settings.metaDescription !== undefined) updates.meta_description = settings.metaDescription;
+  if (settings.metaImage !== undefined) updates.meta_image = settings.metaImage;
+  if (settings.themeColor !== undefined) updates.theme_color = settings.themeColor;
 
   const { error } = await supabase
     .from('settings')

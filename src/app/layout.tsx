@@ -8,6 +8,7 @@ import { CartProvider } from '@/context/CartContext';
 import { ToastProvider } from '@/context/ToastContext';
 import { LoadingProvider } from '@/context/LoadingContext';
 import TargetCursor from '@/components/ui/TargetCursor';
+import { getStoreSettings, DEFAULT_STORE_SETTINGS } from '@/lib/firestore/settings';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -22,59 +23,96 @@ const prompt = Prompt({
   display: 'swap',
 });
 
-export const metadata: Metadata = {
-  title: 'J3A STORE — Next-Gen Digital Commerce & Gaming Store',
-  description:
-    'J3A STORE ศูนย์รวมไอเทมเกม บัตรเติมเงิน และบริการดิจิทัลระดับพรีเมียม จัดส่งอัตโนมัติ รวดเร็ว ปลอดภัย 100%',
-  keywords: [
-    'J3A STORE',
-    'เติมเกม',
-    'บัตรเติมเงิน',
-    'Digital Store',
-    'Steam Wallet',
-    'Valorant Points',
-    'Game Cards',
-    'E-Commerce',
-  ],
-  authors: [{ name: 'J3A STORE Team' }],
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_STORE_URL || 'https://j3a-store.vercel.app'
-  ),
-  openGraph: {
-    title: 'J3A STORE — Next-Gen Digital Commerce',
-    description:
-      'ศูนย์รวมไอเทมเกมและบริการดิจิทัลระดับพรีเมียม ระบบอัตโนมัติ 24 ชม.',
-    url: 'https://j3a-store.vercel.app',
-    siteName: 'J3A STORE',
-    images: [
-      {
-        url: '/logo.png',
-        width: 1200,
-        height: 630,
-        alt: 'J3A STORE Logo',
-      },
-    ],
-    locale: 'th_TH',
-    type: 'website',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'J3A STORE — Modern Online Store',
-    description: 'ศูนย์รวมสินค้าและบริการดิจิทัลระดับพรีเมียม 24 ชม.',
-    images: ['/logo.png'],
-  },
-  icons: {
-    icon: '/logo.png',
-    shortcut: '/logo.png',
-    apple: '/logo.png',
-  },
-};
+export const revalidate = 60; // ตรวจสอบและอัปเดต Metadata อัตโนมัติทุก 60 วินาที
 
-export const viewport: Viewport = {
-  width: 'device-width',
-  initialScale: 1,
-  maximumScale: 5,
-  themeColor: '#080c14',
+export async function generateMetadata(): Promise<Metadata> {
+  let settings = DEFAULT_STORE_SETTINGS;
+  try {
+    settings = await getStoreSettings();
+  } catch (e) {
+    console.error('Failed to load settings in generateMetadata:', e);
+  }
+
+  const title = settings.metaTitle || 'J3A STORE — ซอฟต์แวร์ Discord & บริการดิจิทัลอัตโนมัติ 24 ชม.';
+  const description =
+    settings.metaDescription ||
+    'ศูนย์รวมโปรแกรม Discord AutoQuest, เครื่องมือจัดการโปรไฟล์ และบอท Discord ระดับพรีเมียม ส่งมอบ License Key ทันที ปลอดภัย 100%';
+  const rawImage = settings.metaImage || '/logo.png';
+  const siteUrl = process.env.NEXT_PUBLIC_STORE_URL || 'https://j3a-store.vercel.app';
+  const fullImageUrl = rawImage.startsWith('http')
+    ? rawImage
+    : `${siteUrl}${rawImage.startsWith('/') ? '' : '/'}${rawImage}`;
+  const themeColor = settings.themeColor || '#06b6d4';
+
+  return {
+    title: {
+      default: title,
+      template: `%s | ${settings.storeName || 'J3A STORE'}`,
+    },
+    description,
+    keywords: [
+      'J3A STORE',
+      'Discord Software',
+      'Discord AutoQuest',
+      'Discord Bot',
+      'Discord Profile Manager',
+      'ซอฟต์แวร์ Discord',
+      'บอท Discord',
+      'License Key',
+      'Digital Store',
+    ],
+    authors: [{ name: `${settings.storeName || 'J3A STORE'} Team` }],
+    metadataBase: new URL(siteUrl),
+    openGraph: {
+      title,
+      description,
+      url: siteUrl,
+      siteName: settings.storeName || 'J3A STORE',
+      images: [
+        {
+          url: fullImageUrl,
+          width: 1200,
+          height: 630,
+          alt: `${settings.storeName || 'J3A STORE'} Logo`,
+        },
+      ],
+      locale: 'th_TH',
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: [fullImageUrl],
+    },
+    icons: {
+      icon: '/logo.png',
+      shortcut: '/logo.png',
+      apple: '/logo.png',
+    },
+    other: {
+      'theme-color': themeColor,
+    },
+  };
+}
+
+export async function generateViewport(): Promise<Viewport> {
+  let themeColor = '#06b6d4';
+  try {
+    const settings = await getStoreSettings();
+    if (settings.themeColor) {
+      themeColor = settings.themeColor;
+    }
+  } catch (e) {
+    // fallback
+  }
+
+  return {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 5,
+    themeColor,
+  };
 };
 
 export default function RootLayout({

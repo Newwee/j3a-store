@@ -36,5 +36,13 @@ export interface StoreSettings {
   discordRoleOwner?: string;
   /** Discord Role ID สำหรับแท็ก Admin ในการแจ้งเตือนสลิป */
   discordRoleAdmin?: string;
+  /** หัวข้อแสดงตอนแชร์ลิงก์ (Open Graph / Meta Title) */
+  metaTitle?: string;
+  /** คำอธิบายแสดงตอนแชร์ลิงก์ (Open Graph / Meta Description) */
+  metaDescription?: string;
+  /** รูปภาพแสดงตอนแชร์ลิงก์ (Open Graph / Meta Image URL) */
+  metaImage?: string;
+  /** สีธีมแถบ Embed ใน Discord (Theme Color Hex) */
+  themeColor?: string;
   updatedAt?: string;
 }

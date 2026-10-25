@@ -38,6 +38,10 @@ export async function POST(req: Request) {
     if (body.discordWebhookWelcome !== undefined) updates.discord_webhook_welcome = body.discordWebhookWelcome;
     if (body.discordRoleOwner !== undefined) updates.discord_role_owner = body.discordRoleOwner;
     if (body.discordRoleAdmin !== undefined) updates.discord_role_admin = body.discordRoleAdmin;
+    if (body.metaTitle !== undefined) updates.meta_title = body.metaTitle;
+    if (body.metaDescription !== undefined) updates.meta_description = body.metaDescription;
+    if (body.metaImage !== undefined) updates.meta_image = body.metaImage;
+    if (body.themeColor !== undefined) updates.theme_color = body.themeColor;
 
     const { data, error } = await supabaseAdmin
       .from('settings')
