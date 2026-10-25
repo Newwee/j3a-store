@@ -22,7 +22,7 @@ import {
   Plus,
   Image as ImageIcon,
 } from 'lucide-react';
-import { Product, ProductFormData, ProductStatus } from '@/types/product';
+import { Product, ProductFormData, ProductStatus, PricingType, ProductVariant } from '@/types/product';
 import { uploadProductImage, deleteProductImage } from '@/lib/storage/upload';
 import { createProduct, updateProduct } from '@/lib/firestore/products';
 import { slugify } from '@/lib/utils/formatters';
@@ -88,6 +88,56 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
   const [comparePrice, setComparePrice] = useState<number | string>(
     initialData?.comparePrice ?? ''
   );
+  const [pricingType, setPricingType] = useState<PricingType>(
+    initialData?.pricingType || (initialData?.variants && initialData.variants.length > 0 ? 'multi' : 'single')
+  );
+  const [variants, setVariants] = useState<ProductVariant[]>(() => {
+    if (initialData?.variants && initialData.variants.length > 0) {
+      return initialData.variants;
+    }
+    return [
+      {
+        id: 'var_1w',
+        name: '1 สัปดาห์ (1 Week)',
+        price: 150,
+        comparePrice: 200,
+        stock: 10,
+        tier: '1w',
+        durationDays: 7,
+        badge: 'ยอดนิยม',
+      },
+      {
+        id: 'var_4w',
+        name: '4 สัปดาห์ (4 Weeks)',
+        price: 500,
+        comparePrice: 650,
+        stock: 10,
+        tier: '4w',
+        durationDays: 28,
+        badge: 'สุดคุ้ม',
+      },
+      {
+        id: 'var_6m',
+        name: '6 เดือน (6 Months)',
+        price: 2000,
+        comparePrice: 2500,
+        stock: 10,
+        tier: '6m',
+        durationDays: 180,
+        badge: 'คุ้มค่าที่สุด',
+      },
+      {
+        id: 'var_3d',
+        name: 'ทดลองใช้งาน 3 วัน (3 Days Trial)',
+        price: 0,
+        comparePrice: 50,
+        stock: 99,
+        tier: '3d',
+        durationDays: 3,
+        badge: 'ทดลองฟรี',
+      },
+    ];
+  });
   const [category, setCategory] = useState(initialData?.category || 'ซอฟต์แวร์ Discord');
   const [stock, setStock] = useState<number | string>(initialData?.stock ?? 10);
   const [status, setStatus] = useState<ProductStatus>(initialData?.status || 'active');
@@ -199,13 +249,107 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
     toast('ตั้งเป็นรูปภาพหลักเรียบร้อยแล้ว', 'info');
   };
 
+  // Variant Handlers
+  const handleAddVariant = () => {
+    const newId = `var_${Date.now()}`;
+    setVariants((prev) => [
+      ...prev,
+      {
+        id: newId,
+        name: `ตัวเลือกที่ ${prev.length + 1}`,
+        price: 100,
+        comparePrice: undefined,
+        stock: 10,
+        tier: '1w',
+        durationDays: 7,
+        badge: '',
+      },
+    ]);
+  };
+
+  const handleRemoveVariant = (index: number) => {
+    if (variants.length <= 1) {
+      toast('ต้องมีตัวเลือกอย่างน้อย 1 รายการ', 'info');
+      return;
+    }
+    setVariants((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUpdateVariant = (index: number, field: keyof ProductVariant, value: any) => {
+    setVariants((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  };
+
+  const handleApplyAutoQuestPreset = () => {
+    setPricingType('multi');
+    setVariants([
+      {
+        id: 'var_3d',
+        name: 'ทดลองใช้งาน 3 วัน (3 Days Trial)',
+        price: 0,
+        comparePrice: 50,
+        stock: 99,
+        tier: '3d',
+        durationDays: 3,
+        badge: 'ทดลองฟรี',
+      },
+      {
+        id: 'var_1w',
+        name: '1 สัปดาห์ (1 Week)',
+        price: 150,
+        comparePrice: 200,
+        stock: 10,
+        tier: '1w',
+        durationDays: 7,
+        badge: 'ยอดนิยม',
+      },
+      {
+        id: 'var_4w',
+        name: '4 สัปดาห์ (4 Weeks)',
+        price: 500,
+        comparePrice: 650,
+        stock: 10,
+        tier: '4w',
+        durationDays: 28,
+        badge: 'สุดคุ้ม',
+      },
+      {
+        id: 'var_6m',
+        name: '6 เดือน (6 Months)',
+        price: 2000,
+        comparePrice: 2500,
+        stock: 10,
+        tier: '6m',
+        durationDays: 180,
+        badge: 'คุ้มค่าที่สุด',
+      },
+    ]);
+    toast('ใส่เทมเพลตราคา AutoQuest (3 วัน / 1 สัปดาห์ 150฿ / 4 สัปดาห์ 500฿ / 6 เดือน 2000฿) สำเร็จ', 'success');
+  };
+
   // Validation
   const validate = () => {
     const errs: Record<string, string> = {};
     if (!name.trim()) errs.name = 'กรุณาระบุชื่อสินค้า';
     if (!slug.trim()) errs.slug = 'กรุณาระบุ Slug URL';
-    if (price === '' || Number(price) < 0) errs.price = 'กรุณาระบุราคาที่ถูกต้อง';
-    if (stock === '' || Number(stock) < 0) errs.stock = 'กรุณาระบุจำนวนสินค้าในคลัง';
+
+    if (pricingType === 'single') {
+      if (price === '' || Number(price) < 0) errs.price = 'กรุณาระบุราคาที่ถูกต้อง';
+      if (stock === '' || Number(stock) < 0) errs.stock = 'กรุณาระบุจำนวนสินค้าในคลัง';
+    } else {
+      if (!variants || variants.length === 0) {
+        errs.variants = 'กรุณาเพิ่มตัวเลือกราคาอย่างน้อย 1 รายการ';
+      } else {
+        const hasInvalidVariant = variants.some((v) => !v.name.trim() || Number(v.price) < 0);
+        if (hasInvalidVariant) {
+          errs.variants = 'กรุณากรอกชื่อตัวเลือกและราคาให้ถูกต้องทุกรายการ';
+        }
+      }
+    }
+
     setValidationErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -285,7 +429,20 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
         .map((t) => t.trim())
         .filter(Boolean);
 
-      const numStock = Number(stock);
+      let finalPrice = Number(price);
+      let finalComparePrice = comparePrice !== '' && !isNaN(Number(comparePrice)) ? Number(comparePrice) : undefined;
+      let finalStock = Number(stock);
+
+      if (pricingType === 'multi' && variants.length > 0) {
+        finalPrice = Math.min(...variants.map((v) => Number(v.price) || 0));
+        const matched = variants.find((v) => (Number(v.price) || 0) === finalPrice);
+        if (matched?.comparePrice) {
+          finalComparePrice = Number(matched.comparePrice);
+        }
+        finalStock = variants.reduce((sum, v) => sum + (Number(v.stock) || 0), 0);
+      }
+
+      const numStock = finalStock;
       let finalStatus = status;
       if (numStock > 0 && status === 'out_of_stock') {
         finalStatus = 'active';
@@ -297,8 +454,10 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
         name: name.trim(),
         slug: slug.trim(),
         description: description.trim(),
-        price: Number(price),
-        ...(comparePrice !== '' && !isNaN(Number(comparePrice)) ? { comparePrice: Number(comparePrice) } : {}),
+        price: finalPrice,
+        ...(finalComparePrice !== undefined ? { comparePrice: finalComparePrice } : {}),
+        pricingType,
+        variants: pricingType === 'multi' ? variants : [],
         category,
         stock: numStock,
         status: finalStatus,
@@ -429,64 +588,267 @@ export function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
             </div>
           </div>
 
-          {/* Pricing & Stock Card */}
-          <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-md space-y-4">
-            <h3 className="text-base font-bold text-white mb-2">
-              ราคาและสต็อก (Pricing & Inventory)
-            </h3>
+          {/* Pricing & Stock Card with Single vs Multi Option selector */}
+          <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-md space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-cyan-400" />
+                  <span>ราคาและสต็อก (Pricing & Inventory)</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  เลือกรูปแบบการตั้งราคา: ราคาเดียว (Single) หรือหลายราคา/แพ็กเกจ (Multi)
+                </p>
+              </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {/* Regular Price */}
-              <Input
-                label="ราคาขายจริง (THB) *"
-                type="number"
-                min="0"
-                step="any"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                placeholder="990"
-                error={validationErrors.price}
-                required
-              />
-
-              {/* Compare Price */}
-              <Input
-                label="ราคาเปรียบเทียบ (ขีดฆ่า)"
-                type="number"
-                min="0"
-                step="any"
-                value={comparePrice}
-                onChange={(e) => setComparePrice(e.target.value)}
-                placeholder="1,200"
-                helperText="จะแสดงเป็นราคาเดิมที่ลดราคา"
-              />
-
-              {/* Stock */}
-              <Input
-                label="จำนวนสินค้าในสต็อก *"
-                type="number"
-                min="0"
-                value={stock}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setStock(val);
-                  const num = Number(val);
-                  if (num > 0 && status === 'out_of_stock') {
-                    setStatus('active');
-                  } else if (num === 0 && status === 'active') {
-                    setStatus('out_of_stock');
-                  }
-                }}
-                placeholder="100"
-                error={validationErrors.stock}
-                helperText={
-                  Number(stock) > 0
-                    ? '🟢 มีสินค้าพร้อมขาย (ระบบจะเปิดสถานะพร้อมขายให้อัตโนมัติ)'
-                    : '🔴 สินค้าหมด (ระบบจะปรับสถานะเป็นสินค้าหมดให้อัตโนมัติ)'
-                }
-                required
-              />
+              {/* 2 Option Selector: 1 Single, 2 Multi */}
+              <div className="inline-flex p-1 rounded-xl bg-slate-950 border border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setPricingType('single')}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    pricingType === 'single'
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-[0_0_15px_rgba(6,182,212,0.25)]'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  1. ราคาเดียว (Single)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPricingType('multi')}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    pricingType === 'multi'
+                      ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-[0_0_15px_rgba(168,85,247,0.25)]'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  2. หลายราคา (Multi)
+                </button>
+              </div>
             </div>
+
+            {pricingType === 'single' ? (
+              /* Option 1: Single Price Form */
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+                {/* Regular Price */}
+                <Input
+                  label="ราคาขายจริง (THB) *"
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  placeholder="990"
+                  error={validationErrors.price}
+                  required
+                />
+
+                {/* Compare Price */}
+                <Input
+                  label="ราคาเปรียบเทียบ (ขีดฆ่า)"
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={comparePrice}
+                  onChange={(e) => setComparePrice(e.target.value)}
+                  placeholder="1,200"
+                  helperText="จะแสดงเป็นราคาเดิมที่ลดราคา"
+                />
+
+                {/* Stock */}
+                <Input
+                  label="จำนวนสินค้าในสต็อก *"
+                  type="number"
+                  min="0"
+                  value={stock}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setStock(val);
+                    const num = Number(val);
+                    if (num > 0 && status === 'out_of_stock') {
+                      setStatus('active');
+                    } else if (num === 0 && status === 'active') {
+                      setStatus('out_of_stock');
+                    }
+                  }}
+                  placeholder="100"
+                  error={validationErrors.stock}
+                  helperText={
+                    Number(stock) > 0
+                      ? '🟢 มีสินค้าพร้อมขาย (ระบบจะเปิดสถานะพร้อมขายให้อัตโนมัติ)'
+                      : '🔴 สินค้าหมด (ระบบจะปรับสถานะเป็นสินค้าหมดให้อัตโนมัติ)'
+                  }
+                  required
+                />
+              </div>
+            ) : (
+              /* Option 2: Multi Price & Variants Form */
+              <div className="space-y-4 pt-1">
+                <div className="flex flex-wrap items-center justify-between gap-2 bg-purple-500/10 border border-purple-500/20 rounded-xl p-3">
+                  <div className="text-xs text-purple-200">
+                    💡 <strong>โหมดหลายราคา (Multi-Tier Options):</strong> ให้ลูกค้าเลือกแพ็กเกจ (เช่น 1 สัปดาห์ 150฿, 4 สัปดาห์ 500฿, 6 เดือน 2000฿, ทดลอง 3 วัน)
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleApplyAutoQuestPreset}
+                      className="px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-600/30 hover:bg-purple-600/50 text-purple-300 border border-purple-500/40 transition-colors cursor-pointer"
+                    >
+                      ⚡ โหลดเทมเพลต AutoQuest
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAddVariant}
+                      className="px-3 py-1 rounded-lg text-xs font-bold bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 transition-colors flex items-center gap-1 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> เพิ่มตัวเลือก
+                    </button>
+                  </div>
+                </div>
+
+                {validationErrors.variants && (
+                  <p className="text-xs text-rose-400 font-bold">{validationErrors.variants}</p>
+                )}
+
+                {/* Variant Cards List */}
+                <div className="space-y-3">
+                  {variants.map((v, idx) => (
+                    <div
+                      key={v.id || idx}
+                      className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-purple-500/30 transition-all space-y-3"
+                    >
+                      <div className="flex items-center justify-between gap-2 border-b border-slate-800/60 pb-2">
+                        <span className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
+                          <span className="w-5 h-5 rounded-full bg-purple-500/20 flex items-center justify-center text-[10px]">
+                            {idx + 1}
+                          </span>
+                          <span>ตัวเลือกที่ {idx + 1}: {v.name || 'ยังไม่ระบุชื่อ'}</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveVariant(idx)}
+                          className="text-slate-500 hover:text-rose-400 p-1 rounded-lg transition-colors cursor-pointer"
+                          title="ลบตัวเลือกนี้"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                        <div className="lg:col-span-2">
+                          <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                            ชื่อตัวเลือก / แพ็กเกจ *
+                          </label>
+                          <input
+                            type="text"
+                            value={v.name}
+                            onChange={(e) => handleUpdateVariant(idx, 'name', e.target.value)}
+                            placeholder="เช่น 1 สัปดาห์ (1 Week)"
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-400"
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                            ราคาขายจริง (THB) *
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="any"
+                            value={v.price}
+                            onChange={(e) => handleUpdateVariant(idx, 'price', Number(e.target.value))}
+                            placeholder="150"
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-400 font-bold"
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                            ราคาขีดฆ่า (THB)
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="any"
+                            value={v.comparePrice ?? ''}
+                            onChange={(e) => handleUpdateVariant(idx, 'comparePrice', e.target.value === '' ? undefined : Number(e.target.value))}
+                            placeholder="200"
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-300 placeholder-slate-500 focus:outline-none focus:border-purple-400"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                            สต็อก *
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={v.stock}
+                            onChange={(e) => handleUpdateVariant(idx, 'stock', Number(e.target.value))}
+                            placeholder="10"
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-400"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                            Tier สิทธิ์สำหรับ License (ถ้ามี)
+                          </label>
+                          <select
+                            value={v.tier || 'general'}
+                            onChange={(e) => {
+                              const t = e.target.value;
+                              handleUpdateVariant(idx, 'tier', t);
+                              if (t === '3d') handleUpdateVariant(idx, 'durationDays', 3);
+                              if (t === '1w') handleUpdateVariant(idx, 'durationDays', 7);
+                              if (t === '4w') handleUpdateVariant(idx, 'durationDays', 28);
+                              if (t === '6m') handleUpdateVariant(idx, 'durationDays', 180);
+                            }}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-400"
+                          >
+                            <option value="general">ทั่วไป (ไม่ระบุ Tier)</option>
+                            <option value="3d">ทดลองใช้ 3 วัน (3 Days Trial - กันใช้ซ้ำ HWID)</option>
+                            <option value="1w">1 สัปดาห์ (1 Week / 7 วัน)</option>
+                            <option value="4w">4 สัปดาห์ (4 Weeks / 28 วัน)</option>
+                            <option value="6m">6 เดือน (6 Months / 180 วัน)</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                            ป้ายกำกับพิเศษ (Badge)
+                          </label>
+                          <input
+                            type="text"
+                            value={v.badge || ''}
+                            onChange={(e) => handleUpdateVariant(idx, 'badge', e.target.value)}
+                            placeholder="เช่น แนะนำ, ยอดนิยม, สุดคุ้ม, ทดลองฟรี"
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-400"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center justify-between text-xs text-slate-400">
+                  <span>
+                    ราคาเริ่มต้นที่จะแสดงในร้าน: <strong className="text-cyan-400">฿{variants.length > 0 ? Math.min(...variants.map(v => Number(v.price) || 0)) : 0}</strong>
+                  </span>
+                  <span>
+                    สต็อกรวมทั้งหมด: <strong className="text-emerald-400">{variants.reduce((sum, v) => sum + (Number(v.stock) || 0), 0)} ชิ้น</strong>
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Showcase Video / Demo Link */}

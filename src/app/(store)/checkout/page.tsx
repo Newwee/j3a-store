@@ -398,8 +398,8 @@ export default function CheckoutPage() {
             )
             .map((it) => ({
               productId: it.product.id,
-              name: it.product.name,
-              slug: it.product.slug,
+              name: it.selectedVariant ? `${it.product.name} - ${it.selectedVariant.name}` : it.product.name,
+              slug: it.selectedVariant?.tier ? `${it.product.slug}-${it.selectedVariant.tier}` : it.product.slug,
               quantity: it.quantity,
               deliveryType: it.product.deliveryType,
             }));
@@ -446,13 +446,19 @@ export default function CheckoutPage() {
             .filter((k) => k.productId === item.product.id || k.productSlug === item.product.slug)
             .map((k) => k.key);
 
+          const effectivePrice = item.selectedVariant ? item.selectedVariant.price : item.product.price;
+          const effectiveName = item.selectedVariant
+            ? `${item.product.name} - ${item.selectedVariant.name}`
+            : item.product.name;
+
           return {
             productId: item.product.id,
-            name: item.product.name,
+            name: effectiveName,
             slug: item.product.slug,
-            price: item.product.price,
+            price: effectivePrice,
             quantity: item.quantity,
             image: item.product.image,
+            ...(item.selectedVariant ? { selectedVariant: item.selectedVariant } : {}),
             ...(latestUrl ? { downloadUrl: latestUrl } : {}),
             ...(latestNote ? { deliveryNote: latestNote } : {}),
             ...(latestType ? { deliveryType: latestType } : {}),
@@ -879,30 +885,39 @@ export default function CheckoutPage() {
 
                 {/* Items List */}
                 <div className="max-h-60 overflow-y-auto divide-y divide-slate-800/80 pr-1">
-                  {items.map((item) => (
-                    <div key={item.product.id} className="py-3 flex items-center gap-3">
-                      <div className="relative w-12 h-12 rounded-lg bg-slate-950 border border-slate-800 shrink-0 overflow-hidden">
-                        <Image
-                          src={item.product.image || '/logo.png'}
-                          alt={item.product.name}
-                          fill
-                          unoptimized={Boolean(item.product.image?.startsWith('data:'))}
-                          className="object-contain p-1"
-                        />
+                  {items.map((item) => {
+                    const itemKey = item.selectedVariant ? `${item.product.id}__var_${item.selectedVariant.id}` : item.product.id;
+                    const effectivePrice = item.selectedVariant ? item.selectedVariant.price : item.product.price;
+                    return (
+                      <div key={itemKey} className="py-3 flex items-center gap-3">
+                        <div className="relative w-12 h-12 rounded-lg bg-slate-950 border border-slate-800 shrink-0 overflow-hidden">
+                          <Image
+                            src={item.product.image || '/logo.png'}
+                            alt={item.product.name}
+                            fill
+                            unoptimized={Boolean(item.product.image?.startsWith('data:'))}
+                            className="object-contain p-1"
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-white truncate">
+                            {item.product.name}
+                          </p>
+                          {item.selectedVariant && (
+                            <p className="text-[10px] font-semibold text-purple-300 truncate">
+                              ตัวเลือก: {item.selectedVariant.name}
+                            </p>
+                          )}
+                          <p className="text-[11px] text-slate-400">
+                            {formatCurrency(effectivePrice)} × {item.quantity}
+                          </p>
+                        </div>
+                        <span className="text-xs font-bold text-slate-200">
+                          {formatCurrency(effectivePrice * item.quantity)}
+                        </span>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-bold text-white truncate">
-                          {item.product.name}
-                        </p>
-                        <p className="text-[11px] text-slate-400">
-                          {formatCurrency(item.product.price)} × {item.quantity}
-                        </p>
-                      </div>
-                      <span className="text-xs font-bold text-slate-200">
-                        {formatCurrency(item.product.price * item.quantity)}
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {/* Coupon Code Section */}

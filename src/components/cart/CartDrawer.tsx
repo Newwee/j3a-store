@@ -187,9 +187,14 @@ export function CartDrawer() {
                     item.product.id.startsWith('bundle_') ||
                     (item.product.tags && item.product.tags.includes('bundle'));
 
+                  const itemKey = item.selectedVariant
+                    ? `${item.product.id}__var_${item.selectedVariant.id}`
+                    : item.product.id;
+                  const effectivePrice = item.selectedVariant ? item.selectedVariant.price : item.product.price;
+
                   return (
                     <div
-                      key={item.product.id}
+                      key={itemKey}
                       className="relative p-3.5 rounded-2xl bg-slate-900/70 hover:bg-slate-900/90 border border-slate-800 hover:border-cyan-500/40 transition-all duration-200 flex gap-3.5 group shadow-sm hover:shadow-[0_0_20px_rgba(6,182,212,0.12)]"
                     >
                       {/* Thumbnail */}
@@ -225,10 +230,15 @@ export function CartDrawer() {
                               >
                                 {item.product.name}
                               </Link>
+                              {item.selectedVariant && (
+                                <span className="inline-flex items-center gap-1 mt-1 text-[11px] font-bold px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                                  ⚡ {item.selectedVariant.name}
+                                </span>
+                              )}
                             </div>
 
                             <button
-                              onClick={() => removeItem(item.product.id)}
+                              onClick={() => removeItem(itemKey)}
                               className="text-slate-500 hover:text-rose-400 p-1 rounded-lg hover:bg-rose-500/10 transition-colors shrink-0"
                               aria-label="Remove item"
                             >
@@ -243,7 +253,7 @@ export function CartDrawer() {
                           )}
 
                           <p className="text-xs text-cyan-300 font-extrabold mt-1">
-                            {formatCurrency(item.product.price)}
+                            {formatCurrency(effectivePrice)}
                             <span className="text-[10px] text-slate-500 font-normal ml-1">/ ชิ้น</span>
                           </p>
                         </div>
@@ -252,7 +262,7 @@ export function CartDrawer() {
                         <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-800/80">
                           <div className="flex items-center border border-slate-700/80 rounded-xl bg-slate-950/80 overflow-hidden shadow-inner">
                             <button
-                              onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+                              onClick={() => updateQuantity(itemKey, item.quantity - 1)}
                               className="p-1.5 hover:text-cyan-400 text-slate-400 hover:bg-slate-800 transition-colors"
                               aria-label="Decrease quantity"
                             >
@@ -262,7 +272,7 @@ export function CartDrawer() {
                               {item.quantity}
                             </span>
                             <button
-                              onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                              onClick={() => updateQuantity(itemKey, item.quantity + 1)}
                               disabled={item.quantity >= item.product.stock}
                               className="p-1.5 hover:text-cyan-400 text-slate-400 hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
                               aria-label="Increase quantity"

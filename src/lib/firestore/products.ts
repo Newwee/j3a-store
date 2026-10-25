@@ -25,6 +25,14 @@ function mapRowToProduct(row: any): Product {
   const rawRating = Number(row.rating) || 5.0;
   const rating = rawRating > 5 ? Number((rawRating / 2).toFixed(1)) : rawRating;
 
+  const rawVariants = Array.isArray(row.variants)
+    ? row.variants
+    : typeof row.variants === 'string'
+    ? JSON.parse(row.variants || '[]')
+    : [];
+
+  const pricingType = (row.pricing_type as any) || (rawVariants.length > 0 ? 'multi' : 'single');
+
   return {
     id: row.id,
     name: row.name || '',
@@ -32,6 +40,8 @@ function mapRowToProduct(row: any): Product {
     description: row.description || '',
     price: Number(row.price) || 0,
     comparePrice: row.compare_price !== null && row.compare_price !== undefined ? Number(row.compare_price) : undefined,
+    pricingType,
+    variants: rawVariants,
     image: row.image || '/logo.png',
     images,
     category: row.category || 'ซอฟต์แวร์ Discord',
@@ -209,6 +219,8 @@ export async function createProduct(formData: ProductFormData): Promise<string> 
     featured: Boolean(formData.featured),
     tags: formData.tags || [],
     specs: formData.specs || {},
+    pricing_type: formData.pricingType || (formData.variants && formData.variants.length > 0 ? 'multi' : 'single'),
+    variants: formData.variants || [],
     showcase_url: formData.showcaseUrl || null,
     download_url: formData.downloadUrl || null,
     delivery_note: formData.deliveryNote || null,
@@ -246,6 +258,8 @@ export async function updateProduct(id: string, formData: Partial<ProductFormDat
   if (formData.featured !== undefined) updates.featured = Boolean(formData.featured);
   if (formData.tags !== undefined) updates.tags = formData.tags;
   if (formData.specs !== undefined) updates.specs = formData.specs;
+  if (formData.pricingType !== undefined) updates.pricing_type = formData.pricingType;
+  if (formData.variants !== undefined) updates.variants = formData.variants;
   if (formData.showcaseUrl !== undefined) updates.showcase_url = formData.showcaseUrl;
   if (formData.downloadUrl !== undefined) updates.download_url = formData.downloadUrl;
   if (formData.deliveryNote !== undefined) updates.delivery_note = formData.deliveryNote;

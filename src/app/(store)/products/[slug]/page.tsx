@@ -24,7 +24,7 @@ import {
   X,
 } from 'lucide-react';
 import { extractYouTubeVideoId, getYouTubeEmbedUrl, getYouTubeThumbnailUrl } from '@/lib/utils/youtube';
-import { Product } from '@/types/product';
+import { Product, ProductVariant } from '@/types/product';
 import { getProductBySlug } from '@/lib/firestore/products';
 import { getBundleBySlug, getBundleById, bundleToProduct } from '@/lib/firestore/bundles';
 import { formatCurrency } from '@/lib/utils/formatters';
@@ -52,9 +52,18 @@ export default function ProductDetailPage({
   const { success, error } = useToast();
 
   const [product, setProduct] = useState<Product | null>(null);
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [isShowcaseModalOpen, setIsShowcaseModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (product && product.pricingType === 'multi' && product.variants && product.variants.length > 0) {
+      setSelectedVariant(product.variants[0]);
+    } else {
+      setSelectedVariant(null);
+    }
+  }, [product]);
 
   useEffect(() => {
     let isMounted = true;
@@ -253,20 +262,23 @@ export default function ProductDetailPage({
     );
   }
 
-  const isOutOfStock = product.stock <= 0 || product.status === 'out_of_stock';
+  const effectivePrice = selectedVariant ? selectedVariant.price : product.price;
+  const effectiveComparePrice = selectedVariant?.comparePrice ?? product.comparePrice;
+  const effectiveStock = selectedVariant ? (selectedVariant.stock ?? 999) : product.stock;
+  const isOutOfStock = effectiveStock <= 0 || product.status === 'out_of_stock';
   const discountPercent =
-    product.comparePrice && product.comparePrice > product.price
-      ? Math.round(((product.comparePrice - product.price) / product.comparePrice) * 100)
+    effectiveComparePrice && effectiveComparePrice > effectivePrice
+      ? Math.round(((effectiveComparePrice - effectivePrice) / effectiveComparePrice) * 100)
       : null;
 
   const handleAddToCart = () => {
     if (isOutOfStock) return;
-    addItem(product, quantity);
+    addItem(product, quantity, selectedVariant || undefined);
   };
 
   const handleBuyNow = () => {
     if (isOutOfStock) return;
-    addItem(product, quantity);
+    addItem(product, quantity, selectedVariant || undefined);
     setIsCartOpen(false);
     router.push('/checkout');
   };
@@ -373,17 +385,87 @@ export default function ProductDetailPage({
               );
             })()}
 
+            {/* Multi-Option / Package Variant Selector (If Product has Multi Pricing) */}
+            {product.pricingType === 'multi' && product.variants && product.variants.length > 0 && (
+              <div className="space-y-3 p-4 rounded-2xl bg-slate-900/70 border border-slate-800 backdrop-blur-md">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-purple-400" />
+                    <span>เลือกแพ็กเกจ / ตัวเลือกสินค้า (Choose Package)</span>
+                  </h3>
+                  {selectedVariant && (
+                    <span className="text-[11px] font-bold text-purple-300 bg-purple-500/10 border border-purple-500/20 px-2.5 py-0.5 rounded-full">
+                      เลือก: {selectedVariant.name}
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                  {product.variants.map((v) => {
+                    const isSelected = selectedVariant?.id === v.id;
+                    const isOptOutOfStock = v.stock <= 0;
+
+                    return (
+                      <button
+                        key={v.id}
+                        type="button"
+                        disabled={isOptOutOfStock}
+                        onClick={() => {
+                          setSelectedVariant(v);
+                          setQuantity(1);
+                        }}
+                        className={`relative p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                          isSelected
+                            ? 'bg-purple-500/15 border-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.25)] ring-1 ring-purple-400/50'
+                            : 'bg-slate-950/70 border-slate-800 hover:border-slate-700 hover:bg-slate-900/60'
+                        } ${isOptOutOfStock ? 'opacity-40 cursor-not-allowed' : ''}`}
+                      >
+                        <div className="flex items-start justify-between gap-1.5 w-full mb-2">
+                          <span className={`text-xs font-bold leading-snug ${isSelected ? 'text-white' : 'text-slate-300'}`}>
+                            {v.name}
+                          </span>
+                          {v.badge && (
+                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-purple-500/25 text-purple-200 border border-purple-400/30 shrink-0">
+                              {v.badge}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-baseline justify-between w-full pt-1.5 border-t border-slate-800/60">
+                          <div className="flex items-baseline gap-1.5">
+                            <span className="text-base font-black text-cyan-400">
+                              {formatCurrency(v.price)}
+                            </span>
+                            {v.comparePrice && v.comparePrice > v.price && (
+                              <span className="text-[11px] text-slate-500 line-through">
+                                {formatCurrency(v.comparePrice)}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-slate-400 font-medium">
+                            {isOptOutOfStock ? 'สินค้าหมด' : `คงเหลือ ${v.stock}`}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Pricing Section */}
             <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur-sm flex items-center justify-between">
               <div>
-                <span className="text-xs text-slate-400 block mb-0.5">ราคาพิเศษ</span>
+                <span className="text-xs text-slate-400 block mb-0.5">
+                  {selectedVariant ? `ราคาแพ็กเกจ (${selectedVariant.name})` : 'ราคาพิเศษ'}
+                </span>
                 <div className="flex items-baseline gap-3">
                   <span className="text-3xl sm:text-4xl font-black text-cyan-400">
-                    {formatCurrency(product.price)}
+                    {formatCurrency(effectivePrice)}
                   </span>
-                  {product.comparePrice && product.comparePrice > product.price && (
+                  {effectiveComparePrice && effectiveComparePrice > effectivePrice && (
                     <span className="text-base text-slate-500 line-through">
-                      {formatCurrency(product.comparePrice)}
+                      {formatCurrency(effectiveComparePrice)}
                     </span>
                   )}
                 </div>
@@ -416,7 +498,7 @@ export default function ProductDetailPage({
                 </span>
               ) : (
                 <span className="font-bold text-emerald-400 flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> มีสินค้าพร้อมส่ง ({product.stock} ชิ้น)
+                  <CheckCircle2 className="w-3.5 h-3.5" /> มีสินค้าพร้อมส่ง ({effectiveStock} ชิ้น)
                 </span>
               )}
             </div>
@@ -532,8 +614,8 @@ export default function ProductDetailPage({
                     {quantity}
                   </span>
                   <button
-                    onClick={() => setQuantity((q) => Math.min(product.stock, q + 1))}
-                    disabled={quantity >= product.stock || isOutOfStock}
+                    onClick={() => setQuantity((q) => Math.min(effectiveStock, q + 1))}
+                    disabled={quantity >= effectiveStock || isOutOfStock}
                     className="p-2.5 text-slate-400 hover:text-white disabled:opacity-30 transition-colors"
                     aria-label="Increase quantity"
                   >
