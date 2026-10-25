@@ -1,3 +1,17 @@
+export interface RankTier {
+  id: string; // 'bronze' | 'silver' | 'gold' | 'platinum' | 'vip'
+  name: string; // 'Bronze', 'Silver', 'Gold', 'Platinum', 'VIP'
+  minSpent: number; // e.g. 0, 500, 1500, 5000, 10000
+  discountPercent: number; // e.g. 0, 3, 5, 10, 15
+  badgeColor: string; // e.g. '#cd7f32', '#94a3b8', '#eab308', '#06b6d4', '#a855f7'
+  description?: string;
+}
+
+export interface RankSettings {
+  enabled: boolean;
+  ranks: RankTier[];
+}
+
 export interface StoreSettings {
   storeName: string;
   promptpay: string;
@@ -44,5 +58,7 @@ export interface StoreSettings {
   metaImage?: string;
   /** สีธีมแถบ Embed ใน Discord (Theme Color Hex) */
   themeColor?: string;
+  /** การตั้งค่าระดับสมาชิก Rank และส่วนลดประจำระดับ */
+  rankSettings?: RankSettings;
   updatedAt?: string;
 }

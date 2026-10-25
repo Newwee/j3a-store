@@ -64,6 +64,7 @@ export async function POST(req: Request) {
         max_uses: Number(body.maxUses) || 0,
         used_count: 0,
         used_by: [],
+        limit_per_user: body.limitPerUser ?? true,
         is_active: body.isActive ?? true,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -96,13 +97,21 @@ export async function POST(req: Request) {
         updated_at: new Date().toISOString(),
       };
 
+      if (updatesData?.code !== undefined) updates.code = updatesData.code.trim().toUpperCase();
       if (updatesData?.amount !== undefined) updates.credits = Math.round(Number(updatesData.amount));
-      if (updatesData?.codeType !== undefined) updates.code_type = updatesData.codeType;
+      if (updatesData?.codeType !== undefined) {
+        updates.code_type = updatesData.codeType;
+        updates.discount_type = updatesData.codeType === 'discount_percent' ? 'percent' : 'fixed';
+      }
       if (updatesData?.discountType !== undefined) updates.discount_type = updatesData.discountType;
       if (updatesData?.discountValue !== undefined) updates.discount_value = Number(updatesData.discountValue);
+      if (updatesData?.discountPercent !== undefined) updates.discount_value = Number(updatesData.discountPercent);
       if (updatesData?.minSpend !== undefined) updates.min_spend = Number(updatesData.minSpend);
       if (updatesData?.maxUses !== undefined) updates.max_uses = Number(updatesData.maxUses);
+      if (updatesData?.usedCount !== undefined) updates.used_count = Number(updatesData.usedCount);
       if (updatesData?.isActive !== undefined) updates.is_active = Boolean(updatesData.isActive);
+      if (updatesData?.limitPerUser !== undefined) updates.limit_per_user = Boolean(updatesData.limitPerUser);
+      if (updatesData?.resetUsedBy) updates.used_by = [];
 
       const { data, error } = await supabaseAdmin
         .from('redeem_codes')

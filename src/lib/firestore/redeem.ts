@@ -12,6 +12,7 @@ export interface RedeemCode {
   maxUses: number;
   usedCount: number;
   usedByUsers: string[];
+  limitPerUser?: boolean;
   isActive: boolean;
   expiresAt?: string;
   createdAt: string;
@@ -66,6 +67,7 @@ function mapRowToRedeemCode(row: any): RedeemCode {
     maxUses: Number(row.max_uses) || 0,
     usedCount: Number(row.used_count) || 0,
     usedByUsers: usedBy,
+    limitPerUser: row.limit_per_user !== false,
     isActive: Boolean(row.is_active),
     expiresAt: row.expires_at || undefined,
     createdAt: row.created_at || new Date().toISOString(),
@@ -242,6 +244,23 @@ export interface CreateRedeemCodeInput {
   discountPercent?: number;
   minSpend?: number;
   maxUses?: number;
+  limitPerUser?: boolean;
+  isActive?: boolean;
+  expiresAt?: string;
+}
+
+export interface UpdateRedeemCodeInput {
+  code?: string;
+  codeType?: CodeType;
+  amount?: number;
+  discountPercent?: number;
+  discountValue?: number;
+  discountType?: string;
+  minSpend?: number;
+  maxUses?: number;
+  usedCount?: number;
+  limitPerUser?: boolean;
+  resetUsedBy?: boolean;
   isActive?: boolean;
   expiresAt?: string;
 }
@@ -279,6 +298,7 @@ export async function createRedeemCode(input: CreateRedeemCodeInput): Promise<Re
           discountPercent: input.discountPercent,
           minSpend: input.minSpend || 0,
           maxUses: input.maxUses || 0,
+          limitPerUser: input.limitPerUser ?? true,
           isActive: input.isActive ?? true,
         }),
       });
@@ -308,6 +328,7 @@ export async function createRedeemCode(input: CreateRedeemCodeInput): Promise<Re
     max_uses: Number(input.maxUses) || 0,
     used_count: 0,
     used_by: [],
+    limit_per_user: input.limitPerUser ?? true,
     is_active: input.isActive ?? true,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -326,7 +347,7 @@ export async function createRedeemCode(input: CreateRedeemCodeInput): Promise<Re
  */
 export async function updateRedeemCode(
   codeId: string,
-  data: Partial<CreateRedeemCodeInput>
+  data: UpdateRedeemCodeInput
 ): Promise<void> {
   // 1. Try secure Admin API Route first
   try {
@@ -363,8 +384,19 @@ export async function updateRedeemCode(
     updated_at: new Date().toISOString(),
   };
 
+  if (data.code !== undefined) updates.code = data.code.trim().toUpperCase();
+  if (data.codeType !== undefined) {
+    updates.code_type = data.codeType;
+    updates.discount_type = data.codeType === 'discount_percent' ? 'percent' : 'fixed';
+  }
   if (data.amount !== undefined) updates.credits = Math.round(data.amount);
+  if (data.discountValue !== undefined) updates.discount_value = Number(data.discountValue);
+  if (data.discountPercent !== undefined) updates.discount_value = Number(data.discountPercent);
+  if (data.minSpend !== undefined) updates.min_spend = Number(data.minSpend);
   if (data.maxUses !== undefined) updates.max_uses = Number(data.maxUses);
+  if (data.usedCount !== undefined) updates.used_count = Number(data.usedCount);
+  if (data.limitPerUser !== undefined) updates.limit_per_user = Boolean(data.limitPerUser);
+  if (data.resetUsedBy) updates.used_by = [];
   if (data.isActive !== undefined) updates.is_active = Boolean(data.isActive);
 
   const { error } = await supabase
@@ -501,8 +533,8 @@ export async function validateDiscountCode(
       return { valid: false, message: 'สิทธิ์การใช้งานโค้ดนี้เต็มแล้ว' };
     }
 
-    if (userId && code.usedByUsers.includes(userId)) {
-      return { valid: false, message: 'คุณเคยใช้สิทธิ์โค้ดนี้ไปแล้ว' };
+    if (code.limitPerUser !== false && userId && code.usedByUsers.includes(userId)) {
+      return { valid: false, message: 'คุณเคยใช้สิทธิ์โค้ดนี้ไปแล้ว (จำกัด 1 สิทธิ์ต่อบัญชี)' };
     }
 
     // Check if this is a general credit code (not checkout discount)

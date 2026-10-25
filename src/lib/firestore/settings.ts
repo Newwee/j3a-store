@@ -29,6 +29,16 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   metaDescription: 'ศูนย์รวมโปรแกรม Discord AutoQuest, เครื่องมือจัดการโปรไฟล์ และบอท Discord ระดับพรีเมียม ส่งมอบ License Key ทันที ปลอดภัย 100%',
   metaImage: 'https://j3a-store.vercel.app/logo.png',
   themeColor: '#06b6d4',
+  rankSettings: {
+    enabled: true,
+    ranks: [
+      { id: 'bronze', name: 'Bronze', minSpent: 0, discountPercent: 0, badgeColor: '#cd7f32', description: 'สมาชิกทั่วไป' },
+      { id: 'silver', name: 'Silver', minSpent: 500, discountPercent: 3, badgeColor: '#94a3b8', description: 'ส่วนลด 3% ทุกคำสั่งซื้อ' },
+      { id: 'gold', name: 'Gold', minSpent: 1500, discountPercent: 5, badgeColor: '#eab308', description: 'ส่วนลด 5% ทุกคำสั่งซื้อ' },
+      { id: 'platinum', name: 'Platinum', minSpent: 5000, discountPercent: 10, badgeColor: '#06b6d4', description: 'ส่วนลด 10% ทุกคำสั่งซื้อ' },
+      { id: 'vip', name: 'VIP', minSpent: 10000, discountPercent: 15, badgeColor: '#a855f7', description: 'ส่วนลดพิเศษ 15% ทุกคำสั่งซื้อ' },
+    ],
+  },
 };
 
 /**
@@ -73,6 +83,7 @@ export async function getStoreSettings(): Promise<StoreSettings> {
       metaDescription: data.meta_description ?? DEFAULT_STORE_SETTINGS.metaDescription,
       metaImage: data.meta_image ?? DEFAULT_STORE_SETTINGS.metaImage,
       themeColor: data.theme_color ?? DEFAULT_STORE_SETTINGS.themeColor,
+      rankSettings: data.rank_settings ?? DEFAULT_STORE_SETTINGS.rankSettings,
       updatedAt: data.updated_at || undefined,
     };
   } catch (error) {
@@ -141,6 +152,7 @@ export async function updateStoreSettings(settings: Partial<StoreSettings>): Pro
   if (settings.metaDescription !== undefined) updates.meta_description = settings.metaDescription;
   if (settings.metaImage !== undefined) updates.meta_image = settings.metaImage;
   if (settings.themeColor !== undefined) updates.theme_color = settings.themeColor;
+  if (settings.rankSettings !== undefined) updates.rank_settings = settings.rankSettings;
 
   const { error } = await supabase
     .from('settings')

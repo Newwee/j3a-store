@@ -42,6 +42,7 @@ export async function POST(req: Request) {
     if (body.metaDescription !== undefined) updates.meta_description = body.metaDescription;
     if (body.metaImage !== undefined) updates.meta_image = body.metaImage;
     if (body.themeColor !== undefined) updates.theme_color = body.themeColor;
+    if (body.rankSettings !== undefined) updates.rank_settings = body.rankSettings;
 
     const { data, error } = await supabaseAdmin
       .from('settings')

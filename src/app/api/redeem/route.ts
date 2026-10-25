@@ -85,7 +85,7 @@ export async function POST(req: Request) {
       ? JSON.parse(codeRow.used_by || '[]')
       : [];
 
-    if (usedBy.includes(user.id)) {
+    if (codeRow.limit_per_user !== false && usedBy.includes(user.id)) {
       return NextResponse.json({ error: 'คุณเคยใช้โค้ดนี้ไปแล้ว (จำกัด 1 สิทธิ์ต่อบัญชี)' }, { status: 400 });
     }
 

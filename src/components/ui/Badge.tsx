@@ -132,6 +132,7 @@ export function TierBadge({ tier = 'Bronze' }: { tier?: UserTier }) {
     Bronze: 'bg-amber-900/30 text-amber-400 border-amber-700/40',
     Silver: 'bg-slate-400/20 text-slate-200 border-slate-400/40',
     Gold: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40',
+    Platinum: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40',
     VIP: 'bg-gradient-to-r from-purple-500/20 to-cyan-500/20 text-cyan-300 border-cyan-400/50',
   };
 

@@ -19,6 +19,10 @@ import {
   Tag,
   DollarSign,
   Filter,
+  Edit2,
+  RotateCcw,
+  UserCheck,
+  Sliders,
 } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 import {
@@ -52,8 +56,24 @@ export default function AdminCodesPage() {
   const [discountPercent, setDiscountPercent] = useState('10');
   const [minSpend, setMinSpend] = useState('0');
   const [maxUses, setMaxUses] = useState('0');
+  const [limitPerUser, setLimitPerUser] = useState(true);
   const [isActive, setIsActive] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Edit Modal state
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingCode, setEditingCode] = useState<RedeemCode | null>(null);
+  const [editCodeName, setEditCodeName] = useState('');
+  const [editCodeType, setEditCodeType] = useState<CodeType>('discount_fixed');
+  const [editAmount, setEditAmount] = useState('20');
+  const [editDiscountPercent, setEditDiscountPercent] = useState('10');
+  const [editMinSpend, setEditMinSpend] = useState('0');
+  const [editMaxUses, setEditMaxUses] = useState('67');
+  const [editUsedCount, setEditUsedCount] = useState('0');
+  const [editLimitPerUser, setEditLimitPerUser] = useState(true);
+  const [editResetUsedBy, setEditResetUsedBy] = useState(false);
+  const [editIsActive, setEditIsActive] = useState(true);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   // Delete state
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -117,6 +137,7 @@ export default function AdminCodesPage() {
         discountPercent: codeType === 'discount_percent' ? finalPercent : undefined,
         minSpend: Number(minSpend) || 0,
         maxUses: Number(maxUses) || 0,
+        limitPerUser,
         isActive,
       });
 
@@ -135,12 +156,81 @@ export default function AdminCodesPage() {
       setDiscountPercent('10');
       setMinSpend('0');
       setMaxUses('0');
+      setLimitPerUser(true);
       setIsActive(true);
       await loadCodes();
     } catch (err: any) {
       error(`ไม่สามารถสร้างโค้ด: ${err.message || 'เกิดข้อผิดพลาด'}`);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleOpenEditModal = (item: RedeemCode) => {
+    setEditingCode(item);
+    setEditCodeName(item.code);
+    setEditCodeType(item.codeType);
+    setEditAmount(String(item.amount));
+    setEditDiscountPercent(String(item.discountPercent || item.amount));
+    setEditMinSpend(String(item.minSpend || 0));
+    setEditMaxUses(String(item.maxUses));
+    setEditUsedCount(String(item.usedCount));
+    setEditLimitPerUser(item.limitPerUser !== false);
+    setEditResetUsedBy(false);
+    setEditIsActive(item.isActive);
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCode) return;
+
+    const clean = editCodeName.trim().toUpperCase();
+    if (!clean) {
+      error('กรุณาระบุรหัสโค้ด');
+      return;
+    }
+
+    let finalAmount = Number(editAmount);
+    let finalPercent = Number(editDiscountPercent);
+
+    if (editCodeType === 'discount_percent') {
+      if (isNaN(finalPercent) || finalPercent <= 0 || finalPercent > 100) {
+        error('เปอร์เซ็นต์ส่วนลดต้องอยู่ระหว่าง 1 - 100%');
+        return;
+      }
+      finalAmount = finalPercent;
+    } else {
+      if (isNaN(finalAmount) || finalAmount <= 0) {
+        error('จำนวนเงิน/เครดิตต้องมากกว่า 0 บาท');
+        return;
+      }
+    }
+
+    setIsUpdating(true);
+    try {
+      await updateRedeemCode(editingCode.id, {
+        code: clean,
+        codeType: editCodeType,
+        amount: finalAmount,
+        discountPercent: editCodeType === 'discount_percent' ? finalPercent : undefined,
+        discountValue: editCodeType === 'discount_percent' ? finalPercent : finalAmount,
+        minSpend: Number(editMinSpend) || 0,
+        maxUses: Number(editMaxUses) || 0,
+        usedCount: Number(editUsedCount) || 0,
+        limitPerUser: editLimitPerUser,
+        resetUsedBy: editResetUsedBy,
+        isActive: editIsActive,
+      });
+
+      success(`อัปเดตโค้ด "${clean}" สำเร็จเรียบร้อย`);
+      setIsEditModalOpen(false);
+      setEditingCode(null);
+      await loadCodes();
+    } catch (err: any) {
+      error(`ไม่สามารถอัปเดตโค้ด: ${err.message || 'เกิดข้อผิดพลาด'}`);
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -448,13 +538,22 @@ export default function AdminCodesPage() {
 
                       {/* Usage */}
                       <td className="py-4 px-4 whitespace-nowrap">
-                        <span className="font-mono text-slate-200">
-                          {item.usedCount}
-                          <span className="text-slate-500">
-                            {' '}
-                            / {item.maxUses === 0 ? '∞ ไม่จำกัด' : `${item.maxUses} สิทธิ์`}
+                        <div className="flex flex-col">
+                          <span className="font-mono text-slate-200 font-semibold">
+                            {item.usedCount}
+                            <span className="text-slate-500 font-normal">
+                              {' '}
+                              / {item.maxUses === 0 ? '∞ ไม่จำกัด' : `${item.maxUses} สิทธิ์`}
+                            </span>
                           </span>
-                        </span>
+                          <span className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1">
+                            {item.limitPerUser !== false ? (
+                              <span className="text-cyan-400/90 font-medium">👤 จำกัด 1 User : 1 สิทธิ์</span>
+                            ) : (
+                              <span className="text-amber-400/90 font-medium">👥 ไม่จำกัดสิทธิ์ต่อบัญชี</span>
+                            )}
+                          </span>
+                        </div>
                       </td>
 
                       {/* Status */}
@@ -473,13 +572,22 @@ export default function AdminCodesPage() {
 
                       {/* Actions */}
                       <td className="py-4 px-4 sm:px-6 text-right whitespace-nowrap">
-                        <button
-                          onClick={() => setDeleteId(item.id)}
-                          className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
-                          title="ลบโค้ด"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => handleOpenEditModal(item)}
+                            className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-cyan-500/20 text-slate-400 hover:text-cyan-300 transition-colors cursor-pointer"
+                            title="แก้ไขโค้ดและการใช้สิทธิ์"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setDeleteId(item.id)}
+                            className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
+                            title="ลบโค้ด"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -660,6 +768,27 @@ export default function AdminCodesPage() {
             />
           </div>
 
+          {/* Limit Per User toggle for Create Modal */}
+          <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1">
+            <label className="flex items-center justify-between cursor-pointer">
+              <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                <UserCheck className="w-4 h-4 text-cyan-400" />
+                <span>จำกัด 1 User : 1 สิทธิ์</span>
+              </span>
+              <input
+                type="checkbox"
+                checked={limitPerUser}
+                onChange={(e) => setLimitPerUser(e.target.checked)}
+                className="w-4 h-4 accent-cyan-500 rounded cursor-pointer"
+              />
+            </label>
+            <p className="text-[11px] text-slate-400">
+              {limitPerUser
+                ? '🟢 แต่ละบัญชีผู้ใช้จะใช้โค้ดนี้ได้เพียง 1 ครั้งเท่านั้น'
+                : '🟡 บัญชีเดิมสามารถนำโค้ดมาใช้ซ้ำได้จนกว่าสิทธิ์รวมจะหมด'}
+            </p>
+          </div>
+
           {/* Is Active checkbox */}
           <div className="pt-2">
             <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer select-none">
@@ -685,6 +814,264 @@ export default function AdminCodesPage() {
               className="bg-cyan-500 text-slate-950 font-bold"
             >
               บันทึกโค้ด
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Edit Code Modal (Supports editing used count 0/67 and 1 user : 1 limit) */}
+      <Modal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        title={`แก้ไขโค้ดและการใช้สิทธิ์: ${editingCode?.code || ''}`}
+      >
+        <form onSubmit={handleSaveEdit} className="space-y-4">
+          {/* Code Type */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-slate-300">ประเภทโค้ด</label>
+            <div className="grid grid-cols-3 gap-2">
+              <label
+                className={`p-3 rounded-xl border flex flex-col items-center text-center gap-1 cursor-pointer transition-all ${
+                  editCodeType === 'credit'
+                    ? 'bg-amber-500/15 border-amber-500/50 text-amber-200'
+                    : 'bg-slate-950/80 border-slate-800 text-slate-400 hover:border-slate-700'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="edit_code_type"
+                  checked={editCodeType === 'credit'}
+                  onChange={() => setEditCodeType('credit')}
+                  className="hidden"
+                />
+                <Coins className="w-5 h-5 text-amber-400 mb-0.5" />
+                <strong className="text-xs">แจกเครดิต</strong>
+                <span className="text-[10px] text-slate-400">เติม Wallet</span>
+              </label>
+
+              <label
+                className={`p-3 rounded-xl border flex flex-col items-center text-center gap-1 cursor-pointer transition-all ${
+                  editCodeType === 'discount_percent'
+                    ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-200'
+                    : 'bg-slate-950/80 border-slate-800 text-slate-400 hover:border-slate-700'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="edit_code_type"
+                  checked={editCodeType === 'discount_percent'}
+                  onChange={() => setEditCodeType('discount_percent')}
+                  className="hidden"
+                />
+                <Percent className="w-5 h-5 text-emerald-400 mb-0.5" />
+                <strong className="text-xs">ส่วนลด %</strong>
+                <span className="text-[10px] text-slate-400">ลดตอนจ่าย</span>
+              </label>
+
+              <label
+                className={`p-3 rounded-xl border flex flex-col items-center text-center gap-1 cursor-pointer transition-all ${
+                  editCodeType === 'discount_fixed'
+                    ? 'bg-cyan-500/15 border-cyan-500/50 text-cyan-200'
+                    : 'bg-slate-950/80 border-slate-800 text-slate-400 hover:border-slate-700'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="edit_code_type"
+                  checked={editCodeType === 'discount_fixed'}
+                  onChange={() => setEditCodeType('discount_fixed')}
+                  className="hidden"
+                />
+                <Tag className="w-5 h-5 text-cyan-400 mb-0.5" />
+                <strong className="text-xs">ส่วนลด ฿</strong>
+                <span className="text-[10px] text-slate-400">ลดเป็นบาท</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Code Name */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-slate-300">รหัสโค้ด *</label>
+            <Input
+              type="text"
+              required
+              value={editCodeName}
+              onChange={(e) => setEditCodeName(e.target.value.toUpperCase())}
+              placeholder="ระบุรหัสโค้ด"
+              className="font-mono uppercase font-bold tracking-wider"
+            />
+          </div>
+
+          {/* Value Inputs */}
+          {editCodeType === 'credit' && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-300">จำนวนเครดิต (บาท) *</label>
+              <Input
+                type="number"
+                min="1"
+                required
+                value={editAmount}
+                onChange={(e) => setEditAmount(e.target.value)}
+              />
+            </div>
+          )}
+
+          {editCodeType === 'discount_percent' && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-300">เปอร์เซ็นต์ส่วนลด (%) *</label>
+              <Input
+                type="number"
+                min="1"
+                max="100"
+                required
+                value={editDiscountPercent}
+                onChange={(e) => setEditDiscountPercent(e.target.value)}
+              />
+            </div>
+          )}
+
+          {editCodeType === 'discount_fixed' && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-300">จำนวนเงินที่ลด (บาท ฿) *</label>
+              <Input
+                type="number"
+                min="1"
+                required
+                value={editAmount}
+                onChange={(e) => setEditAmount(e.target.value)}
+              />
+            </div>
+          )}
+
+          {editCodeType !== 'credit' && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-300">ยอดสั่งซื้อขั้นต่ำ (บาท)</label>
+              <Input
+                type="number"
+                min="0"
+                value={editMinSpend}
+                onChange={(e) => setEditMinSpend(e.target.value)}
+              />
+            </div>
+          )}
+
+          {/* Quota & User Limitation Card (0/67 & 1 user: 1 สิทธิ์) */}
+          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3.5">
+            <h4 className="text-xs font-bold text-white flex items-center gap-1.5 border-b border-slate-800/80 pb-2">
+              <Sliders className="w-4 h-4 text-cyan-400" />
+              <span>การจัดการสิทธิ์การใช้งาน (Quota & User Limitation)</span>
+            </h4>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                  จำนวนที่ใช้ไปแล้ว (Used Count)
+                </label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min="0"
+                    value={editUsedCount}
+                    onChange={(e) => setEditUsedCount(e.target.value)}
+                    className="font-mono font-bold"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditUsedCount('0');
+                      setEditResetUsedBy(true);
+                      toast('รีเซ็ตจำนวนที่ใช้ไปแล้วเป็น 0 เรียบร้อย', 'info');
+                    }}
+                    className="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-[11px] font-bold text-slate-300 hover:text-white shrink-0 flex items-center gap-1 cursor-pointer"
+                    title="รีเซ็ตเป็น 0"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>เป็น 0</span>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                  จำนวนสิทธิ์สูงสุด (Max Uses, เช่น 67)
+                </label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={editMaxUses}
+                  onChange={(e) => setEditMaxUses(e.target.value)}
+                  placeholder="0 = ไม่จำกัด"
+                  className="font-mono font-bold"
+                />
+              </div>
+            </div>
+
+            {/* Current preview */}
+            <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between text-xs">
+              <span className="text-slate-400">พรีวิวการแสดงผล:</span>
+              <span className="font-mono font-bold text-cyan-300">
+                {editUsedCount} / {Number(editMaxUses) === 0 ? '∞ ไม่จำกัด' : `${editMaxUses} สิทธิ์`}
+              </span>
+            </div>
+
+            {/* 1 User : 1 สิทธิ์ Toggle */}
+            <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800/80 space-y-1">
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <UserCheck className="w-4 h-4 text-cyan-400" />
+                  <span>จำกัด 1 User : 1 สิทธิ์</span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={editLimitPerUser}
+                  onChange={(e) => setEditLimitPerUser(e.target.checked)}
+                  className="w-4 h-4 accent-cyan-500 rounded cursor-pointer"
+                />
+              </label>
+              <p className="text-[11px] text-slate-400">
+                {editLimitPerUser
+                  ? '🟢 บัญชีผู้ใช้แต่ละคนจะใช้โค้ดนี้ได้เพียง 1 ครั้งเท่านั้น (1 User : 1 สิทธิ์)'
+                  : '🟡 บัญชีเดิมสามารถนำโค้ดมาใช้ซ้ำได้หลายครั้งจนกว่าสิทธิ์รวมจะหมด'}
+              </p>
+            </div>
+
+            {/* Clear Used By History */}
+            <label className="flex items-center gap-2 text-xs text-amber-300 cursor-pointer pt-1 select-none">
+              <input
+                type="checkbox"
+                checked={editResetUsedBy}
+                onChange={(e) => setEditResetUsedBy(e.target.checked)}
+                className="w-3.5 h-3.5 accent-amber-500 rounded"
+              />
+              <span>ล้างประวัติผู้ใช้ที่เคยแลกโค้ดนี้ทั้งหมด (ให้ทุกคนกลับมาใช้โค้ดนี้ใหม่ได้)</span>
+            </label>
+          </div>
+
+          {/* Is Active Toggle */}
+          <div className="pt-1">
+            <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={editIsActive}
+                onChange={(e) => setEditIsActive(e.target.checked)}
+                className="accent-cyan-500 rounded"
+              />
+              <span>เปิดใช้งานโค้ดนี้ (Active)</span>
+            </label>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
+            <Button type="button" variant="ghost" size="sm" onClick={() => setIsEditModalOpen(false)}>
+              ยกเลิก
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              size="sm"
+              isLoading={isUpdating}
+              className="bg-cyan-500 text-slate-950 font-bold"
+            >
+              บันทึกการแก้ไข
             </Button>
           </div>
         </form>

@@ -756,10 +756,11 @@ export default function AdminCustomersPage() {
                   onChange={(e) => setEditTier(e.target.value as UserTier)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-200 focus:border-cyan-400 outline-none"
                 >
-                  <option value="Bronze">Bronze</option>
-                  <option value="Silver">Silver</option>
-                  <option value="Gold">Gold</option>
-                  <option value="VIP">VIP</option>
+                  <option value="Bronze">Bronze (🥉 ทั่วไป)</option>
+                  <option value="Silver">Silver (🥈 ระดับเงิน)</option>
+                  <option value="Gold">Gold (🥇 ระดับทอง)</option>
+                  <option value="Platinum">Platinum (💎 แพลทินัม)</option>
+                  <option value="VIP">VIP (👑 วีไอพีสูงสุด)</option>
                 </select>
               </div>
             </div>

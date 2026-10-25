@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -146,6 +146,24 @@ export default function CheckoutPage() {
 
   const userCredits = profile?.credits || 0;
 
+  // Rank Discount Calculation
+  const userRankTier = profile?.tier || 'Bronze';
+  const rankSettings = storeSettings?.rankSettings;
+  const isRankDiscountEnabled = rankSettings?.enabled !== false;
+
+  const matchedRank = useMemo(() => {
+    if (!isRankDiscountEnabled || !rankSettings?.ranks) return null;
+    return rankSettings.ranks.find(
+      (r) =>
+        r.name.toLowerCase() === userRankTier.toLowerCase() ||
+        r.id.toLowerCase() === userRankTier.toLowerCase()
+    );
+  }, [isRankDiscountEnabled, rankSettings, userRankTier]);
+
+  const rankDiscountPercent = matchedRank?.discountPercent || 0;
+  const rankDiscountAmount =
+    rankDiscountPercent > 0 ? Math.round((subtotal * rankDiscountPercent) / 100) : 0;
+
   // Calculate discount and final payable total
   const discountAmount = appliedDiscount
     ? (appliedDiscount.codeType === 'discount_percent' && appliedDiscount.percent
@@ -153,7 +171,8 @@ export default function CheckoutPage() {
         : Math.min(subtotal, appliedDiscount.amount))
     : 0;
 
-  const finalTotal = Math.max(0, subtotal + shipping - discountAmount);
+  const totalDiscount = discountAmount + rankDiscountAmount;
+  const finalTotal = Math.max(0, subtotal + shipping - totalDiscount);
   const canPayWithWallet = userCredits >= finalTotal;
 
   // Coupon Handlers
@@ -481,8 +500,17 @@ export default function CheckoutPage() {
         items: resolvedItems,
         subtotal,
         shipping,
-        discount: discountAmount,
+        discount: totalDiscount,
         ...(appliedDiscount ? { discountCode: appliedDiscount.code } : {}),
+        ...(rankDiscountAmount > 0
+          ? {
+              rankDiscount: {
+                tier: matchedRank?.name || userRankTier,
+                percent: rankDiscountPercent,
+                amount: rankDiscountAmount,
+              },
+            }
+          : {}),
         total: finalTotal,
         paymentMethod,
         status: (paymentMethod === 'wallet' || finalTotal === 0) ? 'completed' : 'pending',
@@ -1062,6 +1090,15 @@ export default function CheckoutPage() {
                       )}
                     </span>
                   </div>
+                  {rankDiscountAmount > 0 && matchedRank && (
+                    <div className="flex justify-between text-purple-300 font-semibold bg-purple-500/15 px-2.5 py-1.5 rounded-lg border border-purple-500/30">
+                      <span className="flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                        <span>ส่วนลดระดับสมาชิก [{matchedRank.name} - ลด {rankDiscountPercent}%]</span>
+                      </span>
+                      <span className="font-mono font-bold">-{formatCurrency(rankDiscountAmount)}</span>
+                    </div>
+                  )}
                   {discountAmount > 0 && (
                     <div className="flex justify-between text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-1 rounded-lg border border-emerald-500/20">
                       <span className="flex items-center gap-1.5">

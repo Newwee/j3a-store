@@ -1,6 +1,6 @@
 export type UserRole = 'customer' | 'admin';
 
-export type UserTier = 'Bronze' | 'Silver' | 'Gold' | 'VIP';
+export type UserTier = 'Bronze' | 'Silver' | 'Gold' | 'Platinum' | 'VIP';
 
 export interface SocialLinks {
   discord?: string;
