@@ -1,12 +1,14 @@
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
-// Default Fallback Webhook URLs & Role IDs
+// Default Fallback Webhook URLs & Role IDs (Private Category: ୨୧ ₊˚ 🔒 𝐀𝐝𝐦𝐢𝐧 𝐌𝐚𝐧𝐚𝐠𝐞 ˚₊ ୨୧)
 const DEFAULT_WEBHOOK_SLIP =
   'https://discord.com/api/webhooks/1563838807369977917/zubkvc8V0t7i_-CLIbwMhN9yXsx65-yDw_tslKgiM0l9nHbD9xS_Ki4IFAzt1uOB-2Jp';
 const DEFAULT_WEBHOOK_CREDITS =
-  'https://discord.com/api/webhooks/1563838697554710578/CPBlIplPAYSy9EV9FdIBxw_uoafvAiX-xR-y9DPUgHkRGdcSbaBzaTWxondvdVH46EuG';
+  'https://discord.com/api/webhooks/1563850107282128906/G7dp9H3KxujiMJWkl013sFiQs7gvZhrzGqvFWWGEtorrYEpecq9bi-MFZz8sctZycrRK';
+const DEFAULT_WEBHOOK_ORDER =
+  'https://discord.com/api/webhooks/1563850109241008239/PBBRf4WQju8hFSEB32X9VIDQAUb7hRpIwCWAWjg3VL_6DJcCQKX7P-gfiBlHW3j1x00A';
 const DEFAULT_WEBHOOK_WELCOME =
-  'https://discord.com/api/webhooks/1563838727778730106/zmFHamxQ8WO5EGcO9uhSPOJES0ZLReSGmFa0DX0cqaMF9F7ECuKTGvPuqDJK4ZAMhZsx';
+  'https://discord.com/api/webhooks/1563850111170256917/wrWXMv3d0p4ajxvNPrfN4M-sZx_DuvbqgBpSm8euHWbfojuEHskzwGS_S3-z4rC4nyYO';
 
 const DEFAULT_ROLE_OWNER = '1555520737975205919';
 const DEFAULT_ROLE_ADMIN = '1555520740558897205';
@@ -20,12 +22,14 @@ const STORE_URL = process.env.NEXT_PUBLIC_STORE_URL || 'https://j3a-store.vercel
 export async function getDiscordWebhooks(): Promise<{
   slip: string;
   credits: string;
+  order: string;
   welcome: string;
   ownerRoleId: string;
   adminRoleId: string;
 }> {
   let slip = process.env.DISCORD_WEBHOOK_SLIP || DEFAULT_WEBHOOK_SLIP;
   let credits = process.env.DISCORD_WEBHOOK_CREDITS || DEFAULT_WEBHOOK_CREDITS;
+  let order = process.env.DISCORD_WEBHOOK_ORDER || DEFAULT_WEBHOOK_ORDER;
   let welcome = process.env.DISCORD_WEBHOOK_WELCOME || DEFAULT_WEBHOOK_WELCOME;
   let ownerRoleId = process.env.DISCORD_ROLE_OWNER || DEFAULT_ROLE_OWNER;
   let adminRoleId = process.env.DISCORD_ROLE_ADMIN || DEFAULT_ROLE_ADMIN;
@@ -33,7 +37,7 @@ export async function getDiscordWebhooks(): Promise<{
   try {
     const { data } = await supabaseAdmin
       .from('settings')
-      .select('discord_webhook_slip, discord_webhook_credits, discord_webhook_welcome, discord_role_owner, discord_role_admin')
+      .select('discord_webhook_slip, discord_webhook_credits, discord_webhook_order, discord_webhook_welcome, discord_role_owner, discord_role_admin')
       .eq('id', 'store')
       .limit(1)
       .maybeSingle();
@@ -41,6 +45,7 @@ export async function getDiscordWebhooks(): Promise<{
     if (data) {
       if (data.discord_webhook_slip?.trim()) slip = data.discord_webhook_slip.trim();
       if (data.discord_webhook_credits?.trim()) credits = data.discord_webhook_credits.trim();
+      if ((data as any).discord_webhook_order?.trim()) order = (data as any).discord_webhook_order.trim();
       if (data.discord_webhook_welcome?.trim()) welcome = data.discord_webhook_welcome.trim();
       if ((data as any).discord_role_owner?.trim()) ownerRoleId = (data as any).discord_role_owner.trim();
       if ((data as any).discord_role_admin?.trim()) adminRoleId = (data as any).discord_role_admin.trim();
@@ -49,7 +54,7 @@ export async function getDiscordWebhooks(): Promise<{
     console.warn('Could not read discord webhooks from settings table, using defaults:', e);
   }
 
-  return { slip, credits, welcome, ownerRoleId, adminRoleId };
+  return { slip, credits, order, welcome, ownerRoleId, adminRoleId };
 }
 
 /**
@@ -270,7 +275,7 @@ export async function notifyDiscordNewMember(data: {
 
 /**
  * 5. Notify Order: Customer Purchased Product / Bundle
- * Sent to Credits / Orders Channel (e.g. ୨-💾-୧-⁺-˖-credits)
+ * Sent to Private Orders Channel (e.g. ୨-🛒-୧-⁺-˖-คำสั่งซื้อ)
  */
 export async function notifyDiscordOrderPlaced(data: {
   orderNumber: string;
@@ -278,7 +283,8 @@ export async function notifyDiscordOrderPlaced(data: {
   itemsSummary: string;
   totalAmount: number;
 }): Promise<boolean> {
-  const { credits } = await getDiscordWebhooks();
+  const { order, credits } = await getDiscordWebhooks();
+  const targetUrl = order || credits;
 
   const embed: any = {
     title: '🛍️ มีรายการสั่งซื้อใหม่สำเร็จ (New Order)',
@@ -294,8 +300,8 @@ export async function notifyDiscordOrderPlaced(data: {
     timestamp: new Date().toISOString(),
   };
 
-  return sendDiscordWebhook(credits, {
-    username: 'J3A STORE - คำสั่งซื้อ & รายการขาย',
+  return sendDiscordWebhook(targetUrl, {
+    username: 'J3A STORE - คำสั่งซื้อสินค้า',
     embeds: [embed],
   });
 }

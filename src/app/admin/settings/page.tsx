@@ -29,10 +29,11 @@ export default function AdminSettingsPage() {
   const [footerDescription, setFooterDescription] = useState(DEFAULT_STORE_SETTINGS.footerDescription || 'แพลตฟอร์มศูนย์รวมสินค้าและบริการดิจิทัลชั้นนำ เติมเกม ไอดีเกม บัตรเติมเงิน และอุปกรณ์ระดับพรีเมียม ระบบอัตโนมัติ รวดเร็ว ปลอดภัย 100% พร้อมบริการตลอด 24 ชั่วโมง');
   const [discordWebhookSlip, setDiscordWebhookSlip] = useState(DEFAULT_STORE_SETTINGS.discordWebhookSlip || '');
   const [discordWebhookCredits, setDiscordWebhookCredits] = useState(DEFAULT_STORE_SETTINGS.discordWebhookCredits || '');
+  const [discordWebhookOrder, setDiscordWebhookOrder] = useState(DEFAULT_STORE_SETTINGS.discordWebhookOrder || '');
   const [discordWebhookWelcome, setDiscordWebhookWelcome] = useState(DEFAULT_STORE_SETTINGS.discordWebhookWelcome || '');
   const [discordRoleOwner, setDiscordRoleOwner] = useState(DEFAULT_STORE_SETTINGS.discordRoleOwner || '1555520737975205919');
   const [discordRoleAdmin, setDiscordRoleAdmin] = useState(DEFAULT_STORE_SETTINGS.discordRoleAdmin || '1555520740558897205');
-  const [testingChannel, setTestingChannel] = useState<'slip' | 'credits' | 'welcome' | null>(null);
+  const [testingChannel, setTestingChannel] = useState<'slip' | 'credits' | 'order' | 'welcome' | null>(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -57,6 +58,7 @@ export default function AdminSettingsPage() {
         setFooterDescription(data.footerDescription || DEFAULT_STORE_SETTINGS.footerDescription || '');
         setDiscordWebhookSlip(data.discordWebhookSlip || DEFAULT_STORE_SETTINGS.discordWebhookSlip || '');
         setDiscordWebhookCredits(data.discordWebhookCredits || DEFAULT_STORE_SETTINGS.discordWebhookCredits || '');
+        setDiscordWebhookOrder(data.discordWebhookOrder || DEFAULT_STORE_SETTINGS.discordWebhookOrder || '');
         setDiscordWebhookWelcome(data.discordWebhookWelcome || DEFAULT_STORE_SETTINGS.discordWebhookWelcome || '');
         setDiscordRoleOwner(data.discordRoleOwner || DEFAULT_STORE_SETTINGS.discordRoleOwner || '1555520737975205919');
         setDiscordRoleAdmin(data.discordRoleAdmin || DEFAULT_STORE_SETTINGS.discordRoleAdmin || '1555520740558897205');
@@ -93,6 +95,7 @@ export default function AdminSettingsPage() {
         footerDescription: footerDescription.trim(),
         discordWebhookSlip: discordWebhookSlip.trim(),
         discordWebhookCredits: discordWebhookCredits.trim(),
+        discordWebhookOrder: discordWebhookOrder.trim(),
         discordWebhookWelcome: discordWebhookWelcome.trim(),
         discordRoleOwner: discordRoleOwner.trim(),
         discordRoleAdmin: discordRoleAdmin.trim(),
@@ -105,7 +108,7 @@ export default function AdminSettingsPage() {
     }
   };
 
-  const handleTestDiscord = async (channelType: 'slip' | 'credits' | 'welcome') => {
+  const handleTestDiscord = async (channelType: 'slip' | 'credits' | 'order' | 'welcome') => {
     setTestingChannel(channelType);
     try {
       const res = await fetch('/api/notifications/discord', {
@@ -260,11 +263,11 @@ export default function AdminSettingsPage() {
                     <div className="flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
                       <h3 className="text-xs font-bold text-white uppercase tracking-wider">
-                        1. สลิปโอนเงินรอการอนุมัติ (Admin Slip Alerts)
+                        1. สลิปโอนเงินรอการอนุมัติ (Slip Approval Alerts)
                       </h3>
                     </div>
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      ห้อง: <span className="text-amber-300 font-mono font-semibold">୨-💳-୧-⁺-˖-สลิปรออนุมัติ</span> (ห้องส่วนตัวเฉพาะแอดมิน — แนบภาพสลิปเต็ม & ลิงก์อนุมัติทันที)
+                      ห้องส่วนตัว: <span className="text-amber-300 font-mono font-semibold">୨-💳-୧-⁺-˖-สลิปรออนุมัติ</span> (แท็ก Owner & Admin • แนบภาพสลิปเต็ม & ลิงก์อนุมัติทันที)
                     </p>
                   </div>
                   <Button
@@ -292,18 +295,18 @@ export default function AdminSettingsPage() {
                 />
               </div>
 
-              {/* 2. Credits & Order Logs */}
+              {/* 2. Topup Logs */}
               <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
                       <h3 className="text-xs font-bold text-white uppercase tracking-wider">
-                        2. บันทึกประวัติเติมเงิน & การสั่งซื้อ (Credits & Order Logs)
+                        2. ประวัติการเติมเงินสำเร็จ (Topup Logs)
                       </h3>
                     </div>
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      ห้อง: <span className="text-emerald-300 font-mono font-semibold">୨-💾-୧-⁺-˖-credits</span> (แจ้งเตือนเมื่อสลิปอนุมัติ, เติมซองอั่งเปาสำเร็จ, หรือลูกค้าสั่งซื้อสินค้า)
+                      ห้องส่วนตัว: <span className="text-emerald-300 font-mono font-semibold">୨-💰-୧-⁺-˖-ประวัติเติมเงิน</span> (แจ้งเตือนเมื่อแอดมินอนุมัติสลิป หรือลูกค้าเติมซองอั่งเปาสำเร็จ)
                     </p>
                   </div>
                   <Button
@@ -323,7 +326,7 @@ export default function AdminSettingsPage() {
                   </Button>
                 </div>
                 <Input
-                  label="Webhook URL (ประวัติเติมเงิน & คำสั่งซื้อ)"
+                  label="Webhook URL (ประวัติเติมเงิน)"
                   value={discordWebhookCredits}
                   onChange={(e) => setDiscordWebhookCredits(e.target.value)}
                   placeholder="https://discord.com/api/webhooks/..."
@@ -331,18 +334,57 @@ export default function AdminSettingsPage() {
                 />
               </div>
 
-              {/* 3. Welcome New Members */}
+              {/* 3. Order Logs */}
+              <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-indigo-400" />
+                      <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                        3. รายการคำสั่งซื้อสินค้า (Order Logs)
+                      </h3>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      ห้องส่วนตัว: <span className="text-indigo-300 font-mono font-semibold">୨-🛒-୧-⁺-˖-คำสั่งซื้อ</span> (แจ้งเตือนรายการสินค้าที่ลูกค้าสั่งซื้อ, หมายเลขคำสั่งซื้อ, ยอดเงิน)
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={testingChannel === 'order'}
+                    onClick={() => handleTestDiscord('order')}
+                    className="text-xs border-indigo-500/40 text-indigo-300 hover:bg-indigo-500/10 shrink-0 cursor-pointer"
+                  >
+                    {testingChannel === 'order' ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                    ) : (
+                      <Send className="w-3.5 h-3.5 mr-1.5" />
+                    )}
+                    <span>ทดสอบส่งห้องนี้</span>
+                  </Button>
+                </div>
+                <Input
+                  label="Webhook URL (รายการคำสั่งซื้อสินค้า)"
+                  value={discordWebhookOrder}
+                  onChange={(e) => setDiscordWebhookOrder(e.target.value)}
+                  placeholder="https://discord.com/api/webhooks/..."
+                  className="font-mono text-xs"
+                />
+              </div>
+
+              {/* 4. Member Logs */}
               <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full bg-sky-400" />
                       <h3 className="text-xs font-bold text-white uppercase tracking-wider">
-                        3. ต้อนรับสมาชิกใหม่ (New Member Welcome)
+                        4. สมาชิกใหม่ลงทะเบียน (Member Logs)
                       </h3>
                     </div>
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      ห้อง: <span className="text-sky-300 font-mono font-semibold">►-ยินดีต้อนรับ</span> (แจ้งเตือนต้อนรับเมื่อมีผู้ใช้สมัครสมาชิกใหม่บนเว็บไซต์)
+                      ห้องส่วนตัว: <span className="text-sky-300 font-mono font-semibold">୨-👤-୧-⁺-˖-สมาชิกใหม่</span> (แจ้งเตือนเมื่อมีผู้ใช้ใหม่สมัครสมาชิกบนเว็บไซต์)
                     </p>
                   </div>
                   <Button
@@ -362,7 +404,7 @@ export default function AdminSettingsPage() {
                   </Button>
                 </div>
                 <Input
-                  label="Webhook URL (ต้อนรับสมาชิกใหม่)"
+                  label="Webhook URL (สมาชิกใหม่ลงทะเบียน)"
                   value={discordWebhookWelcome}
                   onChange={(e) => setDiscordWebhookWelcome(e.target.value)}
                   placeholder="https://discord.com/api/webhooks/..."
@@ -370,7 +412,7 @@ export default function AdminSettingsPage() {
                 />
               </div>
 
-              {/* 4. Role Mentions for Pending Slips */}
+              {/* 5. Role Mentions for Pending Slips */}
               <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-3">
                 <div>
                   <div className="flex items-center gap-2">

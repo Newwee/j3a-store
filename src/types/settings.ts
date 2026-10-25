@@ -26,9 +26,11 @@ export interface StoreSettings {
   footerDescription?: string;
   /** Discord Webhook สำหรับแจ้งเตือนสลิปรออนุมัติ (Admin Channel) */
   discordWebhookSlip?: string;
-  /** Discord Webhook สำหรับแจ้งเตือนประวัติการเติมเงิน & คำสั่งซื้อ (Credits Channel) */
+  /** Discord Webhook สำหรับแจ้งเตือนประวัติการเติมเงิน (Topup Logs Channel) */
   discordWebhookCredits?: string;
-  /** Discord Webhook สำหรับแจ้งเตือนสมาชิกใหม่ (Welcome Channel) */
+  /** Discord Webhook สำหรับแจ้งเตือนคำสั่งซื้อสินค้า (Order Logs Channel) */
+  discordWebhookOrder?: string;
+  /** Discord Webhook สำหรับแจ้งเตือนสมาชิกใหม่ (Member Logs Channel) */
   discordWebhookWelcome?: string;
   /** Discord Role ID สำหรับแท็ก Owner ในการแจ้งเตือนสลิป */
   discordRoleOwner?: string;

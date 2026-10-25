@@ -34,6 +34,7 @@ export async function POST(req: Request) {
     if (body.footerDescription !== undefined) updates.footer_description = body.footerDescription;
     if (body.discordWebhookSlip !== undefined) updates.discord_webhook_slip = body.discordWebhookSlip;
     if (body.discordWebhookCredits !== undefined) updates.discord_webhook_credits = body.discordWebhookCredits;
+    if (body.discordWebhookOrder !== undefined) updates.discord_webhook_order = body.discordWebhookOrder;
     if (body.discordWebhookWelcome !== undefined) updates.discord_webhook_welcome = body.discordWebhookWelcome;
     if (body.discordRoleOwner !== undefined) updates.discord_role_owner = body.discordRoleOwner;
     if (body.discordRoleAdmin !== undefined) updates.discord_role_admin = body.discordRoleAdmin;

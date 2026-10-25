@@ -61,13 +61,15 @@ export async function POST(req: Request) {
       }
 
       case 'test_channel': {
-        const { channelType } = data; // 'slip' | 'credits' | 'welcome'
+        const { channelType } = data; // 'slip' | 'credits' | 'order' | 'welcome'
         const webhooks = await getDiscordWebhooks();
         const targetUrl =
           channelType === 'slip'
             ? webhooks.slip
             : channelType === 'credits'
             ? webhooks.credits
+            : channelType === 'order'
+            ? webhooks.order
             : webhooks.welcome;
 
         const success = await sendDiscordWebhook(targetUrl, {
