@@ -42,6 +42,7 @@ const ElectricLogo = dynamic(() => import('@/components/ui/ElectricLogo'), {
 export function HeroSection() {
   const { t } = useLanguage();
   const [settings, setSettings] = useState<StoreSettings | null>(null);
+  const [isDesktop, setIsDesktop] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -52,18 +53,31 @@ export function HeroSection() {
       .catch((err) => {
         console.warn('Failed to load store settings for showcase:', err);
       });
+
+    const check = () => {
+      const hasFinePointer = typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+      const isLargeScreen = typeof window !== 'undefined' && window.innerWidth >= 1024;
+      if (isMounted) setIsDesktop(hasFinePointer && isLargeScreen);
+    };
+    check();
+    window.addEventListener('resize', check);
+
     return () => {
       isMounted = false;
+      window.removeEventListener('resize', check);
     };
   }, []);
 
   return (
     <section className="relative pt-8 pb-16 lg:pt-16 lg:pb-24 overflow-visible">
-      {/* Soft ambient atmospheric glow - lowest layer with smooth bottom fade mask */}
-      <div className="absolute inset-0 pointer-events-none -z-10 overflow-visible [mask-image:linear-gradient(to_bottom,black_60%,transparent_100%)]">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[500px] bg-gradient-to-tr from-cyan-500/10 via-indigo-500/10 to-transparent rounded-full blur-[140px]" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-cyan-500/10 rounded-full blur-[140px]" />
-        <div className="absolute top-1/3 right-1/4 w-[400px] h-[400px] bg-blue-600/10 rounded-full blur-[120px]" />
+      {/* Soft ambient atmospheric glow - High-performance GPU radial gradient */}
+      <div className="absolute inset-0 pointer-events-none -z-10 overflow-hidden">
+        <div
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85vw] h-[500px] max-w-[900px] rounded-full pointer-events-none"
+          style={{
+            background: 'radial-gradient(circle, rgba(6,182,212,0.14) 0%, rgba(99,102,241,0.08) 40%, transparent 70%)',
+          }}
+        />
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
@@ -77,13 +91,23 @@ export function HeroSection() {
               <span>{t('hero_new_version', 'เวอร์ชันใหม่เปิดให้บริการแล้ว! ระบบอัตโนมัติ 24 ชม.')}</span>
             </div>
 
-            {/* Main Headline with ASCIIText */}
-            <div className="w-full h-36 sm:h-44 lg:h-52 relative flex items-center justify-center lg:justify-start -my-2 overflow-hidden">
-              <ASCIIText
-                text="J3A STORE"
-                enableWaves={false}
-                asciiFontSize={6}
-              />
+            {/* Main Headline with ASCIIText on Desktop, Clean Typography on Mobile */}
+            <div className="w-full min-h-[100px] sm:min-h-[120px] lg:h-52 relative flex items-center justify-center lg:justify-start -my-2 overflow-hidden">
+              {isDesktop ? (
+                <div className="w-full h-full relative">
+                  <ASCIIText
+                    text="J3A STORE"
+                    enableWaves={false}
+                    asciiFontSize={6}
+                  />
+                </div>
+              ) : (
+                <div className="py-2 text-center lg:text-left">
+                  <h1 className="text-4xl sm:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-sky-300 to-indigo-400 tracking-wider drop-shadow-[0_0_35px_rgba(6,182,212,0.35)] select-none">
+                    J3A STORE
+                  </h1>
+                </div>
+              )}
             </div>
 
             {/* Sub-headline badge (รูป 1: แก้ไขได้จาก Admin Settings) */}
@@ -159,70 +183,85 @@ export function HeroSection() {
             </div>
           </div>
 
-          {/* Right Column: 3D CardSwap (YouTube Showcase & Electric Logo) */}
-          <div className="lg:col-span-5 relative flex items-center justify-center min-h-[500px]">
-            <CardSwap
-              width={460}
-              height={460}
-              cardDistance={35}
-              verticalDistance={30}
-              delay={5000}
-              pauseOnHover={true}
-              skewAmount={4}
-              easing="elastic"
-            >
-              {/* Card 1: YouTube Showcase (Shown FIRST when entering website) */}
-              <Card customClass="w-full h-full">
-                <ShowcaseVideoCard
-                  youtubeUrl={settings?.showcaseYoutubeUrl}
-                  title={settings?.showcaseTitle}
-                  subtitle={settings?.showcaseSubtitle}
-                />
-              </Card>
+          {/* Right Column: 3D CardSwap on Desktop, Native Smooth Showcase on Mobile */}
+          <div className="lg:col-span-5 relative flex items-center justify-center">
+            {isDesktop ? (
+              <div className="min-h-[500px] flex items-center justify-center">
+                <CardSwap
+                  width={460}
+                  height={460}
+                  cardDistance={35}
+                  verticalDistance={30}
+                  delay={5000}
+                  pauseOnHover={true}
+                  skewAmount={4}
+                  easing="elastic"
+                >
+                  {/* Card 1: YouTube Showcase (Shown FIRST when entering website) */}
+                  <Card customClass="w-full h-full">
+                    <ShowcaseVideoCard
+                      youtubeUrl={settings?.showcaseYoutubeUrl}
+                      title={settings?.showcaseTitle}
+                      subtitle={settings?.showcaseSubtitle}
+                    />
+                  </Card>
 
-              {/* Card 2: Electric Logo */}
-              <Card customClass="w-full h-full rounded-3xl overflow-hidden border border-cyan-500/40 bg-slate-950/85 shadow-[0_0_50px_rgba(6,182,212,0.3)] flex flex-col items-center justify-between relative p-4 select-none">
-                {/* Header Tag */}
-                <div className="w-full flex items-center justify-between z-10">
-                  <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/40 text-cyan-300 font-extrabold text-[10px] tracking-wider uppercase shadow-[0_0_12px_rgba(6,182,212,0.2)]">
-                    J3A STORE • OFFICIAL
-                  </span>
-                  <span className="text-[10px] font-bold text-slate-400">
-                    Next-Gen Store
-                  </span>
-                </div>
+                  {/* Card 2: Electric Logo */}
+                  <Card customClass="w-full h-full rounded-3xl overflow-hidden border border-cyan-500/40 bg-slate-950/85 shadow-[0_0_50px_rgba(6,182,212,0.3)] flex flex-col items-center justify-between relative p-4 select-none">
+                    {/* Header Tag */}
+                    <div className="w-full flex items-center justify-between z-10">
+                      <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/40 text-cyan-300 font-extrabold text-[10px] tracking-wider uppercase shadow-[0_0_12px_rgba(6,182,212,0.2)]">
+                        J3A STORE • OFFICIAL
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-400">
+                        Next-Gen Store
+                      </span>
+                    </div>
 
-                {/* Electric Logo Animation */}
-                <div className="w-full flex-1 flex items-center justify-center my-auto scale-90 sm:scale-100">
-                  <ElectricLogo
-                    src="/Logo2.png"
-                    color="#ffcdd2"
-                    glowColor="#ff5260"
-                    scale={0.7}
-                    strands={4}
-                    bend={0.6}
-                    crackle={1.5}
-                    arcs={0.4}
-                    speed={2.5}
-                    interactive
-                    intensity={1}
-                    glow={1}
-                    thickness={1.5}
-                    flicker={0.6}
-                    fill={0}
-                    cursorIntensity={0.75}
-                    cursorRadius={100}
+                    {/* Electric Logo Animation */}
+                    <div className="w-full flex-1 flex items-center justify-center my-auto scale-90 sm:scale-100">
+                      <ElectricLogo
+                        src="/Logo2.png"
+                        color="#ffcdd2"
+                        glowColor="#ff5260"
+                        scale={0.7}
+                        strands={4}
+                        bend={0.6}
+                        crackle={1.5}
+                        arcs={0.4}
+                        speed={2.5}
+                        interactive
+                        intensity={1}
+                        glow={1}
+                        thickness={1.5}
+                        flicker={0.6}
+                        fill={0}
+                        cursorIntensity={0.75}
+                        cursorRadius={100}
+                      />
+                    </div>
+
+                    {/* Footer Tag */}
+                    <div className="w-full text-center z-10 pt-1 border-t border-slate-800/80">
+                      <span className="text-[10px] tracking-widest text-slate-400 uppercase font-semibold">
+                        Automated Digital Delivery • 24/7
+                      </span>
+                    </div>
+                  </Card>
+                </CardSwap>
+              </div>
+            ) : (
+              /* Mobile Showcase: Clean, Lightweight, High Performance (Zero WebGL Crash) */
+              <div className="w-full max-w-lg mx-auto">
+                <div className="w-full rounded-3xl overflow-hidden border border-cyan-500/30 bg-slate-950/90 shadow-[0_0_30px_rgba(6,182,212,0.25)] p-2">
+                  <ShowcaseVideoCard
+                    youtubeUrl={settings?.showcaseYoutubeUrl}
+                    title={settings?.showcaseTitle}
+                    subtitle={settings?.showcaseSubtitle}
                   />
                 </div>
-
-                {/* Footer Tag */}
-                <div className="w-full text-center z-10 pt-1 border-t border-slate-800/80">
-                  <span className="text-[10px] tracking-widest text-slate-400 uppercase font-semibold">
-                    Automated Digital Delivery • 24/7
-                  </span>
-                </div>
-              </Card>
-            </CardSwap>
+              </div>
+            )}
           </div>
         </div>
       </div>

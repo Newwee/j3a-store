@@ -54,7 +54,7 @@ if (typeof Math !== 'undefined') {
   (Math as any).map = mapRange;
 }
 
-const PX_RATIO = typeof window !== 'undefined' ? window.devicePixelRatio : 1;
+const PX_RATIO = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 1.5) : 1;
 
 class AsciiFilter {
   renderer: THREE.WebGLRenderer;
@@ -281,6 +281,7 @@ class CanvAscii {
   renderer!: THREE.WebGLRenderer;
   filter!: AsciiFilter;
   animationFrameId: number = 0;
+  isIntersecting: boolean = true;
 
   constructor(
     { text, asciiFontSize, textFontSize, textColor, planeBaseHeight, enableWaves }: any,
@@ -407,7 +408,9 @@ class CanvAscii {
   animate() {
     const animateFrame = () => {
       this.animationFrameId = requestAnimationFrame(animateFrame);
-      this.render();
+      if (this.isIntersecting) {
+        this.render();
+      }
     };
     animateFrame();
   }
@@ -534,6 +537,13 @@ export default function ASCIIText({
       asciiRef.current = await createAndInit(containerRef.current, width, height);
       if (!cancelled && asciiRef.current) {
         asciiRef.current.load();
+
+        observer = new IntersectionObserver(([entry]) => {
+          if (asciiRef.current) {
+            asciiRef.current.isIntersecting = entry.isIntersecting;
+          }
+        }, { threshold: 0.05 });
+        observer.observe(containerRef.current);
 
         ro = new ResizeObserver(entries => {
           if (!entries[0] || !asciiRef.current) return;

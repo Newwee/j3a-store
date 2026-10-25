@@ -73,7 +73,7 @@ export function Navbar() {
                     J3A STORE
                   </span>
                   <span className="text-[10px] tracking-widest text-cyan-400/80 font-bold -mt-1 uppercase">
-                    Digital Commerce
+                    Discord Software & Services
                   </span>
                 </div>
               </Link>
@@ -129,7 +129,7 @@ export function Navbar() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder={t('nav_search_placeholder', 'ค้นหาเกม / บัตรเติมเงิน / สินค้า...')}
+                  placeholder={t('nav_search_placeholder', 'ค้นหาซอฟต์แวร์ / บอท / สินค้าดิจิทัล...')}
                   className="w-full bg-slate-900/90 text-sm text-slate-100 placeholder:text-slate-500 rounded-full pl-10 pr-4 py-2 border border-slate-700/80 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 outline-none transition-all"
                 />
                 <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />

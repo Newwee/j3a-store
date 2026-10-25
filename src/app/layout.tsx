@@ -7,7 +7,7 @@ import { AuthProvider } from '@/context/AuthContext';
 import { CartProvider } from '@/context/CartContext';
 import { ToastProvider } from '@/context/ToastContext';
 import { LoadingProvider } from '@/context/LoadingContext';
-import TargetCursor from '@/components/ui/TargetCursor';
+import CustomCursor from '@/components/ui/CustomCursor';
 import { getStoreSettings, DEFAULT_STORE_SETTINGS } from '@/lib/firestore/settings';
 
 const inter = Inter({
@@ -149,15 +149,7 @@ export default function RootLayout({
       >
         <ThemeProvider>
           <LanguageProvider>
-            <TargetCursor
-              spinDuration={5}
-              hideDefaultCursor={false}
-              parallaxOn
-              hoverDuration={0.25}
-              cursorColor="#ffffff"
-              cursorColorOnTarget="#B497CF"
-              targetSelector=".cursor-target, button, a, [role='button']"
-            />
+            <CustomCursor />
             <ToastProvider>
               <LoadingProvider>
                 <AuthProvider>

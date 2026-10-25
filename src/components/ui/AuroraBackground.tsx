@@ -18,26 +18,40 @@ export const AuroraBackground = memo(function AuroraBackground({
   children,
   showRadialGradient = true,
 }: AuroraBackgroundProps) {
+  const [isDesktop, setIsDesktop] = React.useState(false);
+
+  React.useEffect(() => {
+    const check = () => {
+      const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+      setIsDesktop(window.innerWidth >= 1024 && finePointer);
+    };
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
   return (
     <div
       className={`aurora-bg fixed inset-0 pointer-events-none -z-50 overflow-hidden bg-[#09080e] transition-colors duration-500 ${className}`}
       style={{ contain: 'strict' }}
       aria-hidden="true"
     >
-      {/* 3D WebGL Particles Background (Optimized to 50 particles for zero GPU strain) */}
-      <div className="particles-layer absolute inset-0 pointer-events-none overflow-hidden -z-50 opacity-60">
-        <Particles
-          particleColors={['#6187ff', '#38bdf8', '#818cf8']}
-          particleCount={50}
-          particleSpread={15}
-          speed={0.14}
-          particleBaseSize={80}
-          moveParticlesOnHover={false}
-          alphaParticles={false}
-          disableRotation={false}
-          pixelRatio={1}
-        />
-      </div>
+      {/* 3D WebGL Particles Background (Only loaded on desktop to save mobile GPU memory) */}
+      {isDesktop && (
+        <div className="particles-layer absolute inset-0 pointer-events-none overflow-hidden -z-50 opacity-60">
+          <Particles
+            particleColors={['#6187ff', '#38bdf8', '#818cf8']}
+            particleCount={40}
+            particleSpread={15}
+            speed={0.14}
+            particleBaseSize={80}
+            moveParticlesOnHover={false}
+            alphaParticles={false}
+            disableRotation={false}
+            pixelRatio={1}
+          />
+        </div>
+      )}
 
       {/* Aurora Ambient Glow Blobs (High-Performance GPU Radial Gradients - Zero Gaussian Blur passes) */}
       <div className="aurora-blobs-layer absolute inset-0 opacity-40 dark:opacity-35 transition-opacity duration-1000 pointer-events-none will-change-transform">
