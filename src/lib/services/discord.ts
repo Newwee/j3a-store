@@ -1,14 +1,10 @@
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
-// Default Fallback Webhook URLs & Role IDs (Private Category: ୨୧ ₊˚ 🔒 𝐀𝐝𝐦𝐢𝐧 𝐌𝐚𝐧𝐚𝐠𝐞 ˚₊ ୨୧)
-const DEFAULT_WEBHOOK_SLIP =
-  'https://discord.com/api/webhooks/1563838807369977917/zubkvc8V0t7i_-CLIbwMhN9yXsx65-yDw_tslKgiM0l9nHbD9xS_Ki4IFAzt1uOB-2Jp';
-const DEFAULT_WEBHOOK_CREDITS =
-  'https://discord.com/api/webhooks/1563850107282128906/G7dp9H3KxujiMJWkl013sFiQs7gvZhrzGqvFWWGEtorrYEpecq9bi-MFZz8sctZycrRK';
-const DEFAULT_WEBHOOK_ORDER =
-  'https://discord.com/api/webhooks/1563850109241008239/PBBRf4WQju8hFSEB32X9VIDQAUb7hRpIwCWAWjg3VL_6DJcCQKX7P-gfiBlHW3j1x00A';
-const DEFAULT_WEBHOOK_WELCOME =
-  'https://discord.com/api/webhooks/1563850111170256917/wrWXMv3d0p4ajxvNPrfN4M-sZx_DuvbqgBpSm8euHWbfojuEHskzwGS_S3-z4rC4nyYO';
+// Default Fallback Webhook URLs & Role IDs (Loaded dynamically via .env or settings table)
+const DEFAULT_WEBHOOK_SLIP = '';
+const DEFAULT_WEBHOOK_CREDITS = '';
+const DEFAULT_WEBHOOK_ORDER = '';
+const DEFAULT_WEBHOOK_WELCOME = '';
 
 const DEFAULT_ROLE_OWNER = '1555520737975205919';
 const DEFAULT_ROLE_ADMIN = '1555520740558897205';
