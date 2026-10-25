@@ -31,6 +31,8 @@ const TIER_NAMES: Record<string, string> = {
   '1w': '1 Week (7 วัน)',
   '4w': '4 Weeks (28 วัน)',
   '6m': '6 Months (180 วัน)',
+  'lifetime': 'Lifetime (ตลอดชีพ / ลูกค้าเดิม)',
+  'legacy': 'Legacy (ชดเชยลูกค้าเดิม)',
 };
 
 export async function POST(req: NextRequest) {
