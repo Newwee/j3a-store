@@ -164,7 +164,7 @@ export function ProductCard({ product }: { product: Product }) {
               addItem(product, 1);
             }}
             disabled={isOutOfStock}
-            className="p-2.5 rounded-xl bg-slate-800 hover:bg-cyan-500 hover:text-slate-950 text-slate-200 border border-slate-700 hover:border-cyan-400 transition-all shadow-sm disabled:opacity-40 disabled:hover:bg-slate-800 disabled:hover:text-slate-200 cursor-pointer"
+            className="p-2.5 min-w-[42px] min-h-[42px] flex items-center justify-center rounded-xl bg-slate-800 hover:bg-cyan-500 hover:text-slate-950 text-slate-200 border border-slate-700 hover:border-cyan-400 transition-all shadow-sm active:scale-90 disabled:opacity-40 disabled:hover:bg-slate-800 disabled:hover:text-slate-200 cursor-pointer"
             aria-label="Add to cart"
           >
             <ShoppingCart className="w-4 h-4" />

@@ -272,64 +272,106 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [syncProfile, showLoading, hideLoading, toast]);
 
   const login = async (email: string, pass: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
+    const trimmedEmail = email.trim();
+    let result = await supabase.auth.signInWithPassword({
+      email: trimmedEmail,
       password: pass,
     });
 
-    if (error) {
-      throw error;
+    if (result.error) {
+      const errMsg = (result.error.message || '').toLowerCase();
+      // If error is email not confirmed, auto-confirm via API and retry
+      if (
+        errMsg.includes('not confirmed') ||
+        (result.error as any).code === 'email_not_confirmed'
+      ) {
+        try {
+          const confirmRes = await fetch('/api/auth/auto-confirm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: trimmedEmail }),
+          });
+          if (confirmRes.ok) {
+            result = await supabase.auth.signInWithPassword({
+              email: trimmedEmail,
+              password: pass,
+            });
+          }
+        } catch (e) {
+          console.warn('Auto-confirm retry failed:', e);
+        }
+      }
+
+      if (result.error) {
+        throw result.error;
+      }
     }
 
-    if (data.user) {
+    if (result.data.user) {
       if (typeof window !== 'undefined') {
         localStorage.setItem('j3a_last_auth_provider', 'email');
-        localStorage.setItem('j3a_last_email', data.user.email || '');
+        localStorage.setItem('j3a_last_email', result.data.user.email || '');
       }
-      const appUser = mapSupabaseUserToAppUser(data.user)!;
+      const appUser = mapSupabaseUserToAppUser(result.data.user)!;
       await clearOrArchiveDeletionRequest(appUser.uid);
       await syncProfile(appUser, { isExplicitLogin: true });
     }
   };
 
   const register = async (email: string, pass: string, name: string) => {
-    const { data, error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password: pass,
-      options: {
-        data: {
-          full_name: name.trim(),
-          name: name.trim(),
-        },
-      },
+    const trimmedEmail = email.trim();
+    const trimmedName = name.trim();
+
+    // 1. Register through server API with auto email confirm & profile creation
+    const regRes = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: trimmedEmail,
+        password: pass,
+        name: trimmedName,
+      }),
     });
 
-    if (error) {
-      throw error;
+    const regData = await regRes.json();
+    if (!regRes.ok || regData.error) {
+      const err = new Error(regData.error || 'ไม่สามารถลงทะเบียนได้');
+      if (regRes.status === 409) {
+        (err as any).code = 'auth/email-already-in-use';
+      }
+      throw err;
     }
 
-    if (data.user) {
-      const appUser = mapSupabaseUserToAppUser(data.user)!;
+    // 2. Immediately sign in on client to establish session
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      email: trimmedEmail,
+      password: pass,
+    });
+
+    if (signInError) {
+      console.warn('Auto-login after register warning:', signInError);
+    } else if (signInData.user) {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('j3a_last_auth_provider', 'email');
+        localStorage.setItem('j3a_last_email', signInData.user.email || '');
+      }
+      const appUser = mapSupabaseUserToAppUser(signInData.user)!;
       await clearOrArchiveDeletionRequest(appUser.uid);
-      const newProfile = await createUserProfile(appUser.uid, {
-        email: appUser.email || undefined,
-        displayName: name.trim(),
-      });
-      setProfile(newProfile);
-
-      // Dispatch Discord Welcome Notification (►-ยินดีต้อนรับ)
-      fetch('/api/notifications/discord', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          event: 'member_registered',
-          data: {
-            userName: name.trim(),
-            userEmail: appUser.email || '',
-          },
-        }),
-      }).catch((notifyErr) => console.warn('Discord new member notify error:', notifyErr));
+      await syncProfile(appUser, { isExplicitLogin: true });
     }
+
+    // 3. Dispatch Discord Welcome Notification (►-ยินดีต้อนรับ)
+    fetch('/api/notifications/discord', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        event: 'member_registered',
+        data: {
+          userName: trimmedName,
+          userEmail: trimmedEmail,
+        },
+      }),
+    }).catch((notifyErr) => console.warn('Discord new member notify error:', notifyErr));
   };
 
   const loginWithGoogle = async () => {

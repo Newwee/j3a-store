@@ -567,7 +567,7 @@ function ProfileContent() {
         </div>
 
         {/* Tab Controls with Neon Glass Accents */}
-        <div className="flex items-center gap-2 border-b border-slate-800/80 pb-3 overflow-x-auto scrollbar-none text-xs sm:text-sm font-bold">
+        <div className="flex items-center gap-2 border-b border-slate-800/80 pb-3 overflow-x-auto smooth-scroll no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 text-xs sm:text-sm font-bold">
           <button
             onClick={() => setActiveTab('overview')}
             className={`px-4 py-2.5 rounded-xl transition-all cursor-pointer flex items-center gap-2 shrink-0 ${

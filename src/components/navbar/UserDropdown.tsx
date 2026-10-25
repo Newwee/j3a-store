@@ -60,16 +60,16 @@ export function UserDropdown() {
 
   if (!user) {
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 sm:gap-2">
         <Link
           href="/login"
-          className="text-xs sm:text-sm font-semibold text-slate-300 hover:text-white px-3 py-2 rounded-xl hover:bg-slate-800/60 transition-all"
+          className="text-xs sm:text-sm font-semibold text-slate-300 hover:text-white px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl hover:bg-slate-800/60 transition-all active:scale-95 whitespace-nowrap"
         >
           {t('nav_login', 'เข้าสู่ระบบ')}
         </Link>
         <Link
           href="/register"
-          className="text-xs sm:text-sm font-semibold bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white px-3.5 py-2 rounded-xl shadow-[0_0_15px_rgba(6,182,212,0.3)] transition-all"
+          className="hidden sm:inline-flex text-xs sm:text-sm font-semibold bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl shadow-[0_0_15px_rgba(6,182,212,0.3)] transition-all active:scale-95 whitespace-nowrap"
         >
           {t('nav_register', 'สมัครสมาชิก')}
         </Link>

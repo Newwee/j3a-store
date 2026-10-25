@@ -82,10 +82,16 @@ function RegisterFormContent() {
     } catch (err: any) {
       console.error('Registration error:', err);
       let msg = 'เกิดข้อผิดพลาดในการสมัครสมาชิก กรุณาลองใหม่อีกครั้ง';
-      if (err.code === 'auth/email-already-in-use') {
-        msg = 'อีเมลนี้ถูกใช้งานแล้ว กรุณาเข้าสู่ระบบหรือใช้อีเมลอื่น';
-      } else if (err.code === 'auth/weak-password') {
-        msg = 'รหัสผ่านคาดเดาง่ายเกินไป กรุณาใช้รหัสผ่านที่รัดกุมยิ่งขึ้น';
+      const rawMsg = (err.message || '').toLowerCase();
+      if (
+        err.code === 'auth/email-already-in-use' ||
+        rawMsg.includes('already registered') ||
+        rawMsg.includes('already exists') ||
+        rawMsg.includes('ถูกลงทะเบียน')
+      ) {
+        msg = 'อีเมลนี้ถูกลงทะเบียนไว้ในระบบแล้ว กรุณาเข้าสู่ระบบหรือใช้อีเมลอื่น';
+      } else if (err.code === 'auth/weak-password' || rawMsg.includes('weak') || rawMsg.includes('at least 6')) {
+        msg = 'รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษรและรัดกุมยิ่งขึ้น';
       } else if (err.message) {
         msg = err.message;
       }

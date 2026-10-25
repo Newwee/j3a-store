@@ -65,7 +65,7 @@ export function CartDrawer() {
       />
 
       {/* Drawer Container */}
-      <div className="fixed inset-y-0 right-0 max-w-full flex pl-6 sm:pl-10">
+      <div className="fixed inset-y-0 right-0 max-w-full flex pl-0 sm:pl-10">
         <div className="w-screen max-w-md bg-slate-950/95 border-l border-cyan-500/20 backdrop-blur-2xl shadow-[-20px_0_60px_rgba(6,182,212,0.15)] flex flex-col z-10 animate-in slide-in-from-right duration-300 relative overflow-hidden">
           {/* Top Neon Accent Line */}
           <div className="h-1 w-full bg-gradient-to-r from-cyan-500 via-indigo-500 to-pink-500 shadow-[0_0_12px_rgba(6,182,212,0.8)]" />

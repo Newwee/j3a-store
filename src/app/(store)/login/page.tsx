@@ -77,15 +77,30 @@ function LoginFormContent() {
     try {
       await login(email.trim(), password);
       success('เข้าสู่ระบบสำเร็จ ยินดีต้อนรับกลับ!');
-      router.push('/');
+      router.push(redirectUrl);
       router.refresh();
     } catch (err: any) {
       console.error('Login error:', err);
       let msg = 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ กรุณาลองใหม่อีกครั้ง';
-      if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
-        msg = 'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
-      } else if (err.code === 'auth/too-many-requests') {
-        msg = 'คุณพยายามเข้าสู่ระบบผิดหลายครั้งเกินไป กรุณารอสักครู่แล้วลองใหม่';
+      const rawMsg = (err.message || '').toLowerCase();
+      
+      if (
+        err.code === 'auth/invalid-credential' || 
+        err.code === 'auth/wrong-password' || 
+        err.code === 'auth/user-not-found' ||
+        rawMsg.includes('invalid login credentials') ||
+        rawMsg.includes('invalid credentials')
+      ) {
+        msg = 'อีเมลหรือรหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบใหม่อีกครั้ง';
+      } else if (
+        err.code === 'email_not_confirmed' ||
+        rawMsg.includes('email not confirmed')
+      ) {
+        msg = 'อีเมลยังไม่ได้รับการยืนยัน ระบบกำลังเปิดใช้งานให้อัตโนมัติ กรุณากดปุ่มเข้าสู่ระบบอีกครั้ง';
+      } else if (err.code === 'auth/too-many-requests' || rawMsg.includes('too many requests')) {
+        msg = 'คุณพยายามเข้าสู่ระบบถี่เกินไป กรุณารอสักครู่แล้วลองใหม่';
+      } else if (rawMsg.includes('invalid email')) {
+        msg = 'รูปแบบอีเมลไม่ถูกต้อง กรุณาตรวจสอบอีเมล';
       } else if (err.message) {
         msg = err.message;
       }

@@ -4,6 +4,7 @@ import { Footer } from '@/components/footer/Footer';
 import { AuroraBackground } from '@/components/ui/AuroraBackground';
 import { getStoreSettings } from '@/lib/firestore/settings';
 import { SitePopupModal } from '@/components/marketing/SitePopupModal';
+import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,8 +25,10 @@ export default async function StoreLayout({
 
       <div className="relative z-10 flex flex-col min-h-screen">
         <Navbar />
-        <main className="flex-1">{children}</main>
+        <main className="flex-1 pb-20 md:pb-0">{children}</main>
         <Footer footerDescription={settings?.footerDescription} />
+        {/* Mobile App-Style Bottom Navigation */}
+        <MobileBottomNav />
       </div>
     </div>
   );

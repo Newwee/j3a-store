@@ -384,3 +384,66 @@ html.light .hover\:bg-slate-700\/70:hover {
   background-color: #e2e8f0 !important;
   color: #0f172a !important;
 }
+
+/* ============================================================================
+   Mobile UX & Touch Performance Optimizations
+   ============================================================================ */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  scroll-behavior: smooth;
+  overscroll-behavior-y: contain;
+}
+
+/* Fast tap response & disable ugly grey highlight */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+a,
+input,
+select,
+textarea,
+[role="button"] {
+  touch-action: manipulation;
+}
+
+/* Prevent text selection when tapping navigation buttons */
+nav a,
+nav button,
+.no-select {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Momentum smooth scrolling on iOS/Android */
+.smooth-scroll {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* Hide scrollbar while preserving touch scroll */
+.no-scrollbar::-webkit-scrollbar,
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar,
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* GPU rendering boost for animated layers */
+.gpu-boost {
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+@media (max-width: 640px) {
+  /* Prevent background blur stutter on low-power mobile GPUs */
+  .backdrop-blur-2xl {
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+  }
+}

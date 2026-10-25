@@ -55,11 +55,11 @@ export function Navbar() {
     <>
       <header className="sticky top-0 z-40 w-full border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-20 gap-4">
+          <div className="flex items-center justify-between h-16 sm:h-20 gap-3 sm:gap-4">
             {/* 1. Brand Logo */}
-            <div className="flex items-center gap-6 shrink-0">
-              <Link href="/" className="flex items-center gap-3 group">
-                <div className="relative w-12 h-12 rounded-xl overflow-hidden shadow-[0_0_20px_rgba(6,182,212,0.3)] transition-transform duration-300 group-hover:scale-105">
+            <div className="flex items-center gap-4 sm:gap-6 shrink-0">
+              <Link href="/" className="flex items-center gap-2.5 sm:gap-3 group">
+                <div className="relative w-9 h-9 sm:w-12 sm:h-12 rounded-xl overflow-hidden shadow-[0_0_20px_rgba(6,182,212,0.3)] transition-transform duration-300 group-hover:scale-105 shrink-0">
                   <Image
                     src="/logo.png"
                     alt="J3A STORE Logo"
@@ -69,10 +69,10 @@ export function Navbar() {
                   />
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-xl font-black tracking-wider bg-gradient-to-r from-white via-cyan-200 to-cyan-400 bg-clip-text text-transparent uppercase">
+                  <span className="text-lg sm:text-xl font-black tracking-wider bg-gradient-to-r from-white via-cyan-200 to-cyan-400 bg-clip-text text-transparent uppercase leading-tight">
                     J3A STORE
                   </span>
-                  <span className="text-[10px] tracking-widest text-cyan-400/80 font-bold -mt-1 uppercase">
+                  <span className="hidden sm:block text-[10px] tracking-widest text-cyan-400/80 font-bold -mt-0.5 uppercase">
                     Discord Software & Services
                   </span>
                 </div>
