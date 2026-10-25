@@ -155,16 +155,9 @@ const TargetCursor = ({
 
     const { x: offsetX, y: offsetY } = getContainingBlockOffset(containingBlockRef.current);
 
-    gsap.to(cursorRef.current, {
-
+    gsap.set(cursorRef.current, {
       x: x - offsetX,
-
       y: y - offsetY,
-
-      duration: 0.1,
-
-      ease: 'power3.out'
-
     });
 
   }, []);
@@ -345,7 +338,19 @@ const TargetCursor = ({
 
 
 
-    const moveHandler = e => moveCursor(e.clientX, e.clientY);
+    let moveRaf = null;
+    let lastClientX = 0;
+    let lastClientY = 0;
+    const moveHandler = e => {
+      lastClientX = e.clientX;
+      lastClientY = e.clientY;
+      if (!moveRaf) {
+        moveRaf = requestAnimationFrame(() => {
+          moveCursor(lastClientX, lastClientY);
+          moveRaf = null;
+        });
+      }
+    };
 
     window.addEventListener('mousemove', moveHandler);
 

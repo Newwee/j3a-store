@@ -126,9 +126,11 @@ export const Particles: React.FC<ParticlesProps> = ({
     if (!container) return;
 
     const renderer = new Renderer({
-      dpr: pixelRatio,
+      dpr: Math.min(pixelRatio, 1.25),
       depth: false,
       alpha: true,
+      powerPreference: 'high-performance',
+      antialias: false,
     });
     const gl = renderer.gl;
     container.appendChild(gl.canvas);
@@ -216,7 +218,8 @@ export const Particles: React.FC<ParticlesProps> = ({
 
     const update = (t: number) => {
       animationFrameId = requestAnimationFrame(update);
-      const delta = t - lastTime;
+      if (typeof document !== 'undefined' && document.hidden) return;
+      const delta = Math.min(t - lastTime, 100);
       lastTime = t;
       elapsed += delta * speed;
 
