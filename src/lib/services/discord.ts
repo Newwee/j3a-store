@@ -14,6 +14,15 @@ const DEFAULT_ROLE_OWNER = '1555520737975205919';
 const DEFAULT_ROLE_ADMIN = '1555520740558897205';
 
 const STORE_AVATAR = 'https://cnrjaonjabzvfkvqdtkm.supabase.co/storage/v1/object/public/store-images/popups/welcome-banner.png';
+
+// Dedicated Discord Webhook Bot Avatars (Only for Webhook Bots - Does not affect website logo)
+export const BOT_AVATAR_SLIP =
+  'https://cnrjaonjabzvfkvqdtkm.supabase.co/storage/v1/object/public/store-images/discord-bots/slip-bot.jpg';
+export const BOT_AVATAR_WELCOME =
+  'https://cnrjaonjabzvfkvqdtkm.supabase.co/storage/v1/object/public/store-images/discord-bots/welcome-bot.jpg';
+export const BOT_AVATAR_CREDITS = BOT_AVATAR_SLIP;
+export const BOT_AVATAR_ORDER = BOT_AVATAR_SLIP;
+
 const STORE_URL = process.env.NEXT_PUBLIC_STORE_URL || 'https://j3a-store.vercel.app';
 
 /**
@@ -159,6 +168,7 @@ export async function notifyDiscordSlipSubmitted(data: {
 
   return sendDiscordWebhook(slip, {
     username: 'J3A STORE - สลิปรออนุมัติ',
+    avatar_url: BOT_AVATAR_SLIP,
     content: `🔔 ${roleTagString} **มีสลิปใหม่รอการตรวจสอบและอนุมัติ!**`,
     allowed_mentions: mentionRoles.length > 0 ? { roles: mentionRoles } : undefined,
     embeds: [embed],
@@ -201,6 +211,7 @@ export async function notifyDiscordSlipApproved(data: {
 
   return sendDiscordWebhook(slip, {
     username: 'J3A STORE - สลิปโอนเงิน (อนุมัติแล้ว)',
+    avatar_url: BOT_AVATAR_SLIP,
     content: `✅ **อนุมัติเรียบร้อย (Success)! รายการ \`${data.topupNumber}\` ยอด ฿${data.amount.toLocaleString('th-TH', { minimumFractionDigits: 2 })} เข้าบัญชีลูกค้าแล้ว**`,
     embeds: [embed],
   });
@@ -241,6 +252,7 @@ export async function notifyDiscordSlipRejected(data: {
 
   return sendDiscordWebhook(slip, {
     username: 'J3A STORE - สลิปโอนเงิน (ปฏิเสธ)',
+    avatar_url: BOT_AVATAR_SLIP,
     content: `⚠️ **รายการสลิป \`${data.topupNumber}\` ถูกปฏิเสธ!**`,
     embeds: [embed],
   });
@@ -274,6 +286,7 @@ export async function notifyDiscordTopupApproved(data: {
 
   return sendDiscordWebhook(credits, {
     username: 'J3A STORE - เครดิต & การชำระเงิน',
+    avatar_url: BOT_AVATAR_CREDITS,
     embeds: [embed],
   });
 }
@@ -310,6 +323,7 @@ export async function notifyDiscordAngpaoSuccess(data: {
 
   return sendDiscordWebhook(credits, {
     username: 'J3A STORE - เครดิต & การชำระเงิน',
+    avatar_url: BOT_AVATAR_CREDITS,
     embeds: [embed],
   });
 }
@@ -349,7 +363,9 @@ export async function notifyDiscordNewMember(data: {
   };
 
   return sendDiscordWebhook(welcome, {
-    username: 'J3A STORE - สมาชิกใหม่',
+    username: 'J3A STORE - ต้อนรับสมาชิกใหม่',
+    avatar_url: BOT_AVATAR_WELCOME,
+    content: `🎉 **ยินดีต้อนรับสมาชิกใหม่สู่ J3A STORE!**`,
     embeds: [embed],
   });
 }
@@ -410,6 +426,7 @@ export async function notifyDiscordOrderPlaced(data: {
 
   return sendDiscordWebhook(targetUrl, {
     username: 'J3A STORE - คำสั่งซื้อสินค้า',
+    avatar_url: BOT_AVATAR_ORDER,
     embeds: [embed],
   });
 }
