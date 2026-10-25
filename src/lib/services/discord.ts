@@ -280,23 +280,50 @@ export async function notifyDiscordNewMember(data: {
 export async function notifyDiscordOrderPlaced(data: {
   orderNumber: string;
   userName: string;
+  userEmail?: string;
   itemsSummary: string;
   totalAmount: number;
+  subtotal?: number;
+  discount?: number;
+  discountCode?: string;
+  paymentMethod?: string;
 }): Promise<boolean> {
   const { order, credits } = await getDiscordWebhooks();
   const targetUrl = order || credits;
 
+  const paymentLabel =
+    data.paymentMethod === 'wallet'
+      ? '💳 ยอดเงินในเว็บ (Wallet)'
+      : data.paymentMethod === 'promptpay'
+      ? '📱 พร้อมเพย์ (PromptPay)'
+      : data.paymentMethod === 'bank_transfer'
+      ? '🏦 โอนผ่านบัญชีธนาคาร'
+      : data.paymentMethod?.toUpperCase() || 'ไม่ระบุ';
+
+  const discountField =
+    data.discount && data.discount > 0
+      ? `🎟️ โค้ด **${data.discountCode || 'DISCOUNT'}** (-฿${data.discount.toLocaleString('th-TH', { minimumFractionDigits: 2 })})`
+      : '❌ ไม่ได้ใช้ส่วนลด (ราคาเต็ม)';
+
   const embed: any = {
     title: '🛍️ มีรายการสั่งซื้อใหม่สำเร็จ (New Order)',
-    description: `ลูกค้าทำรายการสั่งซื้อสินค้าดิจิทัลและจัดส่งผ่านระบบอัตโนมัติเรียบร้อยแล้ว`,
+    description: `ลูกค้าทำรายการสั่งซื้อสินค้าบนเว็บไซต์ J3A STORE เรียบร้อยแล้ว`,
     color: 0x8b5cf6, // Violet / Purple
     fields: [
-      { name: 'รหัสคำสั่งซื้อ', value: `\`${data.orderNumber}\``, inline: true },
-      { name: 'ยอดชำระ', value: `**฿${data.totalAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}**`, inline: true },
+      { name: 'รหัสคำสั่งซื้อ', value: `\`#${data.orderNumber}\``, inline: true },
+      { name: 'ยอดชำระสุทธิ', value: `**฿${data.totalAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}**`, inline: true },
+      { name: 'วิธีชำระเงิน', value: paymentLabel, inline: true },
       { name: 'ลูกค้า', value: data.userName || 'ลูกค้า', inline: true },
+      { name: 'อีเมล', value: data.userEmail || '-', inline: true },
+      { name: 'ส่วนลดคูปอง', value: discountField, inline: true },
       { name: 'รายการสินค้า', value: data.itemsSummary || 'สินค้าดิจิทัล', inline: false },
+      {
+        name: '🔗 ลิงก์สำหรับแอดมิน',
+        value: `[คลิกที่นี่เพื่อไปหน้าจัดการออเดอร์](${STORE_URL}/admin/orders)`,
+        inline: false,
+      },
     ],
-    footer: { text: 'J3A STORE • ระบบจำหน่ายสินค้าดิจิทัลอัตโนมัติ' },
+    footer: { text: 'J3A STORE • ระบบคำสั่งซื้อดิจิทัลอัตโนมัติ' },
     timestamp: new Date().toISOString(),
   };
 

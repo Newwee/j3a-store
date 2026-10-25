@@ -47,15 +47,20 @@ export async function POST(req: Request) {
       }
 
       case 'order_placed': {
-        const { orderNumber, userName, itemsSummary, totalAmount } = data;
+        const { orderNumber, userName, userEmail, itemsSummary, totalAmount, subtotal, discount, discountCode, paymentMethod } = data;
         if (!orderNumber || totalAmount === undefined) {
           return NextResponse.json({ error: 'Missing order details' }, { status: 400 });
         }
         const success = await notifyDiscordOrderPlaced({
           orderNumber,
           userName,
+          userEmail,
           itemsSummary,
           totalAmount: Number(totalAmount),
+          subtotal: subtotal ? Number(subtotal) : undefined,
+          discount: discount ? Number(discount) : undefined,
+          discountCode,
+          paymentMethod,
         });
         return NextResponse.json({ ok: true, sent: success });
       }

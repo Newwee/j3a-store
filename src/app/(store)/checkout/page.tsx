@@ -512,8 +512,13 @@ export default function CheckoutPage() {
             data: {
               orderNumber: created.orderNumber || created.id,
               userName: name.trim() || user?.displayName || 'ลูกค้า',
+              userEmail: user?.email || email || '',
               itemsSummary,
               totalAmount: finalTotal,
+              subtotal: subtotal,
+              discount: discountAmount,
+              discountCode: appliedDiscount?.code,
+              paymentMethod: paymentMethod,
             },
           }),
           signal: AbortSignal.timeout(4000),
