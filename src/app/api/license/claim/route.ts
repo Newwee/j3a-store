@@ -48,6 +48,20 @@ export function mapProductToLicenseType(
   return 'discord_profile';
 }
 
+export function detectTier(str: string = ''): '3d' | '1w' | '4w' | '6m' {
+  const s = str.toLowerCase();
+  if (s.includes('3d') || s.includes('3-day') || s.includes('3 day') || s.includes('trial') || s.includes('ทดลอง')) {
+    return '3d';
+  }
+  if (s.includes('6m') || s.includes('6-month') || s.includes('6 month') || s.includes('6เดือน') || s.includes('6 เดือน')) {
+    return '6m';
+  }
+  if (s.includes('4w') || s.includes('4-week') || s.includes('4 week') || s.includes('1m') || s.includes('1 month') || s.includes('1 เดือน') || s.includes('เดือน')) {
+    return '4w';
+  }
+  return '1w';
+}
+
 /**
  * Claim a single key from Google Apps Script with timeout
  */
@@ -85,6 +99,68 @@ async function claimSingleKeyFromGAS(
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+/**
+ * Unified key claimer: checks local Supabase licenses first for AutoQuest,
+ * falls back to GAS if not available or for other software.
+ */
+async function claimKey(
+  productType: string,
+  tier: string = '1w',
+  customerEmail?: string,
+  orderId?: string
+): Promise<{ success: boolean; key?: string; message?: string }> {
+  if (productType === 'discord_autoquest') {
+    try {
+      // 1. Try finding an available key for the exact tier in Supabase
+      const { data: exactLicense } = await supabaseAdmin
+        .from('licenses')
+        .select('*')
+        .eq('product_slug', 'j3adiscordautoquest')
+        .eq('tier', tier)
+        .eq('status', 'available')
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      let targetLicense = exactLicense;
+
+      // 2. If exact tier is out of stock, fallback to any available AutoQuest key
+      if (!targetLicense) {
+        const { data: anyLicense } = await supabaseAdmin
+          .from('licenses')
+          .select('*')
+          .eq('product_slug', 'j3adiscordautoquest')
+          .eq('status', 'available')
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        targetLicense = anyLicense;
+      }
+
+      if (targetLicense) {
+        const updatePayload: Record<string, any> = {
+          status: 'claimed',
+          updated_at: new Date().toISOString(),
+        };
+        if (orderId) updatePayload.order_id = orderId;
+        if (customerEmail) updatePayload.notes = `Claimed for ${customerEmail}`;
+
+        await supabaseAdmin
+          .from('licenses')
+          .update(updatePayload)
+          .eq('id', targetLicense.id);
+
+        return { success: true, key: targetLicense.key };
+      }
+    } catch (dbErr) {
+      console.warn('Database error claiming key from Supabase:', dbErr);
+    }
+  }
+
+  // Fallback to Google Apps Script
+  return claimSingleKeyFromGAS(productType, customerEmail);
 }
 
 /**
@@ -135,9 +211,10 @@ export async function POST(req: NextRequest) {
 
         const qty = Math.max(1, Math.min(20, Math.floor(Number(item.quantity) || 1)));
         const productType = mapProductToLicenseType(`${pSlug} ${pName}`);
+        const tier = detectTier(`${pSlug} ${pName}`);
 
         for (let q = 1; q <= qty; q++) {
-          const res = await claimSingleKeyFromGAS(productType, customerEmail);
+          const res = await claimKey(productType, tier, customerEmail, orderId);
           if (res.success && res.key) {
             const resolvedName =
               pName ||
@@ -171,6 +248,7 @@ export async function POST(req: NextRequest) {
     } else {
       // Mode B: Single product or fallback legacy mode
       const productType = mapProductToLicenseType(fallbackProduct || '');
+      const tier = detectTier(fallbackProduct || '');
       const qty = Math.max(1, Math.min(20, fallbackQuantity));
 
       const defaultName =
@@ -188,7 +266,7 @@ export async function POST(req: NextRequest) {
           : 'j3a-discord-profile';
 
       for (let q = 1; q <= qty; q++) {
-        const res = await claimSingleKeyFromGAS(productType, customerEmail);
+        const res = await claimKey(productType, tier, customerEmail, orderId);
         if (res.success && res.key) {
           claimedKeys.push({
             productId: fallbackProduct || productType,
@@ -253,6 +331,13 @@ export async function POST(req: NextRequest) {
               updated_at: new Date().toISOString(),
             })
             .eq('id', orderId);
+
+          // Update order_id in licenses table for any claimed keys
+          const keyValues = claimedKeys.map((k) => k.key);
+          await supabaseAdmin
+            .from('licenses')
+            .update({ order_id: orderId, updated_at: new Date().toISOString() })
+            .in('key', keyValues);
         }
       } catch (dbErr) {
         console.warn('Could not attach license keys to order record:', dbErr);
