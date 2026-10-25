@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
-// Default Fallback Webhook URLs
+// Default Fallback Webhook URLs & Role IDs
 const DEFAULT_WEBHOOK_SLIP =
   'https://discord.com/api/webhooks/1563838807369977917/zubkvc8V0t7i_-CLIbwMhN9yXsx65-yDw_tslKgiM0l9nHbD9xS_Ki4IFAzt1uOB-2Jp';
 const DEFAULT_WEBHOOK_CREDITS =
@@ -8,25 +8,32 @@ const DEFAULT_WEBHOOK_CREDITS =
 const DEFAULT_WEBHOOK_WELCOME =
   'https://discord.com/api/webhooks/1563838727778730106/zmFHamxQ8WO5EGcO9uhSPOJES0ZLReSGmFa0DX0cqaMF9F7ECuKTGvPuqDJK4ZAMhZsx';
 
+const DEFAULT_ROLE_OWNER = '1555520737975205919';
+const DEFAULT_ROLE_ADMIN = '1555520740558897205';
+
 const STORE_AVATAR = 'https://cnrjaonjabzvfkvqdtkm.supabase.co/storage/v1/object/public/store-images/popups/welcome-banner.png';
 const STORE_URL = process.env.NEXT_PUBLIC_STORE_URL || 'https://j3a-store.vercel.app';
 
 /**
- * Retrieves configured webhook URLs from Supabase store settings or environment variables
+ * Retrieves configured webhook URLs and role IDs from Supabase store settings or environment variables
  */
 export async function getDiscordWebhooks(): Promise<{
   slip: string;
   credits: string;
   welcome: string;
+  ownerRoleId: string;
+  adminRoleId: string;
 }> {
   let slip = process.env.DISCORD_WEBHOOK_SLIP || DEFAULT_WEBHOOK_SLIP;
   let credits = process.env.DISCORD_WEBHOOK_CREDITS || DEFAULT_WEBHOOK_CREDITS;
   let welcome = process.env.DISCORD_WEBHOOK_WELCOME || DEFAULT_WEBHOOK_WELCOME;
+  let ownerRoleId = process.env.DISCORD_ROLE_OWNER || DEFAULT_ROLE_OWNER;
+  let adminRoleId = process.env.DISCORD_ROLE_ADMIN || DEFAULT_ROLE_ADMIN;
 
   try {
     const { data } = await supabaseAdmin
       .from('settings')
-      .select('discord_webhook_slip, discord_webhook_credits, discord_webhook_welcome')
+      .select('discord_webhook_slip, discord_webhook_credits, discord_webhook_welcome, discord_role_owner, discord_role_admin')
       .eq('id', 'store')
       .limit(1)
       .maybeSingle();
@@ -35,12 +42,14 @@ export async function getDiscordWebhooks(): Promise<{
       if (data.discord_webhook_slip?.trim()) slip = data.discord_webhook_slip.trim();
       if (data.discord_webhook_credits?.trim()) credits = data.discord_webhook_credits.trim();
       if (data.discord_webhook_welcome?.trim()) welcome = data.discord_webhook_welcome.trim();
+      if ((data as any).discord_role_owner?.trim()) ownerRoleId = (data as any).discord_role_owner.trim();
+      if ((data as any).discord_role_admin?.trim()) adminRoleId = (data as any).discord_role_admin.trim();
     }
   } catch (e) {
     console.warn('Could not read discord webhooks from settings table, using defaults:', e);
   }
 
-  return { slip, credits, welcome };
+  return { slip, credits, welcome, ownerRoleId, adminRoleId };
 }
 
 /**
@@ -53,6 +62,11 @@ export async function sendDiscordWebhook(
     avatar_url?: string;
     content?: string;
     embeds?: any[];
+    allowed_mentions?: {
+      roles?: string[];
+      users?: string[];
+      parse?: ('roles' | 'users' | 'everyone')[];
+    };
   }
 ): Promise<boolean> {
   if (!webhookUrl || !webhookUrl.startsWith('https://discord.com/api/webhooks/')) {
@@ -69,6 +83,7 @@ export async function sendDiscordWebhook(
         avatar_url: payload.avatar_url || STORE_AVATAR,
         content: payload.content,
         embeds: payload.embeds || [],
+        allowed_mentions: payload.allowed_mentions,
       }),
       signal: AbortSignal.timeout(6000),
     });
@@ -88,6 +103,7 @@ export async function sendDiscordWebhook(
 /**
  * 1. Notify Admin: New Slip Uploaded (Requires Manual Approval)
  * Sent to private Admin Channel (e.g. ୨-💳-୧-⁺-˖-สลิปรออนุมัติ)
+ * Mentions ONLY Owner & Admin roles instead of @everyone
  */
 export async function notifyDiscordSlipSubmitted(data: {
   topupNumber: string;
@@ -96,7 +112,7 @@ export async function notifyDiscordSlipSubmitted(data: {
   amount: number;
   slipUrl?: string;
 }): Promise<boolean> {
-  const { slip } = await getDiscordWebhooks();
+  const { slip, ownerRoleId, adminRoleId } = await getDiscordWebhooks();
 
   const embed: any = {
     title: '💳 แจ้งเตือน: มีรายการโอนเงินใหม่ (รอตรวจสอบสลิป)',
@@ -123,9 +139,23 @@ export async function notifyDiscordSlipSubmitted(data: {
     embed.image = { url: data.slipUrl };
   }
 
+  const tags: string[] = [];
+  const mentionRoles: string[] = [];
+  if (ownerRoleId) {
+    tags.push(`<@&${ownerRoleId}>`);
+    mentionRoles.push(ownerRoleId);
+  }
+  if (adminRoleId) {
+    tags.push(`<@&${adminRoleId}>`);
+    mentionRoles.push(adminRoleId);
+  }
+
+  const roleTagString = tags.length > 0 ? tags.join(' ') : '@everyone';
+
   return sendDiscordWebhook(slip, {
     username: 'J3A STORE - สลิปรออนุมัติ',
-    content: '🔔 **@everyone มีสลิปใหม่รอการตรวจสอบและอนุมัติ!**',
+    content: `🔔 ${roleTagString} **มีสลิปใหม่รอการตรวจสอบและอนุมัติ!**`,
+    allowed_mentions: mentionRoles.length > 0 ? { roles: mentionRoles } : undefined,
     embeds: [embed],
   });
 }

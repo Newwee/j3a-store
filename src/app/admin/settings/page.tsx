@@ -30,6 +30,8 @@ export default function AdminSettingsPage() {
   const [discordWebhookSlip, setDiscordWebhookSlip] = useState(DEFAULT_STORE_SETTINGS.discordWebhookSlip || '');
   const [discordWebhookCredits, setDiscordWebhookCredits] = useState(DEFAULT_STORE_SETTINGS.discordWebhookCredits || '');
   const [discordWebhookWelcome, setDiscordWebhookWelcome] = useState(DEFAULT_STORE_SETTINGS.discordWebhookWelcome || '');
+  const [discordRoleOwner, setDiscordRoleOwner] = useState(DEFAULT_STORE_SETTINGS.discordRoleOwner || '1555520737975205919');
+  const [discordRoleAdmin, setDiscordRoleAdmin] = useState(DEFAULT_STORE_SETTINGS.discordRoleAdmin || '1555520740558897205');
   const [testingChannel, setTestingChannel] = useState<'slip' | 'credits' | 'welcome' | null>(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -56,6 +58,8 @@ export default function AdminSettingsPage() {
         setDiscordWebhookSlip(data.discordWebhookSlip || DEFAULT_STORE_SETTINGS.discordWebhookSlip || '');
         setDiscordWebhookCredits(data.discordWebhookCredits || DEFAULT_STORE_SETTINGS.discordWebhookCredits || '');
         setDiscordWebhookWelcome(data.discordWebhookWelcome || DEFAULT_STORE_SETTINGS.discordWebhookWelcome || '');
+        setDiscordRoleOwner(data.discordRoleOwner || DEFAULT_STORE_SETTINGS.discordRoleOwner || '1555520737975205919');
+        setDiscordRoleAdmin(data.discordRoleAdmin || DEFAULT_STORE_SETTINGS.discordRoleAdmin || '1555520740558897205');
       } catch (err: any) {
         console.error('Failed to load settings:', err);
       } finally {
@@ -90,6 +94,8 @@ export default function AdminSettingsPage() {
         discordWebhookSlip: discordWebhookSlip.trim(),
         discordWebhookCredits: discordWebhookCredits.trim(),
         discordWebhookWelcome: discordWebhookWelcome.trim(),
+        discordRoleOwner: discordRoleOwner.trim(),
+        discordRoleAdmin: discordRoleAdmin.trim(),
       });
       success('บันทึกการตั้งค่าร้านค้าเรียบร้อยแล้ว! ข้อมูลหน้าแรก, นโยบาย และคำอธิบายร้านค้าอัปเดตทันที');
     } catch (err: any) {
@@ -362,6 +368,37 @@ export default function AdminSettingsPage() {
                   placeholder="https://discord.com/api/webhooks/..."
                   className="font-mono text-xs"
                 />
+              </div>
+
+              {/* 4. Role Mentions for Pending Slips */}
+              <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-400" />
+                    <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                      ยศที่จะได้รับการแท็กเตือนเมื่อมีสลิปใหม่ (Role Mentions for Slips)
+                    </h3>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    บอทจะแท็กเฉพาะยศที่ระบุด้านล่างนี้ในห้อง <span className="text-amber-300 font-mono font-semibold">୨-💳-୧-⁺-˖-สลิปรออนุมัติ</span> (แทนการแท็ก @everyone)
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Input
+                    label="Discord Role ID: Owner"
+                    value={discordRoleOwner}
+                    onChange={(e) => setDiscordRoleOwner(e.target.value)}
+                    placeholder="1555520737975205919"
+                    className="font-mono text-xs"
+                  />
+                  <Input
+                    label="Discord Role ID: Admin"
+                    value={discordRoleAdmin}
+                    onChange={(e) => setDiscordRoleAdmin(e.target.value)}
+                    placeholder="1555520740558897205"
+                    className="font-mono text-xs"
+                  />
+                </div>
               </div>
             </div>
 

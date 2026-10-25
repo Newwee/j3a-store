@@ -30,5 +30,9 @@ export interface StoreSettings {
   discordWebhookCredits?: string;
   /** Discord Webhook สำหรับแจ้งเตือนสมาชิกใหม่ (Welcome Channel) */
   discordWebhookWelcome?: string;
+  /** Discord Role ID สำหรับแท็ก Owner ในการแจ้งเตือนสลิป */
+  discordRoleOwner?: string;
+  /** Discord Role ID สำหรับแท็ก Admin ในการแจ้งเตือนสลิป */
+  discordRoleAdmin?: string;
   updatedAt?: string;
 }

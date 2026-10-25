@@ -35,6 +35,8 @@ export async function POST(req: Request) {
     if (body.discordWebhookSlip !== undefined) updates.discord_webhook_slip = body.discordWebhookSlip;
     if (body.discordWebhookCredits !== undefined) updates.discord_webhook_credits = body.discordWebhookCredits;
     if (body.discordWebhookWelcome !== undefined) updates.discord_webhook_welcome = body.discordWebhookWelcome;
+    if (body.discordRoleOwner !== undefined) updates.discord_role_owner = body.discordRoleOwner;
+    if (body.discordRoleAdmin !== undefined) updates.discord_role_admin = body.discordRoleAdmin;
 
     const { data, error } = await supabaseAdmin
       .from('settings')

@@ -22,6 +22,8 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   discordWebhookSlip: 'https://discord.com/api/webhooks/1563838807369977917/zubkvc8V0t7i_-CLIbwMhN9yXsx65-yDw_tslKgiM0l9nHbD9xS_Ki4IFAzt1uOB-2Jp',
   discordWebhookCredits: 'https://discord.com/api/webhooks/1563838697554710578/CPBlIplPAYSy9EV9FdIBxw_uoafvAiX-xR-y9DPUgHkRGdcSbaBzaTWxondvdVH46EuG',
   discordWebhookWelcome: 'https://discord.com/api/webhooks/1563838727778730106/zmFHamxQ8WO5EGcO9uhSPOJES0ZLReSGmFa0DX0cqaMF9F7ECuKTGvPuqDJK4ZAMhZsx',
+  discordRoleOwner: '1555520737975205919',
+  discordRoleAdmin: '1555520740558897205',
 };
 
 /**
@@ -59,6 +61,8 @@ export async function getStoreSettings(): Promise<StoreSettings> {
       discordWebhookSlip: data.discord_webhook_slip ?? DEFAULT_STORE_SETTINGS.discordWebhookSlip,
       discordWebhookCredits: data.discord_webhook_credits ?? DEFAULT_STORE_SETTINGS.discordWebhookCredits,
       discordWebhookWelcome: data.discord_webhook_welcome ?? DEFAULT_STORE_SETTINGS.discordWebhookWelcome,
+      discordRoleOwner: data.discord_role_owner ?? DEFAULT_STORE_SETTINGS.discordRoleOwner,
+      discordRoleAdmin: data.discord_role_admin ?? DEFAULT_STORE_SETTINGS.discordRoleAdmin,
       updatedAt: data.updated_at || undefined,
     };
   } catch (error) {
@@ -120,6 +124,8 @@ export async function updateStoreSettings(settings: Partial<StoreSettings>): Pro
   if (settings.discordWebhookSlip !== undefined) updates.discord_webhook_slip = settings.discordWebhookSlip;
   if (settings.discordWebhookCredits !== undefined) updates.discord_webhook_credits = settings.discordWebhookCredits;
   if (settings.discordWebhookWelcome !== undefined) updates.discord_webhook_welcome = settings.discordWebhookWelcome;
+  if (settings.discordRoleOwner !== undefined) updates.discord_role_owner = settings.discordRoleOwner;
+  if (settings.discordRoleAdmin !== undefined) updates.discord_role_admin = settings.discordRoleAdmin;
 
   const { error } = await supabase
     .from('settings')
