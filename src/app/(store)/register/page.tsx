@@ -4,9 +4,10 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Lock, Mail, User, ArrowRight, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
+import { Lock, Mail, User, ArrowRight, ShieldCheck, AlertCircle, Loader2, Sun, Moon } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
+import { useTheme } from '@/context/ThemeContext';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 
@@ -16,6 +17,7 @@ function RegisterFormContent() {
   const redirectUrl = searchParams.get('redirect') || '/';
   const { user, register, loginWithGoogle, isFirebaseReady } = useAuth();
   const { success, error } = useToast();
+  const { resolvedTheme, toggleTheme } = useTheme();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -105,7 +107,27 @@ function RegisterFormContent() {
   return (
     <div className="py-12 sm:py-16 flex items-center justify-center">
       <div className="max-w-md w-full mx-auto px-4 sm:px-6">
-        <div className="bg-slate-900/70 border border-slate-800 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-2xl space-y-6">
+        <div className="relative bg-slate-900/70 border border-slate-800 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-2xl space-y-6">
+          {/* Quick Theme Switcher Button on Card */}
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/80 text-xs font-semibold text-slate-300 hover:text-white transition-all shadow-sm active:scale-95 cursor-pointer select-none"
+            title={`คลิกเพื่อสลับเป็น ${resolvedTheme === 'dark' ? 'โหมดสว่าง (สบายตา)' : 'โหมดมืด'}`}
+          >
+            {resolvedTheme === 'dark' ? (
+              <>
+                <Sun className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden sm:inline">โหมดสว่าง (สบายตา)</span>
+              </>
+            ) : (
+              <>
+                <Moon className="w-3.5 h-3.5 text-cyan-400" />
+                <span className="hidden sm:inline">โหมดมืด</span>
+              </>
+            )}
+          </button>
+
           {/* Logo & Header */}
           <div className="text-center space-y-2">
             <div className="relative w-16 h-16 mx-auto rounded-2xl overflow-hidden shadow-[0_0_25px_rgba(6,182,212,0.4)]">

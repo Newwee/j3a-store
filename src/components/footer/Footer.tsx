@@ -3,8 +3,9 @@
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ShieldCheck, Zap, Headphones, Sparkles, Send, MessageCircle } from 'lucide-react';
+import { ShieldCheck, Zap, Headphones, Sparkles, Send, MessageCircle, Moon, Sun, Laptop } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { useTheme } from '@/context/ThemeContext';
 
 interface FooterProps {
   footerDescription?: string;
@@ -12,6 +13,7 @@ interface FooterProps {
 
 export function Footer({ footerDescription }: FooterProps = {}) {
   const { t, language } = useLanguage();
+  const { theme, resolvedTheme, setTheme } = useTheme();
   const [desc, setDesc] = React.useState<string | undefined>(footerDescription);
 
   React.useEffect(() => {
@@ -164,8 +166,57 @@ export function Footer({ footerDescription }: FooterProps = {}) {
         </div>
 
         {/* Bottom bar */}
-        <div className="mt-12 pt-8 border-t border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
+        <div className="mt-12 pt-8 border-t border-slate-900 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-400">
           <p>© {new Date().getFullYear()} J3A STORE. All rights reserved. Powered by Next.js & Supabase.</p>
+          
+          {/* Quick Theme Controls (Accessible for all visitors without login) */}
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-slate-500">ธีมหน้าจอ:</span>
+            <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-full p-0.5">
+              <button
+                type="button"
+                onClick={() => setTheme('dark')}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all cursor-pointer ${
+                  theme === 'dark' || (theme === 'system' && resolvedTheme === 'dark')
+                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="โหมดมืด"
+              >
+                <Moon className="w-3 h-3 text-cyan-400" />
+                <span>มืด</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setTheme('light')}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all cursor-pointer ${
+                  theme === 'light' || (theme === 'system' && resolvedTheme === 'light')
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="โหมดสว่าง (ถนอมสายตา)"
+              >
+                <Sun className="w-3 h-3 text-amber-400" />
+                <span>สว่าง (สบายตา)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setTheme('system')}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all cursor-pointer ${
+                  theme === 'system'
+                    ? 'bg-slate-800 text-white border border-slate-700 shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="ตามระบบเครื่อง"
+              >
+                <Laptop className="w-3 h-3 text-slate-300" />
+                <span>ตามระบบ</span>
+              </button>
+            </div>
+          </div>
+
           <div className="flex items-center gap-6">
             <span>Server Status: <span className="text-emerald-400 font-semibold">● {t('footer_server_online')}</span></span>
             <span>Version: 1.0.0 (Production)</span>

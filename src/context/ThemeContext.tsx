@@ -78,10 +78,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   };
 
   const toggleTheme = () => {
-    let next: Theme = 'dark';
-    if (theme === 'dark') next = 'light';
-    else if (theme === 'light') next = 'system';
-    else next = 'dark';
+    // If currently dark (either explicitly or via system), switch immediately to light.
+    // If currently light, switch immediately to dark. Ensures 1-click response for eye comfort.
+    const next: Theme = resolvedTheme === 'dark' ? 'light' : 'dark';
     setTheme(next);
   };
 

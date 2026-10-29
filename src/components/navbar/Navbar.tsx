@@ -22,16 +22,18 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/context/CartContext';
-import { useTheme } from '@/context/ThemeContext';
+import { useTheme, Theme } from '@/context/ThemeContext';
 import { useLanguage } from '@/context/LanguageContext';
+import { useToast } from '@/context/ToastContext';
 import { UserDropdown } from './UserDropdown';
 import { CartDrawer } from '@/components/cart/CartDrawer';
 
 export function Navbar() {
   const { isAdmin } = useAuth();
   const { totalItems, setIsCartOpen } = useCart();
-  const { theme, resolvedTheme, toggleTheme } = useTheme();
-  const { language, toggleLanguage, t } = useLanguage();
+  const { theme, resolvedTheme, setTheme, toggleTheme } = useTheme();
+  const { language, setLanguage, toggleLanguage, t } = useLanguage();
+  const { toast } = useToast();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const router = useRouter();
@@ -149,17 +151,25 @@ export function Navbar() {
                 <span>{language === 'th' ? '🇹🇭 TH' : '🇺🇸 EN'}</span>
               </button>
 
-              {/* Theme Toggle Button (Desktop & Mobile) */}
+              {/* Theme Toggle Button (Desktop & Mobile - Always accessible without login) */}
               <button
                 type="button"
-                onClick={toggleTheme}
-                className="p-2.5 rounded-full bg-slate-900 border border-slate-700/80 hover:border-cyan-500/50 hover:bg-slate-800 transition-all text-slate-200 hover:text-white cursor-pointer group shadow-sm active:scale-95"
-                title={`ธีม: ${theme === 'system' ? `ตามระบบ (${resolvedTheme === 'dark' ? 'มืด' : 'สว่าง'})` : theme === 'dark' ? 'โหมดมืด' : 'โหมดสว่าง'} (คลิกเพื่อสลับ)`}
-                aria-label="Toggle theme"
+                onClick={() => {
+                  const next = resolvedTheme === 'dark' ? 'light' : 'dark';
+                  toggleTheme();
+                  toast(
+                    next === 'light'
+                      ? '☀️ ' + t('toast_theme_light', 'เปลี่ยนเป็นโหมดสว่าง (Light Theme) - ถนอมสายตาแล้ว')
+                      : '🌙 ' + t('toast_theme_dark', 'เปลี่ยนเป็นโหมดมืด (Dark Theme) แล้ว'),
+                    'info',
+                    2500
+                  );
+                }}
+                className="p-2 sm:p-2.5 rounded-full bg-slate-900 border border-slate-700/80 hover:border-cyan-500/50 hover:bg-slate-800 transition-all text-slate-200 hover:text-white cursor-pointer group shadow-sm active:scale-95"
+                title={`คลิกเพื่อสลับธีม: ${resolvedTheme === 'dark' ? 'เปลี่ยนเป็นโหมดสว่าง (สบายตา)' : 'เปลี่ยนเป็นโหมดมืด'}`}
+                aria-label="Toggle theme for eye comfort"
               >
-                {theme === 'system' ? (
-                  <Laptop className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
-                ) : resolvedTheme === 'dark' ? (
+                {resolvedTheme === 'dark' ? (
                   <Moon className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
                 ) : (
                   <Sun className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
@@ -270,6 +280,74 @@ export function Navbar() {
                 <span>แผงควบคุม Admin Dashboard</span>
               </Link>
             )}
+
+            {/* Theme & Eye Comfort Selector for Mobile Drawer (Accessible without login) */}
+            <div className="pt-3 mt-2 border-t border-slate-800/80 space-y-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block px-1">
+                🎨 ธีมหน้าจอ / ปรับโหมดถนอมสายตา (Theme)
+              </span>
+              <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-900/90 border border-slate-800 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTheme('dark');
+                    toast('🌙 เปลี่ยนเป็น Dark Theme (โหมดมืด) แล้ว', 'info', 2000);
+                  }}
+                  className={`flex flex-col items-center justify-center py-2 px-1 rounded-lg text-xs font-semibold transition-all ${
+                    theme === 'dark' || (theme === 'system' && resolvedTheme === 'dark')
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Moon className="w-4 h-4 mb-0.5 text-cyan-400" />
+                  <span>โหมดมืด</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTheme('light');
+                    toast('☀️ เปลี่ยนเป็น Light Theme (โหมดสว่าง สบายตา) แล้ว', 'info', 2000);
+                  }}
+                  className={`flex flex-col items-center justify-center py-2 px-1 rounded-lg text-xs font-semibold transition-all ${
+                    theme === 'light' || (theme === 'system' && resolvedTheme === 'light')
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Sun className="w-4 h-4 mb-0.5 text-amber-400" />
+                  <span>โหมดสว่าง</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTheme('system');
+                    toast('💻 ปรับธีมตามระบบอุปกรณ์ของคุณแล้ว', 'info', 2000);
+                  }}
+                  className={`flex flex-col items-center justify-center py-2 px-1 rounded-lg text-xs font-semibold transition-all ${
+                    theme === 'system'
+                      ? 'bg-slate-800 text-white border border-slate-700 shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Laptop className="w-4 h-4 mb-0.5 text-slate-300" />
+                  <span>ตามระบบ</span>
+                </button>
+              </div>
+
+              {/* Language toggle row in mobile drawer */}
+              <div className="flex items-center justify-between px-2 pt-1">
+                <span className="text-xs text-slate-400">ภาษา / Language:</span>
+                <button
+                  type="button"
+                  onClick={toggleLanguage}
+                  className="px-3 py-1 rounded-lg bg-slate-900 border border-slate-700 text-xs font-bold text-slate-200 hover:text-white flex items-center gap-1.5"
+                >
+                  <span>{language === 'th' ? '🇹🇭 ภาษาไทย (TH)' : '🇺🇸 English (EN)'}</span>
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </header>
