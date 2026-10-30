@@ -16,7 +16,6 @@ export function GlareHover({
   ...props
 }: GlareHoverProps) {
   const cardRef = useRef<HTMLDivElement>(null);
-  const [glarePosition, setGlarePosition] = useState({ x: 50, y: 50 });
   const [isHovered, setIsHovered] = useState(false);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -24,7 +23,8 @@ export function GlareHover({
     const rect = cardRef.current.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * 100;
     const y = ((e.clientY - rect.top) / rect.height) * 100;
-    setGlarePosition({ x, y });
+    cardRef.current.style.setProperty('--glare-x', `${x}%`);
+    cardRef.current.style.setProperty('--glare-y', `${y}%`);
   };
 
   return (
@@ -37,12 +37,12 @@ export function GlareHover({
       {...props}
     >
       {children}
-      {/* Dynamic Glare Light Overlay */}
+      {/* Dynamic Glare Light Overlay (GPU-accelerated via CSS custom properties - zero React re-renders) */}
       <div
         className="pointer-events-none absolute inset-0 transition-opacity duration-300 rounded-[inherit]"
         style={{
           opacity: isHovered ? glareOpacity : 0,
-          background: `radial-gradient(circle 280px at ${glarePosition.x}% ${glarePosition.y}%, rgba(6, 182, 212, 0.45), transparent 70%)`,
+          background: `radial-gradient(circle 280px at var(--glare-x, 50%) var(--glare-y, 50%), rgba(6, 182, 212, 0.45), transparent 70%)`,
         }}
       />
     </div>

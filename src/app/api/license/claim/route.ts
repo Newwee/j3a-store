@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { verifyAdminRequest } from '@/lib/auth/adminAuth';
 
 // Protected server-side endpoint - Not exposed to client bundle
 const GOOGLE_APPS_SCRIPT_BASE_URL =
@@ -187,6 +188,57 @@ export async function POST(req: NextRequest) {
       // Body is optional
     }
 
+    // Security Gate: Ensure either a verified paid order exists or caller is admin
+    if (orderId) {
+      const { data: ord } = await supabaseAdmin
+        .from('orders')
+        .select('id, status, items, transaction_ref, customer_email, user_id')
+        .eq('id', orderId)
+        .maybeSingle();
+
+      if (!ord) {
+        return NextResponse.json({ ok: false, error: 'ไม่พบคำสั่งซื้อนี้ในระบบ' }, { status: 404 });
+      }
+
+      if (ord.status !== 'completed' && ord.status !== 'paid') {
+        return NextResponse.json(
+          { ok: false, error: 'คำสั่งซื้อนี้ยังไม่ได้รับการชำระเงินหรือยังไม่สำเร็จ จึงไม่สามารถรับ License Key ได้' },
+          { status: 403 }
+        );
+      }
+
+      // Idempotency: Return existing key if order already has key delivered
+      if (ord.transaction_ref && typeof ord.transaction_ref === 'string' && ord.transaction_ref.trim()) {
+        const existingKey = ord.transaction_ref.trim();
+        return NextResponse.json({
+          ok: true,
+          success: true,
+          keys: [
+            {
+              productId: 'existing-key',
+              productName: 'J3A Software License',
+              productSlug: 'license-key',
+              productType: 'discord_autoquest',
+              key: existingKey,
+              unitIndex: 1,
+            },
+          ],
+          key: existingKey,
+          totalClaimed: 1,
+          message: 'ส่งมอบ License Key ที่ออกให้แล้วสำหรับคำสั่งซื้อนี้เรียบร้อย',
+        });
+      }
+    } else {
+      // If no orderId is provided, ONLY admins can trigger key allocation
+      const adminAuth = await verifyAdminRequest(req);
+      if (!adminAuth.isAdmin) {
+        return NextResponse.json(
+          { ok: false, error: 'ไม่อนุญาตให้ดึงคีย์โดยไม่มีหมายเลขคำสั่งซื้อที่ชำระเงินแล้ว (Requires Admin Authorization)' },
+          { status: 403 }
+        );
+      }
+    }
+
     const claimedKeys: ClaimedKeyItem[] = [];
     const errors: string[] = [];
 
@@ -364,6 +416,6 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET(req: NextRequest) {
-  return POST(req);
+export async function GET() {
+  return NextResponse.json({ error: 'Method Not Allowed. Use POST with orderId.' }, { status: 405 });
 }

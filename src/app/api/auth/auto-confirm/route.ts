@@ -12,20 +12,45 @@ export async function POST(req: Request) {
 
     const trimmedEmail = email.trim().toLowerCase();
 
-    // Find the user by listing users or querying
-    const { data, error } = await supabaseAdmin.auth.admin.listUsers();
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    // Fast indexed lookup via profiles table first
+    let targetUserId: string | null = null;
+    let isAlreadyConfirmed = false;
+
+    const { data: profileRow } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .eq('email', trimmedEmail)
+      .maybeSingle();
+
+    if (profileRow?.id) {
+      targetUserId = profileRow.id;
+      const { data: userObj } = await supabaseAdmin.auth.admin.getUserById(profileRow.id);
+      if (userObj?.user?.email_confirmed_at) {
+        isAlreadyConfirmed = true;
+      }
+    } else {
+      // Fallback: search via auth admin list
+      const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+      const targetUser = data.users.find((u) => u.email?.toLowerCase() === trimmedEmail);
+      if (!targetUser) {
+        return NextResponse.json({ error: 'ไม่พบผู้ใช้ในระบบ' }, { status: 404 });
+      }
+      targetUserId = targetUser.id;
+      if (targetUser.email_confirmed_at) {
+        isAlreadyConfirmed = true;
+      }
     }
 
-    const targetUser = data.users.find((u) => u.email?.toLowerCase() === trimmedEmail);
-    if (!targetUser) {
+    if (!targetUserId) {
       return NextResponse.json({ error: 'ไม่พบผู้ใช้ในระบบ' }, { status: 404 });
     }
 
     // If not confirmed, confirm immediately
-    if (!targetUser.email_confirmed_at) {
-      const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(targetUser.id, {
+    if (!isAlreadyConfirmed) {
+      const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(targetUserId, {
         email_confirm: true,
       });
 
@@ -37,7 +62,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       confirmed: true,
-      userId: targetUser.id,
+      userId: targetUserId,
     });
   } catch (err: any) {
     console.error('Auto Confirm API Error:', err);

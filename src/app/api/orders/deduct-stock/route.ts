@@ -23,6 +23,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, message: 'No items to deduct' });
     }
 
+    if (!orderId) {
+      return NextResponse.json({ error: 'Missing orderId' }, { status: 400 });
+    }
+
+    const { data: ord } = await supabaseAdmin
+      .from('orders')
+      .select('id')
+      .eq('id', orderId)
+      .maybeSingle();
+
+    if (!ord) {
+      return NextResponse.json({ error: 'Invalid or non-existent order' }, { status: 404 });
+    }
+
     const updatedProducts: Array<{
       id: string;
       name: string;

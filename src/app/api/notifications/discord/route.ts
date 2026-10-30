@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { verifyAdminRequest } from '@/lib/auth/adminAuth';
 import {
   notifyDiscordSlipSubmitted,
   notifyDiscordSlipApproved,
@@ -18,6 +19,14 @@ export async function POST(req: Request) {
 
     if (!event || !data) {
       return NextResponse.json({ error: 'Missing event or data parameter' }, { status: 400 });
+    }
+
+    // Protect sensitive admin events from unauthenticated triggers
+    if (event === 'test_channel' || event === 'slip_approved' || event === 'slip_rejected') {
+      const adminAuth = await verifyAdminRequest(req);
+      if (!adminAuth.isAdmin) {
+        return NextResponse.json({ error: 'Unauthorized: Admin privileges required for this notification event' }, { status: 403 });
+      }
     }
 
     switch (event) {

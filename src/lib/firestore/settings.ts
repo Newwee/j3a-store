@@ -19,10 +19,10 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   heroDescription: 'ศูนย์รวมโปรแกรมและเครื่องมือ Discord อัจฉริยะ AutoQuest, จัดการโปรไฟล์, บอทคุมเซิร์ฟเวอร์ พร้อมระบบส่งมอบ License Key อัตโนมัติ 24 ชม.',
   privacyPolicy: '1. ข้อมูลที่เราเก็บรวบรวม\nJ3A STORE เก็บรวบรวมข้อมูลที่จำเป็นต่อการให้บริการ เช่น ชื่อ-นามสกุล, ที่อยู่อีเมล, เบอร์โทรศัพท์, และประวัติการทำรายการ เพื่อใช้ในการจัดส่งสินค้าดิจิทัลและยืนยันสถานะการชำระเงิน\n\n2. การรักษาความปลอดภัยของข้อมูล\nข้อมูลรหัสผ่านทั้งหมดได้รับการจัดการและเข้ารหัสผ่าน Supabase Authentication ซึ่งเป็นไปตามมาตรฐานความปลอดภัยชั้นนำระดับโลก เราไม่มีนโยบายจำหน่ายหรือเปิดเผยข้อมูลส่วนบุคคลของคุณแก่บุคคลภายนอก',
   footerDescription: 'แพลตฟอร์มจำหน่ายซอฟต์แวร์ Discord เครื่องมือและบอทอัตโนมัติระดับพรีเมียม ส่งมอบ License Key ทันที ปลอดภัย 100% พร้อมบริการและดูแลตลอด 24 ชั่วโมง',
-  discordWebhookSlip: 'https://discord.com/api/webhooks/1563838807369977917/zubkvc8V0t7i_-CLIbwMhN9yXsx65-yDw_tslKgiM0l9nHbD9xS_Ki4IFAzt1uOB-2Jp',
-  discordWebhookCredits: 'https://discord.com/api/webhooks/1563850107282128906/G7dp9H3KxujiMJWkl013sFiQs7gvZhrzGqvFWWGEtorrYEpecq9bi-MFZz8sctZycrRK',
-  discordWebhookOrder: 'https://discord.com/api/webhooks/1563850109241008239/PBBRf4WQju8hFSEB32X9VIDQAUb7hRpIwCWAWjg3VL_6DJcCQKX7P-gfiBlHW3j1x00A',
-  discordWebhookWelcome: 'https://discord.com/api/webhooks/1563850111170256917/wrWXMv3d0p4ajxvNPrfN4M-sZx_DuvbqgBpSm8euHWbfojuEHskzwGS_S3-z4rC4nyYO',
+  discordWebhookSlip: '',
+  discordWebhookCredits: '',
+  discordWebhookOrder: '',
+  discordWebhookWelcome: '',
   discordRoleOwner: '1555520737975205919',
   discordRoleAdmin: '1555520740558897205',
   metaTitle: 'J3A STORE — ซอฟต์แวร์ Discord & บริการดิจิทัลอัตโนมัติ 24 ชม.',
@@ -41,14 +41,23 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   },
 };
 
+let cachedSettings: StoreSettings | null = null;
+let lastFetchTime = 0;
+const SETTINGS_CACHE_TTL = 60 * 1000; // 60 seconds memory cache
+
 /**
- * Fetch current store settings from Supabase
+ * Fetch current store settings from Supabase (with client-side memory caching)
  */
-export async function getStoreSettings(): Promise<StoreSettings> {
+export async function getStoreSettings(bypassCache = false): Promise<StoreSettings> {
+  const now = Date.now();
+  if (!bypassCache && cachedSettings && now - lastFetchTime < SETTINGS_CACHE_TTL) {
+    return cachedSettings;
+  }
+
   try {
     const { data, error } = await supabase
       .from('settings')
-      .select('*')
+      .select('id, store_name, promptpay, truemoney_phone, line_contact, discord_contact, announcement, shipping_fee, free_shipping_threshold, showcase_youtube_url, showcase_title, showcase_subtitle, hero_tagline, hero_description, privacy_policy, footer_description, meta_title, meta_description, meta_image, theme_color, rank_settings, updated_at')
       .eq('id', STORE_DOC_ID)
       .limit(1)
       .maybeSingle();
@@ -57,7 +66,7 @@ export async function getStoreSettings(): Promise<StoreSettings> {
       return DEFAULT_STORE_SETTINGS;
     }
 
-    return {
+    const result: StoreSettings = {
       storeName: data.store_name || DEFAULT_STORE_SETTINGS.storeName,
       promptpay: data.promptpay || DEFAULT_STORE_SETTINGS.promptpay,
       truemoneyPhone: data.truemoney_phone || data.promptpay || DEFAULT_STORE_SETTINGS.truemoneyPhone,
@@ -73,12 +82,12 @@ export async function getStoreSettings(): Promise<StoreSettings> {
       heroDescription: data.hero_description ?? DEFAULT_STORE_SETTINGS.heroDescription,
       privacyPolicy: data.privacy_policy ?? DEFAULT_STORE_SETTINGS.privacyPolicy,
       footerDescription: data.footer_description ?? DEFAULT_STORE_SETTINGS.footerDescription,
-      discordWebhookSlip: data.discord_webhook_slip ?? DEFAULT_STORE_SETTINGS.discordWebhookSlip,
-      discordWebhookCredits: data.discord_webhook_credits ?? DEFAULT_STORE_SETTINGS.discordWebhookCredits,
-      discordWebhookOrder: data.discord_webhook_order ?? DEFAULT_STORE_SETTINGS.discordWebhookOrder,
-      discordWebhookWelcome: data.discord_webhook_welcome ?? DEFAULT_STORE_SETTINGS.discordWebhookWelcome,
-      discordRoleOwner: data.discord_role_owner ?? DEFAULT_STORE_SETTINGS.discordRoleOwner,
-      discordRoleAdmin: data.discord_role_admin ?? DEFAULT_STORE_SETTINGS.discordRoleAdmin,
+      discordWebhookSlip: '',
+      discordWebhookCredits: '',
+      discordWebhookOrder: '',
+      discordWebhookWelcome: '',
+      discordRoleOwner: DEFAULT_STORE_SETTINGS.discordRoleOwner,
+      discordRoleAdmin: DEFAULT_STORE_SETTINGS.discordRoleAdmin,
       metaTitle: data.meta_title ?? DEFAULT_STORE_SETTINGS.metaTitle,
       metaDescription: data.meta_description ?? DEFAULT_STORE_SETTINGS.metaDescription,
       metaImage: data.meta_image ?? DEFAULT_STORE_SETTINGS.metaImage,
@@ -86,6 +95,10 @@ export async function getStoreSettings(): Promise<StoreSettings> {
       rankSettings: data.rank_settings ?? DEFAULT_STORE_SETTINGS.rankSettings,
       updatedAt: data.updated_at || undefined,
     };
+
+    cachedSettings = result;
+    lastFetchTime = now;
+    return result;
   } catch (error) {
     console.error('Error fetching store settings:', error);
     return DEFAULT_STORE_SETTINGS;
@@ -159,4 +172,5 @@ export async function updateStoreSettings(settings: Partial<StoreSettings>): Pro
     .upsert([{ id: STORE_DOC_ID, ...updates }]);
 
   if (error) throw new Error(error.message);
+  cachedSettings = null;
 }
