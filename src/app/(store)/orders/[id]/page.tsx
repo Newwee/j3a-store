@@ -363,41 +363,34 @@ export default function OrderDetailPage({
     }) || order?.transactionRef
   );
 
-  // Discount breakdown calculations
-  const totalDiscount = Number(order?.discount) || 0;
-  const hasDiscount = totalDiscount > 0 || Boolean(order?.discountCode);
+  // Discount breakdown calculations (plain values to comply with React hook rules)
+  const totalDiscount = Number(order.discount) || 0;
+  const hasDiscount = totalDiscount > 0 || Boolean(order.discountCode);
 
-  const calculatedCodeDiscount = useMemo(() => {
-    if (!order) return 0;
-    if (!order.discountCode) return 0;
+  let calculatedCodeDiscount = 0;
+  if (order.discountCode) {
     if (order.rankDiscount?.amount) {
-      return Math.max(0, totalDiscount - order.rankDiscount.amount);
-    }
-    if (discountCodeInfo) {
+      calculatedCodeDiscount = Math.max(0, totalDiscount - order.rankDiscount.amount);
+    } else if (discountCodeInfo) {
       if (discountCodeInfo.codeType === 'discount_fixed') {
-        return Math.min(order.subtotal, discountCodeInfo.amount);
-      }
-      if (discountCodeInfo.codeType === 'discount_percent') {
+        calculatedCodeDiscount = Math.min(order.subtotal, discountCodeInfo.amount);
+      } else if (discountCodeInfo.codeType === 'discount_percent') {
         const pct = discountCodeInfo.discountPercent || discountCodeInfo.amount;
-        return Math.round((order.subtotal * pct) / 100);
+        calculatedCodeDiscount = Math.round((order.subtotal * pct) / 100);
       }
+    } else {
+      calculatedCodeDiscount = totalDiscount;
     }
-    return totalDiscount;
-  }, [order, totalDiscount, discountCodeInfo]);
+  }
 
-  const calculatedRankDiscount = useMemo(() => {
-    if (!order) return 0;
-    if (order.rankDiscount?.amount) {
-      return order.rankDiscount.amount;
-    }
-    if (calculatedCodeDiscount > 0 && totalDiscount > calculatedCodeDiscount) {
-      return totalDiscount - calculatedCodeDiscount;
-    }
-    if (!order.discountCode && totalDiscount > 0) {
-      return totalDiscount;
-    }
-    return 0;
-  }, [order, totalDiscount, calculatedCodeDiscount]);
+  let calculatedRankDiscount = 0;
+  if (order.rankDiscount?.amount) {
+    calculatedRankDiscount = order.rankDiscount.amount;
+  } else if (calculatedCodeDiscount > 0 && totalDiscount > calculatedCodeDiscount) {
+    calculatedRankDiscount = totalDiscount - calculatedCodeDiscount;
+  } else if (!order.discountCode && totalDiscount > 0) {
+    calculatedRankDiscount = totalDiscount;
+  }
 
   return (
     <div className="py-8 sm:py-12">
