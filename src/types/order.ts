@@ -34,6 +34,11 @@ export interface Order {
   shipping: number;
   discount: number;
   discountCode?: string;
+  rankDiscount?: {
+    tier?: string;
+    percent?: number;
+    amount?: number;
+  };
   total: number;
   paymentMethod: PaymentMethod;
   status: OrderStatus;
@@ -51,6 +56,11 @@ export interface CreateOrderInput {
   shipping: number;
   discount: number;
   discountCode?: string;
+  rankDiscount?: {
+    tier?: string;
+    percent?: number;
+    amount?: number;
+  };
   transactionRef?: string;
   total: number;
   paymentMethod: PaymentMethod;

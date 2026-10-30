@@ -16,6 +16,15 @@ import {
   Wallet,
   AlertCircle,
   ExternalLink,
+  Tag,
+  Ticket,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  Check,
+  Sparkles,
+  Gift,
+  Percent,
 } from 'lucide-react';
 import { Order } from '@/types/order';
 import { Review } from '@/types/review';
@@ -32,6 +41,7 @@ import { useLoading } from '@/context/LoadingContext';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LicenseKeyDelivery, getDownloadUrlForProduct } from '@/components/license/LicenseKeyDelivery';
 import { submitProductReview, updateProductReview, deleteReview, getUserReviews } from '@/lib/firestore/reviews';
+import { getRedeemCodeByCode, RedeemCode } from '@/lib/firestore/redeem';
 
 export default function OrderDetailPage({
   params,
@@ -49,6 +59,19 @@ export default function OrderDetailPage({
   const [uploadingSlip, setUploadingSlip] = useState(false);
   const [selectedSlip, setSelectedSlip] = useState<File | null>(null);
 
+  // Discount details state
+  const [discountCodeInfo, setDiscountCodeInfo] = useState<RedeemCode | null>(null);
+  const [showDiscountDetails, setShowDiscountDetails] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
+
+  const handleCopyDiscountCode = (code: string) => {
+    if (!code) return;
+    navigator.clipboard.writeText(code);
+    setCopiedCode(true);
+    success(`คัดลอกโค้ด "${code}" สำเร็จ!`);
+    setTimeout(() => setCopiedCode(false), 2000);
+  };
+
   // Review Modal State
   const [reviewItem, setReviewItem] = useState<{
     productId?: string;
@@ -62,7 +85,6 @@ export default function OrderDetailPage({
   const [submittingReview, setSubmittingReview] = useState(false);
   const [userReviewsMap, setUserReviewsMap] = useState<Record<string, Review>>({});
 
-
   useEffect(() => {
     let isMounted = true;
     async function fetchOrder() {
@@ -70,6 +92,13 @@ export default function OrderDetailPage({
         const data = await getOrderById(orderId);
         if (isMounted) {
           setOrder(data);
+          if (data?.discountCode) {
+            getRedeemCodeByCode(data.discountCode).then((codeInfo) => {
+              if (isMounted && codeInfo) {
+                setDiscountCodeInfo(codeInfo);
+              }
+            });
+          }
         }
       } catch (err) {
         console.error('Error fetching order:', err);
@@ -334,6 +363,42 @@ export default function OrderDetailPage({
     }) || order?.transactionRef
   );
 
+  // Discount breakdown calculations
+  const totalDiscount = Number(order?.discount) || 0;
+  const hasDiscount = totalDiscount > 0 || Boolean(order?.discountCode);
+
+  const calculatedCodeDiscount = useMemo(() => {
+    if (!order) return 0;
+    if (!order.discountCode) return 0;
+    if (order.rankDiscount?.amount) {
+      return Math.max(0, totalDiscount - order.rankDiscount.amount);
+    }
+    if (discountCodeInfo) {
+      if (discountCodeInfo.codeType === 'discount_fixed') {
+        return Math.min(order.subtotal, discountCodeInfo.amount);
+      }
+      if (discountCodeInfo.codeType === 'discount_percent') {
+        const pct = discountCodeInfo.discountPercent || discountCodeInfo.amount;
+        return Math.round((order.subtotal * pct) / 100);
+      }
+    }
+    return totalDiscount;
+  }, [order, totalDiscount, discountCodeInfo]);
+
+  const calculatedRankDiscount = useMemo(() => {
+    if (!order) return 0;
+    if (order.rankDiscount?.amount) {
+      return order.rankDiscount.amount;
+    }
+    if (calculatedCodeDiscount > 0 && totalDiscount > calculatedCodeDiscount) {
+      return totalDiscount - calculatedCodeDiscount;
+    }
+    if (!order.discountCode && totalDiscount > 0) {
+      return totalDiscount;
+    }
+    return 0;
+  }, [order, totalDiscount, calculatedCodeDiscount]);
+
   return (
     <div className="py-8 sm:py-12">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
@@ -556,6 +621,25 @@ export default function OrderDetailPage({
                   {order.shipping === 0 ? 'ฟรี' : formatCurrency(order.shipping)}
                 </span>
               </div>
+
+              {/* Discount Row (Highlighted if order has discount) */}
+              {hasDiscount && (
+                <div className="flex justify-between items-center py-1.5 px-2.5 -mx-1 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300">
+                  <span className="flex items-center gap-1.5 font-medium">
+                    <Tag className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>ส่วนลดที่ได้รับ</span>
+                    {order.discountCode && (
+                      <span className="font-mono text-[10px] font-black px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 tracking-wider">
+                        {order.discountCode}
+                      </span>
+                    )}
+                  </span>
+                  <span className="font-extrabold font-mono text-emerald-400 text-sm">
+                    -{formatCurrency(totalDiscount)}
+                  </span>
+                </div>
+              )}
+
               <div className="flex justify-between text-slate-400">
                 <span>วิธีชำระเงิน</span>
                 <span className="text-cyan-400 font-semibold uppercase">
@@ -564,8 +648,146 @@ export default function OrderDetailPage({
               </div>
               <div className="flex justify-between text-sm font-bold text-white pt-2 border-t border-slate-800">
                 <span>ยอดสุทธิ</span>
-                <span className="text-base text-cyan-400">{formatCurrency(order.total)}</span>
+                <span className="text-base text-cyan-400 font-mono font-bold">{formatCurrency(order.total)}</span>
               </div>
+
+              {/* Collapsible Button to open/close detailed code & discount breakdown */}
+              {hasDiscount && (
+                <div className="pt-2 border-t border-slate-800/80">
+                  <button
+                    type="button"
+                    onClick={() => setShowDiscountDetails(!showDiscountDetails)}
+                    className="w-full flex items-center justify-between py-2 px-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 hover:border-emerald-500/50 text-slate-200 hover:text-white transition-all text-xs font-semibold cursor-pointer group shadow-sm active:scale-[0.99]"
+                    aria-expanded={showDiscountDetails}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Ticket className="w-3.5 h-3.5 text-emerald-400 group-hover:rotate-12 transition-transform" />
+                      <span>{showDiscountDetails ? 'ซ่อนรายละเอียดส่วนลด' : 'ดูรายละเอียดโค้ดส่วนลดที่ใช้'}</span>
+                      {order.discountCode && (
+                        <span className="text-[10px] font-mono font-bold text-emerald-300 bg-emerald-950 px-1.5 py-0.5 rounded border border-emerald-800">
+                          {order.discountCode}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 text-[11px] text-slate-400 group-hover:text-emerald-300">
+                      <span>{showDiscountDetails ? 'ย่อเก็บ' : 'คลิกเปิดดู'}</span>
+                      <ChevronDown
+                        className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                          showDiscountDetails ? 'rotate-180 text-emerald-400' : ''
+                        }`}
+                      />
+                    </div>
+                  </button>
+
+                  {/* Detailed Collapsible Content */}
+                  {showDiscountDetails && (
+                    <div className="mt-2.5 p-3.5 rounded-xl bg-slate-900/95 border border-emerald-500/30 text-xs space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                      <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                        <span className="font-bold text-slate-200 flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                          <span>รายละเอียดสิทธิ์และส่วนลดที่ใช้</span>
+                        </span>
+                        <span className="text-[10px] text-emerald-400 bg-emerald-950/90 border border-emerald-500/40 px-2 py-0.5 rounded-full font-bold">
+                          ใช้สิทธิ์สำเร็จ
+                        </span>
+                      </div>
+
+                      {/* 1. Code Breakdown */}
+                      {order.discountCode && (
+                        <div className="space-y-2 bg-slate-950/70 rounded-xl p-3 border border-slate-800/80">
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-400">รหัสโค้ดโปรโมชั่น:</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono font-extrabold text-cyan-300 bg-slate-900 border border-cyan-500/40 px-2 py-0.5 rounded text-xs tracking-wider">
+                                {order.discountCode}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleCopyDiscountCode(order.discountCode!)}
+                                className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                                title="คัดลอกรหัสโค้ด"
+                              >
+                                {copiedCode ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-400">ประเภทโค้ด:</span>
+                            <span className="text-slate-200 font-medium">
+                              {discountCodeInfo?.codeType === 'discount_percent'
+                                ? `ส่วนลดเปอร์เซ็นต์ (${discountCodeInfo.discountPercent || discountCodeInfo.amount}%)`
+                                : discountCodeInfo?.codeType === 'discount_fixed'
+                                ? `ส่วนลดเงินสดทันที (฿${discountCodeInfo.amount})`
+                                : 'โค้ดส่วนลดโปรโมชั่นพิเศษ'}
+                            </span>
+                          </div>
+
+                          {discountCodeInfo?.minSpend ? (
+                            <div className="flex items-center justify-between">
+                              <span className="text-slate-400">เงื่อนไขยอดสั่งซื้อ:</span>
+                              <span className="text-slate-300">
+                                ขั้นต่ำ ฿{discountCodeInfo.minSpend} (ผ่านเกณฑ์)
+                              </span>
+                            </div>
+                          ) : null}
+
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-400">การจำกัดสิทธิ์:</span>
+                            <span className="text-slate-300">
+                              {discountCodeInfo?.limitPerUser ? 'จำกัด 1 บัญชี : 1 สิทธิ์' : 'ใช้งานได้ตามเงื่อนไข'}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between pt-1.5 border-t border-slate-800 text-emerald-300 font-semibold">
+                            <span>ส่วนลดจากโค้ด:</span>
+                            <span className="font-mono font-bold">
+                              -{formatCurrency(calculatedCodeDiscount)}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 2. Rank Discount Breakdown (if any) */}
+                      {calculatedRankDiscount > 0 && (
+                        <div className="space-y-1.5 bg-slate-950/70 rounded-xl p-3 border border-slate-800/80">
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-400 flex items-center gap-1.5">
+                              <span>👑 สิทธิประโยชน์ระดับสมาชิก:</span>
+                            </span>
+                            <span className="font-bold text-amber-300">
+                              {order.rankDiscount?.tier || 'Rank Loyalty Discount'}
+                              {order.rankDiscount?.percent ? ` (ลด ${order.rankDiscount.percent}%)` : ''}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-emerald-300 font-semibold pt-1 border-t border-slate-800/60">
+                            <span className="text-slate-400">ส่วนลดเพิ่มจาก Rank:</span>
+                            <span className="font-mono font-bold">
+                              -{formatCurrency(calculatedRankDiscount)}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 3. Summary Total Savings */}
+                      <div className="pt-1 flex items-center justify-between font-bold text-emerald-400 bg-emerald-950/40 p-2.5 rounded-xl border border-emerald-500/30">
+                        <span className="flex items-center gap-1.5 text-xs">
+                          <Gift className="w-4 h-4 text-emerald-400" />
+                          <span>รวมประหยัดได้ทั้งหมด:</span>
+                        </span>
+                        <div className="text-right">
+                          <span className="font-mono text-sm">-{formatCurrency(totalDiscount)}</span>
+                          {order.subtotal > 0 && (
+                            <span className="text-[10px] text-emerald-300/80 block font-normal">
+                              (ประหยัด {Math.round((totalDiscount / order.subtotal) * 100)}% ของยอดรวม)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 

@@ -145,6 +145,11 @@ export default function OrdersPage() {
                         #{order.orderNumber}
                       </span>
                       <OrderStatusBadge status={order.status} />
+                      {order.discountCode && (
+                        <span className="text-[10px] font-mono font-bold text-emerald-300 bg-emerald-950/80 border border-emerald-500/40 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          🏷️ โค้ด: {order.discountCode} (-{formatCurrency(order.discount)})
+                        </span>
+                      )}
                       {order.status === 'completed' && (
                         <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
                           ⭐ ปลดล็อกสิทธิ์ให้คะแนนแล้ว
@@ -159,8 +164,13 @@ export default function OrdersPage() {
 
                   <div className="flex items-center justify-between sm:justify-end gap-4">
                     <div className="text-left sm:text-right">
-                      <span className="text-xs text-slate-400 block">ยอดรวม</span>
-                      <span className="text-base font-black text-cyan-400">
+                      <span className="text-xs text-slate-400 block">ยอดสุทธิ</span>
+                      {order.discount > 0 && (
+                        <span className="text-[11px] text-slate-500 line-through block font-mono">
+                          {formatCurrency(order.subtotal || (order.total + order.discount))}
+                        </span>
+                      )}
+                      <span className="text-base font-black text-cyan-400 font-mono">
                         {formatCurrency(order.total)}
                       </span>
                     </div>

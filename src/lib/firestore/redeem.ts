@@ -636,3 +636,26 @@ export async function recordDiscountUsage(codeStr: string, userId?: string): Pro
     console.warn('Direct record discount usage error:', err);
   }
 }
+
+/**
+ * Retrieve details for a specific redeem / discount code by its code string
+ */
+export async function getRedeemCodeByCode(codeStr: string): Promise<RedeemCode | null> {
+  const clean = codeStr.trim().toUpperCase();
+  if (!clean) return null;
+
+  try {
+    const { data: row, error } = await supabase
+      .from('redeem_codes')
+      .select('*')
+      .eq('code', clean)
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !row) return null;
+    return mapRowToRedeemCode(row);
+  } catch (err) {
+    console.warn('Error fetching redeem code by code:', err);
+    return null;
+  }
+}
