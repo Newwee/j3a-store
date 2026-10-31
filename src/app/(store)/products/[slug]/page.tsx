@@ -37,6 +37,7 @@ import { ProductStatusBadge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ProductReviewsSection } from '@/components/review/ProductReviewsSection';
+import Counter from '@/components/ui/Counter';
 
 export default function ProductDetailPage({
   params,
@@ -599,29 +600,40 @@ export default function ProductDetailPage({
 
             {/* Quantity Selector & Action Buttons */}
             <div className="pt-4 border-t border-slate-800 space-y-4">
-              <div className="flex items-center gap-4">
-                <span className="text-xs font-semibold text-slate-300">จำนวน:</span>
-                <div className="flex items-center border border-slate-700 rounded-xl bg-slate-900/80">
-                  <button
-                    onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                    disabled={quantity <= 1 || isOutOfStock}
-                    className="p-2.5 text-slate-400 hover:text-white disabled:opacity-30 transition-colors"
-                    aria-label="Decrease quantity"
-                  >
-                    <Minus className="w-4 h-4" />
-                  </button>
-                  <span className="px-4 text-sm font-bold text-white min-w-[40px] text-center">
-                    {quantity}
-                  </span>
-                  <button
-                    onClick={() => setQuantity((q) => Math.min(effectiveStock, q + 1))}
-                    disabled={quantity >= effectiveStock || isOutOfStock}
-                    className="p-2.5 text-slate-400 hover:text-white disabled:opacity-30 transition-colors"
-                    aria-label="Increase quantity"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-semibold text-slate-300">จำนวน:</span>
+                  <div className="flex items-center border border-slate-700/80 rounded-xl bg-slate-900/90 shadow-inner overflow-hidden">
+                    <button
+                      onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                      disabled={quantity <= 1 || isOutOfStock}
+                      className="p-2.5 text-slate-400 hover:text-cyan-400 hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-transparent transition-colors cursor-pointer"
+                      aria-label="Decrease quantity"
+                    >
+                      <Minus className="w-4 h-4" />
+                    </button>
+                    <span className="px-4 text-sm font-bold text-white min-w-[44px] text-center font-mono inline-flex items-center justify-center">
+                      <Counter value={quantity} fontSize={16} fontWeight={800} textColor="#ffffff" />
+                    </span>
+                    <button
+                      onClick={() => setQuantity((q) => Math.min(effectiveStock, q + 1))}
+                      disabled={quantity >= effectiveStock || isOutOfStock}
+                      className="p-2.5 text-slate-400 hover:text-cyan-400 hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-transparent transition-colors cursor-pointer"
+                      aria-label="Increase quantity"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
+
+                {quantity > 1 && (
+                  <div className="text-xs text-slate-400 font-mono flex items-center gap-1.5 bg-slate-900/60 border border-slate-800 px-3 py-1.5 rounded-xl">
+                    <span>ยอดรวม ({quantity} ชิ้น):</span>
+                    <span className="text-cyan-400 font-extrabold text-sm drop-shadow-[0_0_8px_rgba(6,182,212,0.4)]">
+                      <Counter value={effectivePrice * quantity} prefix="฿" fontSize={15} fontWeight={900} textColor="#22d3ee" />
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Action Buttons */}

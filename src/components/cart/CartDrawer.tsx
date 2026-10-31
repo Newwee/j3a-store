@@ -24,6 +24,7 @@ import { useCart } from '@/context/CartContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { Button } from '@/components/ui/Button';
+import Counter from '@/components/ui/Counter';
 
 export function CartDrawer() {
   const { user, profile } = useAuth();
@@ -263,26 +264,32 @@ export function CartDrawer() {
                           <div className="flex items-center border border-slate-700/80 rounded-xl bg-slate-950/80 overflow-hidden shadow-inner">
                             <button
                               onClick={() => updateQuantity(itemKey, item.quantity - 1)}
-                              className="p-1.5 hover:text-cyan-400 text-slate-400 hover:bg-slate-800 transition-colors"
+                              className="p-1.5 hover:text-cyan-400 text-slate-400 hover:bg-slate-800 transition-colors cursor-pointer"
                               aria-label="Decrease quantity"
                             >
                               <Minus className="w-3 h-3" />
                             </button>
-                            <span className="px-2.5 text-xs font-black text-white min-w-[24px] text-center">
-                              {item.quantity}
+                            <span className="px-2.5 text-xs font-black text-white min-w-[26px] text-center font-mono inline-flex items-center justify-center">
+                              <Counter value={item.quantity} fontSize={13} fontWeight={900} textColor="#ffffff" />
                             </span>
                             <button
                               onClick={() => updateQuantity(itemKey, item.quantity + 1)}
                               disabled={item.quantity >= item.product.stock}
-                              className="p-1.5 hover:text-cyan-400 text-slate-400 hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                              className="p-1.5 hover:text-cyan-400 text-slate-400 hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-transparent transition-colors cursor-pointer"
                               aria-label="Increase quantity"
                             >
                               <Plus className="w-3 h-3" />
                             </button>
                           </div>
 
-                          <span className="text-xs font-black text-cyan-400 drop-shadow-[0_0_8px_rgba(6,182,212,0.3)]">
-                            {formatCurrency(item.product.price * item.quantity)}
+                          <span className="text-xs font-black text-cyan-400 drop-shadow-[0_0_8px_rgba(6,182,212,0.3)] font-mono inline-flex items-baseline justify-end">
+                            <Counter
+                              value={effectivePrice * item.quantity}
+                              prefix="฿"
+                              fontSize={13}
+                              fontWeight={900}
+                              textColor="#22d3ee"
+                            />
                           </span>
                         </div>
                       </div>
@@ -300,7 +307,9 @@ export function CartDrawer() {
               <div className="space-y-1.5 text-xs text-slate-400">
                 <div className="flex justify-between">
                   <span>{t('cart_subtotal')} ({totalItems} {t('cart_items_count')})</span>
-                  <span className="text-slate-200 font-semibold">{formatCurrency(subtotal)}</span>
+                  <span className="text-slate-200 font-semibold font-mono inline-flex items-baseline">
+                    <Counter value={subtotal} prefix="฿" fontSize={13} fontWeight={700} textColor="#e2e8f0" />
+                  </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span>{t('cart_shipping')}</span>
@@ -311,8 +320,8 @@ export function CartDrawer() {
                 <div className="flex justify-between items-baseline pt-2.5 border-t border-slate-800 text-white font-bold">
                   <span className="text-sm">{t('cart_total')}</span>
                   <div className="text-right">
-                    <span className="text-xl font-black text-cyan-400 drop-shadow-[0_0_12px_rgba(6,182,212,0.4)]">
-                      {formatCurrency(total)}
+                    <span className="text-xl font-black text-cyan-400 drop-shadow-[0_0_12px_rgba(6,182,212,0.4)] font-mono inline-flex items-baseline justify-end">
+                      <Counter value={total} prefix="฿" fontSize={20} fontWeight={900} textColor="#22d3ee" />
                     </span>
                   </div>
                 </div>

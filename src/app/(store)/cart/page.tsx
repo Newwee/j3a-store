@@ -26,6 +26,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/context/CartContext';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { Button } from '@/components/ui/Button';
+import Counter from '@/components/ui/Counter';
 
 export default function CartPage() {
   const { user, profile } = useAuth();
@@ -265,8 +266,8 @@ export default function CartPage() {
                         >
                           <Minus className="w-3.5 h-3.5" />
                         </button>
-                        <span className="px-3 text-xs font-black text-white min-w-[28px] text-center font-mono">
-                          {item.quantity}
+                        <span className="px-3 text-xs font-black text-white min-w-[28px] text-center font-mono inline-flex items-center justify-center">
+                          <Counter value={item.quantity} fontSize={14} fontWeight={900} textColor="#ffffff" />
                         </span>
                         <button
                           onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
@@ -280,8 +281,14 @@ export default function CartPage() {
 
                       {/* Subtotal */}
                       <div className="text-right min-w-[100px]">
-                        <span className="text-base sm:text-lg font-black text-cyan-400 drop-shadow-[0_0_12px_rgba(6,182,212,0.35)] font-mono">
-                          {formatCurrency(item.product.price * item.quantity)}
+                        <span className="text-base sm:text-lg font-black text-cyan-400 drop-shadow-[0_0_12px_rgba(6,182,212,0.35)] font-mono inline-flex items-baseline justify-end">
+                          <Counter
+                            value={item.product.price * item.quantity}
+                            prefix="฿"
+                            fontSize="inherit"
+                            fontWeight={900}
+                            textColor="#22d3ee"
+                          />
                         </span>
                       </div>
 
@@ -333,7 +340,9 @@ export default function CartPage() {
               <div className="space-y-3 text-xs text-slate-400 border-b border-slate-800 pb-4">
                 <div className="flex justify-between">
                   <span>ยอดรวมสินค้า</span>
-                  <span className="text-slate-200 font-semibold font-mono">{formatCurrency(subtotal)}</span>
+                  <span className="text-slate-200 font-semibold font-mono inline-flex items-baseline">
+                    <Counter value={subtotal} prefix="฿" fontSize={12} fontWeight={700} textColor="#e2e8f0" />
+                  </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span>ค่าบริการจัดส่ง</span>
@@ -356,8 +365,8 @@ export default function CartPage() {
                    <span className="text-sm font-black text-white block">ยอดสุทธิที่ต้องชำระ</span>
                    <span className="text-[10px] text-slate-500">รวมภาษีและค่าบริการแล้ว</span>
                  </div>
-                 <span className="text-2xl sm:text-3xl font-black text-cyan-400 drop-shadow-[0_0_20px_rgba(6,182,212,0.45)] font-mono">
-                   {formatCurrency(total)}
+                 <span className="text-2xl sm:text-3xl font-black text-cyan-400 drop-shadow-[0_0_20px_rgba(6,182,212,0.45)] font-mono inline-flex items-baseline justify-end">
+                   <Counter value={total} prefix="฿" fontSize="inherit" fontWeight={900} textColor="#22d3ee" />
                  </span>
                </div>
 
