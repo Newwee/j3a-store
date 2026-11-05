@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useEffect, useState, useRef, use } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import {
   Layers,
   ArrowLeft,
@@ -34,10 +34,11 @@ import { slugify } from '@/lib/utils/formatters';
 export default function EditBundlePage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params?: Promise<{ id: string }>;
 }) {
-  const resolvedParams = use(params);
-  const bundleId = resolvedParams.id;
+  const routeParams = useParams();
+  const rawId = routeParams?.id;
+  const bundleId = (typeof rawId === 'string' ? rawId : Array.isArray(rawId) ? rawId[0] : '') || '';
   const router = useRouter();
   const { success, error, toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);

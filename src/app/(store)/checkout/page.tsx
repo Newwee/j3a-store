@@ -421,6 +421,7 @@ export default function CheckoutPage() {
               slug: it.selectedVariant?.tier ? `${it.product.slug}-${it.selectedVariant.tier}` : it.product.slug,
               quantity: it.quantity,
               deliveryType: it.product.deliveryType,
+              tier: it.selectedVariant?.tier,
             }));
 
           const claimRes = await fetch('/api/license/claim', {

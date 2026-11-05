@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useEffect, useState, use } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams, useParams } from 'next/navigation';
 import {
   ShoppingCart,
   Zap,
@@ -42,10 +42,11 @@ import Counter from '@/components/ui/Counter';
 export default function ProductDetailPage({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params?: Promise<{ slug: string }>;
 }) {
-  const resolvedParams = use(params);
-  const slug = resolvedParams.slug;
+  const routeParams = useParams();
+  const rawSlug = routeParams?.slug;
+  const slug = (typeof rawSlug === 'string' ? rawSlug : Array.isArray(rawSlug) ? rawSlug[0] : '') || '';
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();

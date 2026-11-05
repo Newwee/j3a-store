@@ -322,6 +322,7 @@ export function LicenseKeyDelivery({
             slug: it.slug,
             quantity: it.quantity,
             deliveryType: it.deliveryType,
+            tier: (it as any).selectedVariant?.tier || (it as any).tier,
           })),
         }),
       });
@@ -401,6 +402,7 @@ export function LicenseKeyDelivery({
         const meta = resolveProductMeta(undefined, itKeys[0], `${it.slug} ${it.name}`);
 
         itKeys.forEach((k, idx) => {
+          if (!k || typeof k !== 'string') return;
           fromItems.push({
             key: k.trim(),
             productId: it.productId,
@@ -416,10 +418,12 @@ export function LicenseKeyDelivery({
     if (fromItems.length > 0) return fromItems;
 
     // 3. Fallback: Parse comma or newline separated initialKey
-    const rawKeys = (licenseKey || initialKey || '')
-      .split(/[\n,]+/)
-      .map((k) => k.trim())
-      .filter(Boolean);
+    const rawKeys = typeof (licenseKey || initialKey) === 'string'
+      ? (licenseKey || initialKey || '')
+          .split(/[\n,]+/)
+          .map((k) => (typeof k === 'string' ? k.trim() : ''))
+          .filter(Boolean)
+      : [];
 
     return rawKeys.map((k, idx) => {
       const meta = resolveProductMeta(undefined, k, purchasedSoftware[idx]?.id);

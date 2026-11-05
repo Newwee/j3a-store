@@ -38,10 +38,8 @@ function RegisterFormContent() {
     setGoogleLoading(true);
     setErrorMessage('');
     try {
-      await loginWithGoogle();
-      success('เข้าสู่ระบบด้วย Google สำเร็จ ยินดีต้อนรับสู่ J3A STORE!');
-      router.push(redirectUrl);
-      router.refresh();
+      await loginWithGoogle(redirectUrl);
+      // Browser navigates to Google OAuth directly; no router.push needed
     } catch (err: any) {
       console.error('Google Sign-in error:', err);
       if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
@@ -49,7 +47,6 @@ function RegisterFormContent() {
         setErrorMessage(msg);
         error(msg);
       }
-    } finally {
       setGoogleLoading(false);
     }
   };

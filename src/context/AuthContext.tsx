@@ -35,7 +35,7 @@ interface AuthContextType {
   isFirebaseReady: boolean;
   login: (email: string, pass: string) => Promise<void>;
   register: (email: string, pass: string, name: string) => Promise<void>;
-  loginWithGoogle: () => Promise<void>;
+  loginWithGoogle: (redirectUrl?: string) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -374,7 +374,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }).catch((notifyErr) => console.warn('Discord new member notify error:', notifyErr));
   };
 
-  const loginWithGoogle = async () => {
+  const loginWithGoogle = async (redirectUrl?: string) => {
     let savedGoogleEmail = '';
     if (typeof window !== 'undefined') {
       localStorage.setItem('j3a_last_auth_provider', 'google');
@@ -388,10 +388,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       queryParams.login_hint = savedGoogleEmail;
     }
 
+    const targetPath = redirectUrl || (typeof window !== 'undefined' ? window.location.pathname + window.location.search : '/');
+    const callbackUrl =
+      typeof window !== 'undefined'
+        ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(targetPath)}`
+        : undefined;
+
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/` : undefined,
+        redirectTo: callbackUrl,
         queryParams,
       },
     });

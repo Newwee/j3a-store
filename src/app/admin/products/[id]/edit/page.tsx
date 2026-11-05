@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useState, use } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useEffect, useState } from 'react';
+import { useRouter, useParams } from 'next/navigation';
 import { AdminHeader } from '@/components/admin/AdminHeader';
 import { ProductForm } from '@/components/admin/ProductForm';
 import { getProductById } from '@/lib/firestore/products';
@@ -12,10 +12,11 @@ import { Loader2 } from 'lucide-react';
 export default function EditProductPage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params?: Promise<{ id: string }>;
 }) {
-  const resolvedParams = use(params);
-  const productId = resolvedParams.id;
+  const routeParams = useParams();
+  const rawId = routeParams?.id;
+  const productId = (typeof rawId === 'string' ? rawId : Array.isArray(rawId) ? rawId[0] : '') || '';
   const router = useRouter();
 
   const [product, setProduct] = useState<Product | null>(null);

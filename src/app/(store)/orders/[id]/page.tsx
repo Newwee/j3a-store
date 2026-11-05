@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useEffect, useState, useMemo, use } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useParams } from 'next/navigation';
 import {
   CheckCircle2,
   Clock,
@@ -46,10 +47,11 @@ import { getRedeemCodeByCode, RedeemCode } from '@/lib/firestore/redeem';
 export default function OrderDetailPage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params?: Promise<{ id: string }>;
 }) {
-  const resolvedParams = use(params);
-  const orderId = resolvedParams.id;
+  const routeParams = useParams();
+  const rawId = routeParams?.id;
+  const orderId = (typeof rawId === 'string' ? rawId : Array.isArray(rawId) ? rawId[0] : '') || '';
   const { user } = useAuth();
   const { success, error } = useToast();
   const { showLoading, hideLoading } = useLoading();
@@ -582,18 +584,18 @@ export default function OrderDetailPage({
                 ข้อมูลผู้รับ & การจัดส่ง
               </h4>
               <p className="text-slate-200">
-                <strong className="text-slate-400">ชื่อ:</strong> {order.customer.name}
+                <strong className="text-slate-400">ชื่อ:</strong> {order.customer?.name || '-'}
               </p>
               <p className="text-slate-200">
-                <strong className="text-slate-400">อีเมล:</strong> {order.customer.email}
+                <strong className="text-slate-400">อีเมล:</strong> {order.customer?.email || '-'}
               </p>
               <p className="text-slate-200">
-                <strong className="text-slate-400">โทรศัพท์:</strong> {order.customer.phone || '-'}
+                <strong className="text-slate-400">โทรศัพท์:</strong> {order.customer?.phone || '-'}
               </p>
               <p className="text-slate-200">
-                <strong className="text-slate-400">ข้อมูลจัดส่ง/UID:</strong> {order.customer.address}
+                <strong className="text-slate-400">ข้อมูลจัดส่ง/UID:</strong> {order.customer?.address || '-'}
               </p>
-              {order.customer.notes && (
+              {order.customer?.notes && (
                 <p className="text-slate-200">
                   <strong className="text-slate-400">หมายเหตุ:</strong> {order.customer.notes}
                 </p>

@@ -50,10 +50,8 @@ function LoginFormContent() {
     setGoogleLoading(true);
     setErrorMessage('');
     try {
-      await loginWithGoogle();
-      success('เข้าสู่ระบบด้วย Google สำเร็จ ยินดีต้อนรับ!');
-      router.push(redirectUrl);
-      router.refresh();
+      await loginWithGoogle(redirectUrl);
+      // Browser navigates to Google OAuth directly; no router.push needed
     } catch (err: any) {
       console.error('Google Sign-in error:', err);
       if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
@@ -61,7 +59,6 @@ function LoginFormContent() {
         setErrorMessage(msg);
         error(msg);
       }
-    } finally {
       setGoogleLoading(false);
     }
   };

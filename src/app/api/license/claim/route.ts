@@ -12,6 +12,7 @@ export interface ClaimKeyItemInput {
   slug?: string;
   quantity?: number;
   deliveryType?: 'link' | 'key' | 'both';
+  tier?: string;
 }
 
 export interface ClaimedKeyItem {
@@ -51,15 +52,70 @@ export function mapProductToLicenseType(
 
 export function detectTier(str: string = ''): '3d' | '1w' | '4w' | '6m' {
   const s = str.toLowerCase();
-  if (s.includes('3d') || s.includes('3-day') || s.includes('3 day') || s.includes('trial') || s.includes('ทดลอง')) {
+  // 3 Days Check (including Thai variants)
+  if (
+    s.includes('3d') ||
+    s.includes('3-day') ||
+    s.includes('3 day') ||
+    s.includes('3day') ||
+    s.includes('3วัน') ||
+    s.includes('3 วัน') ||
+    s.includes('trial') ||
+    s.includes('ทดลอง')
+  ) {
     return '3d';
   }
-  if (s.includes('6m') || s.includes('6-month') || s.includes('6 month') || s.includes('6เดือน') || s.includes('6 เดือน')) {
+
+  // 6 Months Check (including Thai variants)
+  if (
+    s.includes('6m') ||
+    s.includes('6-month') ||
+    s.includes('6 month') ||
+    s.includes('6เดือน') ||
+    s.includes('6 เดือน') ||
+    s.includes('ครึ่งปี')
+  ) {
     return '6m';
   }
-  if (s.includes('4w') || s.includes('4-week') || s.includes('4 week') || s.includes('1m') || s.includes('1 month') || s.includes('1 เดือน') || s.includes('เดือน')) {
+
+  // 4 Weeks / 1 Month Check (including Thai variants)
+  if (
+    s.includes('4w') ||
+    s.includes('4-week') ||
+    s.includes('4 week') ||
+    s.includes('4สัปดาห์') ||
+    s.includes('4 สัปดาห์') ||
+    s.includes('1m') ||
+    s.includes('1 month') ||
+    s.includes('1เดือน') ||
+    s.includes('1 เดือน') ||
+    s.includes('28 วัน') ||
+    s.includes('28วัน') ||
+    s.includes('30 วัน') ||
+    s.includes('30วัน') ||
+    s.includes('เดือน')
+  ) {
     return '4w';
   }
+
+  // 1 Week Check
+  if (
+    s.includes('1w') ||
+    s.includes('1-week') ||
+    s.includes('1 week') ||
+    s.includes('7d') ||
+    s.includes('7-day') ||
+    s.includes('7 day') ||
+    s.includes('7วัน') ||
+    s.includes('7 วัน') ||
+    s.includes('1สัปดาห์') ||
+    s.includes('1 สัปดาห์') ||
+    s.includes('1อาทิตย์') ||
+    s.includes('1 อาทิตย์')
+  ) {
+    return '1w';
+  }
+
   return '1w';
 }
 
@@ -68,11 +124,13 @@ export function detectTier(str: string = ''): '3d' | '1w' | '4w' | '6m' {
  */
 async function claimSingleKeyFromGAS(
   productType: string,
+  tier: string = '1w',
   email?: string
 ): Promise<{ success: boolean; key?: string; message?: string }> {
   const url = new URL(GOOGLE_APPS_SCRIPT_BASE_URL);
   url.searchParams.set('action', 'claim_key');
   if (productType) url.searchParams.set('product', productType);
+  if (tier) url.searchParams.set('tier', tier);
   if (email) url.searchParams.set('email', email);
 
   const controller = new AbortController();
@@ -105,6 +163,7 @@ async function claimSingleKeyFromGAS(
 /**
  * Unified key claimer: checks local Supabase licenses first for AutoQuest,
  * falls back to GAS if not available or for other software.
+ * Strict Tier Enforcement: NEVER falls back to a different tier!
  */
 async function claimKey(
   productType: string,
@@ -114,7 +173,7 @@ async function claimKey(
 ): Promise<{ success: boolean; key?: string; message?: string }> {
   if (productType === 'discord_autoquest') {
     try {
-      // 1. Try finding an available key for the exact tier in Supabase
+      // 1. Find an available key for the exact tier in Supabase
       const { data: exactLicense } = await supabaseAdmin
         .from('licenses')
         .select('*')
@@ -125,22 +184,7 @@ async function claimKey(
         .limit(1)
         .maybeSingle();
 
-      let targetLicense = exactLicense;
-
-      // 2. If exact tier is out of stock, fallback to any available AutoQuest key
-      if (!targetLicense) {
-        const { data: anyLicense } = await supabaseAdmin
-          .from('licenses')
-          .select('*')
-          .in('product_slug', ['j3adiscordautoquest', 'j3akeydiscordquestauto', 'key-j3a-discord-quest-auto'])
-          .eq('status', 'available')
-          .order('created_at', { ascending: true })
-          .limit(1)
-          .maybeSingle();
-        targetLicense = anyLicense;
-      }
-
-      if (targetLicense) {
+      if (exactLicense) {
         const updatePayload: Record<string, any> = {
           status: 'claimed',
           updated_at: new Date().toISOString(),
@@ -151,17 +195,23 @@ async function claimKey(
         await supabaseAdmin
           .from('licenses')
           .update(updatePayload)
-          .eq('id', targetLicense.id);
+          .eq('id', exactLicense.id);
 
-        return { success: true, key: targetLicense.key };
+        return { success: true, key: exactLicense.key };
       }
+
+      // If exact tier key is not in Supabase, report out of stock for this tier
+      return {
+        success: false,
+        message: `สินค้าหมดชั่วคราว (ไม่มีคีย์ว่างสำหรับแพ็กเกจ ${tier.toUpperCase()}) กรุณาติดต่อแอดมินเพื่อเติมสต็อก`,
+      };
     } catch (dbErr) {
       console.warn('Database error claiming key from Supabase:', dbErr);
     }
   }
 
-  // Fallback to Google Apps Script
-  return claimSingleKeyFromGAS(productType, customerEmail);
+  // Fallback to Google Apps Script for other products (passing tier)
+  return claimSingleKeyFromGAS(productType, tier, customerEmail);
 }
 
 /**
@@ -263,7 +313,7 @@ export async function POST(req: NextRequest) {
 
         const qty = Math.max(1, Math.min(20, Math.floor(Number(item.quantity) || 1)));
         const productType = mapProductToLicenseType(`${pSlug} ${pName}`);
-        const tier = detectTier(`${pSlug} ${pName}`);
+        const tier = item.tier ? detectTier(item.tier) : detectTier(`${pSlug} ${pName}`);
 
         for (let q = 1; q <= qty; q++) {
           const res = await claimKey(productType, tier, customerEmail, orderId);
