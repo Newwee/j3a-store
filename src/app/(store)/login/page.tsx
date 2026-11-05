@@ -8,6 +8,7 @@ import { Lock, Mail, ArrowRight, ShieldCheck, AlertCircle, Loader2, Sparkles, Su
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useLoading } from '@/context/LoadingContext';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 
@@ -18,6 +19,7 @@ function LoginFormContent() {
   const { user, login, loginWithGoogle, isFirebaseReady } = useAuth();
   const { success, error } = useToast();
   const { resolvedTheme, toggleTheme } = useTheme();
+  const { showLoading, hideLoading } = useLoading();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -49,11 +51,13 @@ function LoginFormContent() {
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
     setErrorMessage('');
+    showLoading('กำลังเชื่อมต่อบัญชี Google กรุณารอสักครู่...');
     try {
       await loginWithGoogle(redirectUrl);
-      // Browser navigates to Google OAuth directly; no router.push needed
+      // Browser navigates to Google OAuth directly; keep showing loading
     } catch (err: any) {
       console.error('Google Sign-in error:', err);
+      hideLoading();
       if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
         const msg = err.message || 'ไม่สามารถเข้าสู่ระบบด้วย Google ได้ กรุณาลองใหม่อีกครั้ง';
         setErrorMessage(msg);
@@ -72,13 +76,19 @@ function LoginFormContent() {
 
     setLoading(true);
     setErrorMessage('');
+    showLoading('กำลังเข้าสู่ระบบ กรุณารอสักครู่...');
 
     try {
       await login(email.trim(), password);
       success('เข้าสู่ระบบสำเร็จ ยินดีต้อนรับกลับ!');
-      router.push(redirectUrl);
-      router.refresh();
+      showLoading('เข้าสู่ระบบสำเร็จ กำลังพาไปยังหน้าร้านค้า...');
+      setTimeout(() => {
+        hideLoading();
+        router.push(redirectUrl);
+        router.refresh();
+      }, 500);
     } catch (err: any) {
+      hideLoading();
       console.error('Login error:', err);
       let msg = 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ กรุณาลองใหม่อีกครั้ง';
       const rawMsg = (err.message || '').toLowerCase();

@@ -24,6 +24,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { useTheme, Theme } from '@/context/ThemeContext';
 import { useLanguage } from '@/context/LanguageContext';
+import { useLoading } from '@/context/LoadingContext';
 import { TierBadge } from '@/components/ui/Badge';
 import { formatCurrency } from '@/lib/utils/formatters';
 
@@ -32,6 +33,7 @@ export function UserDropdown() {
   const { success, error, toast } = useToast();
   const { theme, resolvedTheme, setTheme } = useTheme();
   const { language, setLanguage, t } = useLanguage();
+  const { showLoading, hideLoading } = useLoading();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -48,12 +50,18 @@ export function UserDropdown() {
   }, []);
 
   const handleLogout = async () => {
+    showLoading('กำลังออกจากระบบ กรุณารอสักครู่...');
     try {
       await logout();
       setIsOpen(false);
       success('ออกจากระบบสำเร็จแล้ว');
-      router.push('/');
+      setTimeout(() => {
+        hideLoading();
+        router.push('/');
+        router.refresh();
+      }, 500);
     } catch {
+      hideLoading();
       error('ไม่สามารถออกจากระบบได้ กรุณาลองใหม่อีกครั้ง');
     }
   };

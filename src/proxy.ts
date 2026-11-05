@@ -119,10 +119,14 @@ export function proxy(request: NextRequest) {
   let windowSeconds = 60;
   let tierPrefix = 'general';
 
-  if (path.startsWith('/api/license/claim') || path === '/login' || path === '/register') {
-    // Sensitive Auth & Claim endpoints: Max 20 requests per minute
+  if (path.startsWith('/api/license/claim')) {
+    // Sensitive Claim endpoints: Max 20 requests per minute
     limit = 20;
-    tierPrefix = 'sensitive';
+    tierPrefix = 'claim';
+  } else if (path === '/login' || path === '/register' || path.startsWith('/auth/')) {
+    // Auth endpoints: Max 60 requests per minute
+    limit = 60;
+    tierPrefix = 'auth';
   } else if (path.startsWith('/api/')) {
     // General API endpoints: Max 60 requests per minute
     limit = 60;

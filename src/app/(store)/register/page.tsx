@@ -8,6 +8,7 @@ import { Lock, Mail, User, ArrowRight, ShieldCheck, AlertCircle, Loader2, Sun, M
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useLoading } from '@/context/LoadingContext';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 
@@ -18,6 +19,7 @@ function RegisterFormContent() {
   const { user, register, loginWithGoogle, isFirebaseReady } = useAuth();
   const { success, error } = useToast();
   const { resolvedTheme, toggleTheme } = useTheme();
+  const { showLoading, hideLoading } = useLoading();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -37,11 +39,13 @@ function RegisterFormContent() {
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
     setErrorMessage('');
+    showLoading('กำลังเชื่อมต่อบัญชี Google กรุณารอสักครู่...');
     try {
       await loginWithGoogle(redirectUrl);
-      // Browser navigates to Google OAuth directly; no router.push needed
+      // Browser navigates to Google OAuth directly; keep showing loading
     } catch (err: any) {
       console.error('Google Sign-in error:', err);
+      hideLoading();
       if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
         const msg = err.message || 'ไม่สามารถสมัครหรือเข้าสู่ระบบด้วย Google ได้ กรุณาลองใหม่อีกครั้ง';
         setErrorMessage(msg);
@@ -72,13 +76,19 @@ function RegisterFormContent() {
 
     setLoading(true);
     setErrorMessage('');
+    showLoading('กำลังสร้างบัญชีของคุณ กรุณารอสักครู่...');
 
     try {
       await register(email.trim(), password, name.trim());
       success('สมัครสมาชิกสำเร็จแล้ว! ยินดีต้อนรับสู่ J3A STORE');
-      router.push(redirectUrl);
-      router.refresh();
+      showLoading('สมัครสมาชิกสำเร็จ กำลังพาไปยังหน้าร้านค้า...');
+      setTimeout(() => {
+        hideLoading();
+        router.push(redirectUrl);
+        router.refresh();
+      }, 500);
     } catch (err: any) {
+      hideLoading();
       console.error('Registration error:', err);
       let msg = 'เกิดข้อผิดพลาดในการสมัครสมาชิก กรุณาลองใหม่อีกครั้ง';
       const rawMsg = (err.message || '').toLowerCase();

@@ -412,9 +412,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.warn('SignOut error:', e);
+    }
     if (typeof window !== 'undefined') {
       localStorage.removeItem('j3a_last_auth_provider');
+      localStorage.removeItem('j3a_store_auth_token');
+      try {
+        const cookies = document.cookie.split(';');
+        for (const cookie of cookies) {
+          const eqPos = cookie.indexOf('=');
+          const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+          if (name.startsWith('sb-') || name.includes('auth')) {
+            document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+            document.cookie = `${name}=; path=/; domain=${window.location.hostname}; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+          }
+        }
+      } catch {}
     }
     setUser(null);
     setProfile(null);

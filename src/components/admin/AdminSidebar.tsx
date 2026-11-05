@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   Package,
@@ -22,6 +22,7 @@ import {
   ClipboardCheck,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { useLoading } from '@/context/LoadingContext';
 import { cn } from '@/lib/utils/cn';
 
 interface AdminSidebarProps {
@@ -31,7 +32,23 @@ interface AdminSidebarProps {
 
 export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const { logout, profile } = useAuth();
+  const { showLoading, hideLoading } = useLoading();
+
+  const handleAdminLogout = async () => {
+    showLoading('กำลังออกจากระบบ Admin กรุณารอสักครู่...');
+    try {
+      await logout();
+      setTimeout(() => {
+        hideLoading();
+        router.push('/');
+        router.refresh();
+      }, 500);
+    } catch {
+      hideLoading();
+    }
+  };
 
   const links = [
     {
@@ -154,7 +171,7 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
         </Link>
 
         <button
-          onClick={() => logout()}
+          onClick={handleAdminLogout}
           className="w-full flex items-center gap-2.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors cursor-pointer"
         >
           <LogOut className="w-4 h-4" />
