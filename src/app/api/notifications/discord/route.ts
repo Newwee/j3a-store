@@ -8,6 +8,7 @@ import {
   notifyDiscordOrderPlaced,
   notifyDiscordTopupApproved,
   notifyDiscordAngpaoSuccess,
+  notifyDiscordCodeRedeemed,
   sendDiscordWebhook,
   getDiscordWebhooks,
 } from '@/lib/services/discord';
@@ -98,6 +99,25 @@ export async function POST(req: Request) {
           discount: discount ? Number(discount) : undefined,
           discountCode,
           paymentMethod,
+        });
+        return NextResponse.json({ ok: true, sent: success });
+      }
+
+      case 'code_redeemed': {
+        const { code, codeType, rewardAmount, userName, userEmail, userId, newCredits, usedCount, maxUses } = data;
+        if (!code || !userId) {
+          return NextResponse.json({ error: 'Missing code or userId' }, { status: 400 });
+        }
+        const success = await notifyDiscordCodeRedeemed({
+          code,
+          codeType: codeType || 'credit',
+          rewardAmount: Number(rewardAmount) || 0,
+          userName: userName || 'ลูกค้า',
+          userEmail,
+          userId,
+          newCredits: newCredits !== undefined ? Number(newCredits) : undefined,
+          usedCount: Number(usedCount) || 1,
+          maxUses: maxUses ? Number(maxUses) : undefined,
         });
         return NextResponse.json({ ok: true, sent: success });
       }

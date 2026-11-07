@@ -81,6 +81,38 @@ export default function AdminCodesPage() {
   const [isDeleteAllModalOpen, setIsDeleteAllModalOpen] = useState(false);
   const [isDeletingAll, setIsDeletingAll] = useState(false);
 
+  // View Users state
+  const [viewingUsersCode, setViewingUsersCode] = useState<RedeemCode | null>(null);
+  const [codeHistoryLoading, setCodeHistoryLoading] = useState(false);
+  const [codeHistoryData, setCodeHistoryData] = useState<{
+    topups: any[];
+    orders: any[];
+    users: any[];
+  } | null>(null);
+
+  const handleOpenViewUsers = async (item: RedeemCode) => {
+    setViewingUsersCode(item);
+    setCodeHistoryLoading(true);
+    try {
+      const { supabase } = await import('@/lib/supabase/client');
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      const res = await fetch(`/api/admin/codes/users?code=${encodeURIComponent(item.code)}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setCodeHistoryData(data);
+      } else {
+        error(data.error || 'ไม่สามารถโหลดประวัติผู้ใช้งานได้');
+      }
+    } catch (err: any) {
+      error('เกิดข้อผิดพลาดในการโหลดประวัติผู้ใช้งาน');
+    } finally {
+      setCodeHistoryLoading(false);
+    }
+  };
+
   const loadCodes = async () => {
     setIsLoading(true);
     try {
@@ -573,6 +605,13 @@ export default function AdminCodesPage() {
                       {/* Actions */}
                       <td className="py-4 px-4 sm:px-6 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => handleOpenViewUsers(item)}
+                            className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-amber-500/20 text-slate-400 hover:text-amber-300 transition-colors cursor-pointer"
+                            title="ดูประวัติผู้ใช้งานโค้ดนี้"
+                          >
+                            <Users className="w-4 h-4" />
+                          </button>
                           <button
                             onClick={() => handleOpenEditModal(item)}
                             className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-cyan-500/20 text-slate-400 hover:text-cyan-300 transition-colors cursor-pointer"
@@ -1096,6 +1135,124 @@ export default function AdminCodesPage() {
         title="ยืนยันการลบโค้ดทั้งหมดในระบบ?"
         message="การดำเนินการนี้จะลบโค้ดส่วนลดและโค้ดของขวัญทั้งหมดออกจากระบบอย่างถาวร ไม่สามารถกู้คืนได้"
       />
+
+      {/* View Users of Code Modal */}
+      <Modal
+        isOpen={Boolean(viewingUsersCode)}
+        onClose={() => {
+          setViewingUsersCode(null);
+          setCodeHistoryData(null);
+        }}
+        title={`👥 ประวัติผู้ใช้งานโค้ด "${viewingUsersCode?.code}"`}
+      >
+        <div className="space-y-4">
+          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-xs">
+            <div>
+              <span className="text-slate-400 block text-[11px]">รหัสโค้ด</span>
+              <strong className="text-amber-400 font-mono text-sm">{viewingUsersCode?.code}</strong>
+            </div>
+            <div className="text-right">
+              <span className="text-slate-400 block text-[11px]">จำนวนการใช้สิทธิ์</span>
+              <span className="font-mono text-slate-200 font-bold">
+                {viewingUsersCode?.usedCount || 0} / {viewingUsersCode?.maxUses === 0 ? '∞ ไม่จำกัด' : viewingUsersCode?.maxUses}
+              </span>
+            </div>
+          </div>
+
+          {codeHistoryLoading ? (
+            <div className="py-12 text-center text-slate-400 text-xs space-y-2">
+              <RefreshCw className="w-6 h-6 animate-spin mx-auto text-cyan-400" />
+              <p>กำลังค้นหาประวัติการใช้งานโค้ดจากฐานข้อมูล...</p>
+            </div>
+          ) : !codeHistoryData || (codeHistoryData.topups.length === 0 && codeHistoryData.orders.length === 0) ? (
+            <div className="py-10 text-center text-slate-500 text-xs bg-slate-950/40 rounded-2xl border border-slate-800/80 p-6">
+              <AlertCircle className="w-8 h-8 mx-auto mb-2 text-slate-600" />
+              <p className="font-bold text-slate-400">ยังไม่มีผู้ใช้งานโค้ดนี้ในระบบ</p>
+              <p className="text-[11px] mt-1 text-slate-600">เมื่อมีลูกค้ากดแลกหรือใช้เป็นส่วนลด รายชื่อจะปรากฏที่นี่ทันที</p>
+            </div>
+          ) : (
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+              {/* Gift Code Redemptions */}
+              {codeHistoryData.topups.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                    <Coins className="w-3.5 h-3.5" />
+                    <span>รายการแลกรับเครดิต ({codeHistoryData.topups.length} รายการ)</span>
+                  </h4>
+                  <div className="border border-slate-800 rounded-xl overflow-hidden divide-y divide-slate-800 bg-slate-950/60">
+                    {codeHistoryData.topups.map((t: any) => (
+                      <div key={t.id} className="p-3 flex items-center justify-between text-xs">
+                        <div>
+                          <strong className="text-slate-100 block">{t.user_name || 'ลูกค้า'}</strong>
+                          <span className="text-slate-400 text-[11px] font-mono">{t.user_email || t.user_id}</span>
+                          <span className="text-[10px] text-slate-500 block mt-0.5">
+                            {new Date(t.created_at).toLocaleString('th-TH')}
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-bold text-emerald-400 font-mono text-sm block">
+                            +{formatCurrency(t.amount)}
+                          </span>
+                          <span className="text-[10px] text-emerald-500/80 uppercase font-semibold">
+                            อนุมัติแล้ว
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Order Discounts */}
+              {codeHistoryData.orders.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold text-cyan-400 flex items-center gap-1.5">
+                    <Tag className="w-3.5 h-3.5" />
+                    <span>รายการใช้ส่วนลดสั่งซื้อ ({codeHistoryData.orders.length} รายการ)</span>
+                  </h4>
+                  <div className="border border-slate-800 rounded-xl overflow-hidden divide-y divide-slate-800 bg-slate-950/60">
+                    {codeHistoryData.orders.map((o: any) => (
+                      <div key={o.id} className="p-3 flex items-center justify-between text-xs">
+                        <div>
+                          <strong className="text-slate-100 block">
+                            #{o.order_number || o.id} • {o.customer_name || 'ลูกค้า'}
+                          </strong>
+                          <span className="text-slate-400 text-[11px] font-mono">{o.customer_email}</span>
+                          <span className="text-[10px] text-slate-500 block mt-0.5">
+                            {new Date(o.created_at).toLocaleString('th-TH')}
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-bold text-rose-400 font-mono text-xs block">
+                            ส่วนลด -{formatCurrency(o.discount)}
+                          </span>
+                          <span className="text-[11px] text-slate-400 font-mono block">
+                            ยอดรวม {formatCurrency(o.total)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex justify-end pt-3 border-t border-slate-800">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setViewingUsersCode(null);
+                setCodeHistoryData(null);
+              }}
+            >
+              ปิดหน้าต่าง
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

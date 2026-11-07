@@ -164,6 +164,56 @@ function RegisterFormContent() {
             </div>
           )}
 
+          {/* Google Sign-In Button (Primary & Recommended) */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="font-bold text-emerald-400 flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>แนะนำ: ยืนยันตัวตนอัตโนมัติ</span>
+              </span>
+              <span className="text-[10px] text-slate-500">ปลอดภัย 100% มีตัวตนจริง</span>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={googleLoading || loading}
+              className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl bg-slate-900/90 hover:bg-slate-800/90 border border-emerald-500/30 hover:border-emerald-500/60 text-slate-100 hover:text-white text-xs sm:text-sm font-bold transition-all duration-200 shadow-[0_0_15px_rgba(16,185,129,0.15)] active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+            >
+              {googleLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
+              ) : (
+                <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.28 14.28c-.25-.72-.38-1.49-.38-2.28s.13-1.56.38-2.28V6.57H1.25C.45 8.16 0 9.98 0 12s.45 3.84 1.25 5.43l4.03-3.15z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.57l4.03 3.15c.95-2.83 3.6-4.97 6.72-4.97z"
+                  />
+                </svg>
+              )}
+              <span>สมัครสมาชิกด้วย Google (Google Sign-In)</span>
+            </button>
+          </div>
+
+          {/* Divider */}
+          <div className="relative my-2 flex items-center justify-center">
+            <div className="w-full border-t border-slate-800" />
+            <span className="absolute bg-[#0c0a13] px-3 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+              หรือกรอกข้อมูลสมัครด้วยตนเอง
+            </span>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
               label="ชื่อของคุณ (Display Name) *"
@@ -175,15 +225,26 @@ function RegisterFormContent() {
               required
             />
 
-            <Input
-              label="อีเมล (Email) *"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="example@gmail.com"
-              leftIcon={<Mail className="w-4 h-4" />}
-              required
-            />
+            <div>
+              <Input
+                label="อีเมลจริง (Real Email) *"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="example@gmail.com"
+                leftIcon={<Mail className="w-4 h-4" />}
+                required
+              />
+              {email.toLowerCase().includes('@gmail.com') ? (
+                <p className="text-[11px] text-cyan-400 mt-1 flex items-center gap-1 font-medium">
+                  <span>💡 ใช้ Gmail: แนะนำให้ใช้ปุ่ม &quot;สมัครด้วย Google&quot; ด้านบน เพื่อยืนยันตัวตนอัตโนมัติ 100%</span>
+                </p>
+              ) : (
+                <p className="text-[10px] text-slate-500 mt-1">
+                  🛡️ ระบบตรวจสอบ DNS Mail Server จริง (ไม่อนุญาตให้อีเมลชั่วคราวหรืออีเมลปลอม)
+                </p>
+              )}
+            </div>
 
             <Input
               label="รหัสผ่าน (Password) *"
@@ -216,46 +277,6 @@ function RegisterFormContent() {
               สมัครสมาชิกทันที
             </Button>
           </form>
-
-          {/* Divider */}
-          <div className="relative my-2 flex items-center justify-center">
-            <div className="w-full border-t border-slate-800" />
-            <span className="absolute bg-[#0c0a13] px-3 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-              หรือสมัครด้วย
-            </span>
-          </div>
-
-          {/* Google Sign-In Button */}
-          <button
-            type="button"
-            onClick={handleGoogleSignIn}
-            disabled={googleLoading || loading}
-            className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 hover:border-slate-600 text-slate-200 hover:text-white text-xs sm:text-sm font-semibold transition-all duration-200 shadow-sm active:scale-[0.98] disabled:opacity-50 cursor-pointer"
-          >
-            {googleLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
-            ) : (
-              <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.03 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
-                />
-              </svg>
-            )}
-            <span>สมัครสมาชิกด้วย Google</span>
-          </button>
 
           {/* Footer Navigation */}
           <div className="pt-4 border-t border-slate-800 text-center text-xs text-slate-400">

@@ -1,5 +1,42 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import dns from 'dns/promises';
+
+// Blocklist of disposable, temporary, and fake mail domains
+const DISPOSABLE_DOMAINS = new Set([
+  'kaiei.com',
+  'tempmail.com',
+  '10minutemail.com',
+  'guerrillamail.com',
+  'mailinator.com',
+  'throwawaymail.com',
+  'yopmail.com',
+  'sharklasers.com',
+  'dispostable.com',
+  'trashmail.com',
+  'fakemailgenerator.com',
+  'getairmail.com',
+  'mohmal.com',
+  'crazymailing.com',
+  'dropmail.me',
+  'inboxkitten.com',
+  'temp-mail.org',
+  'generator.email',
+  'trashmail.net',
+  'nada.ltd',
+  'emailfake.com',
+]);
+
+function isGibberish(username: string): boolean {
+  const clean = username.toLowerCase().replace(/[^a-z]/g, '');
+  if (clean.length >= 6) {
+    // 6 or more consecutive consonants with no vowels (e.g. shjdkfkf, bcdfghjk)
+    if (/[bcdfghjklmnpqrstvwxyz]{6,}/i.test(clean)) return true;
+  }
+  // Repeated characters e.g. aaaaaa, 111111
+  if (/(.)\1{4,}/.test(username)) return true;
+  return false;
+}
 
 export async function POST(req: Request) {
   try {
@@ -21,6 +58,71 @@ export async function POST(req: Request) {
 
     const trimmedEmail = email.trim().toLowerCase();
     const trimmedName = name.trim();
+
+    // 0. Strict Real Email & Domain Verification
+    const parts = trimmedEmail.split('@');
+    if (parts.length !== 2) {
+      return NextResponse.json({ error: 'รูปแบบอีเมลไม่ถูกต้อง' }, { status: 400 });
+    }
+    const [localPart, domain] = parts;
+
+    if (!localPart || !domain || localPart.length < 3) {
+      return NextResponse.json({ error: 'ชื่ออีเมลสั้นเกินไป กรุณาระบุอีเมลจริง' }, { status: 400 });
+    }
+
+    // Check disposable domains
+    if (
+      DISPOSABLE_DOMAINS.has(domain) ||
+      domain.includes('tempmail') ||
+      domain.includes('dispostable') ||
+      domain.includes('throwaway') ||
+      domain.includes('fake')
+    ) {
+      return NextResponse.json(
+        { error: 'ระบบไม่อนุญาตให้ใช้อีเมลชั่วคราว (Disposable Email) กรุณาใช้อีเมลจริงที่สามารถติดต่อได้' },
+        { status: 400 }
+      );
+    }
+
+    // Check spam / keyboard smash
+    if (isGibberish(localPart)) {
+      return NextResponse.json(
+        { error: 'ชื่ออีเมลดูเป็นตัวอักษรสุ่มหรือสแปม กรุณาใช้อีเมลจริงในการสมัครสมาชิก' },
+        { status: 400 }
+      );
+    }
+
+    // Gmail-specific checks
+    if (domain === 'gmail.com') {
+      if (localPart.length < 6 || localPart.length > 30) {
+        return NextResponse.json(
+          { error: 'ที่อยู่อีเมล Gmail ต้องมีความยาวระหว่าง 6 ถึง 30 ตัวอักษร' },
+          { status: 400 }
+        );
+      }
+      if (!/^[a-z0-9.]+$/i.test(localPart) || localPart.includes('..')) {
+        return NextResponse.json(
+          { error: 'รูปแบบชื่อ Gmail ไม่ถูกต้อง (อนุญาตเฉพาะตัวอักษร ตัวเลข และจุด)' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Real-time DNS MX Record Check (Domain must have active mail servers)
+    try {
+      const mxRecords = await dns.resolveMx(domain);
+      if (!mxRecords || mxRecords.length === 0) {
+        return NextResponse.json(
+          { error: `โดเมน "${domain}" ไม่มี Mail Server สำหรับรับอีเมลจริง กรุณาใช้อีเมลจริง` },
+          { status: 400 }
+        );
+      }
+    } catch (dnsErr: any) {
+      return NextResponse.json(
+        { error: `ไม่พบเซิร์ฟเวอร์รับอีเมลของโดเมน "${domain}" หรือโดเมนนี้ไม่มีอยู่จริง กรุณาใช้อีเมลจริง` },
+        { status: 400 }
+      );
+    }
 
     // 1. Create user via supabaseAdmin with email_confirm: true (Auto-confirmed)
     const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({

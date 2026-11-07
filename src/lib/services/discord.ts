@@ -325,6 +325,71 @@ export async function notifyDiscordAngpaoSuccess(data: {
 }
 
 /**
+ * 3.5 Notify Credits/Admin: Customer Redeemed Gift / Promo Code
+ * Sent to Credits Channel (e.g. ୨-💾-୧-⁺-˖-credits)
+ */
+export async function notifyDiscordCodeRedeemed(data: {
+  code: string;
+  codeType: string;
+  rewardAmount: number;
+  userName: string;
+  userEmail?: string;
+  userId: string;
+  newCredits?: number;
+  usedCount: number;
+  maxUses?: number;
+}): Promise<boolean> {
+  const { credits, slip } = await getDiscordWebhooks();
+  const targetUrl = credits || slip;
+
+  const typeLabel =
+    data.codeType === 'credit'
+      ? `🪙 โค้ดของขวัญ (+฿${data.rewardAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })} เครดิต)`
+      : data.codeType === 'discount_percent'
+      ? `🏷️ โค้ดส่วนลด (${data.rewardAmount}% OFF)`
+      : `🏷️ โค้ดส่วนลด (-฿${data.rewardAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })})`;
+
+  const usesLabel =
+    data.maxUses && data.maxUses > 0
+      ? `${data.usedCount} / ${data.maxUses} สิทธิ์`
+      : `${data.usedCount} ครั้ง (ไม่จำกัดสิทธิ์)`;
+
+  const embed: any = {
+    title: '🎁 มีลูกค้าใช้งานโค้ด (Code Redeemed)',
+    description: `ตรวจพบการใช้งานโค้ดของขวัญ / โค้ดส่วนลด บนเว็บไซต์ **J3A STORE**`,
+    color: 0xf59e0b, // Amber / Gold
+    fields: [
+      { name: '🎟️ โค้ดที่ใช้', value: `\`${data.code}\``, inline: true },
+      { name: '💎 ประเภท & มูลค่า', value: typeLabel, inline: true },
+      { name: '📊 จำนวนที่ใช้ไปแล้ว', value: usesLabel, inline: true },
+      { name: '👤 ลูกค้า', value: data.userName || 'ลูกค้า', inline: true },
+      { name: '📧 อีเมล', value: data.userEmail || '-', inline: true },
+      {
+        name: '💳 เครดิตคงเหลือล่าสุด',
+        value: data.newCredits !== undefined
+          ? `**฿${data.newCredits.toLocaleString('th-TH', { minimumFractionDigits: 2 })}**`
+          : '-',
+        inline: true,
+      },
+      { name: '🆔 User ID', value: `\`${data.userId}\``, inline: false },
+      {
+        name: '🔗 ตรวจสอบในหลังบ้าน Admin',
+        value: `[จัดการโค้ด](${STORE_URL}/admin/codes) • [ข้อมูลลูกค้า](${STORE_URL}/admin/customers)`,
+        inline: false,
+      },
+    ],
+    footer: { text: 'J3A STORE • ระบบตรวจสอบโค้ดอัตโนมัติ (Admin Only)' },
+    timestamp: new Date().toISOString(),
+  };
+
+  return sendDiscordWebhook(targetUrl, {
+    username: 'J3A STORE - บันทึกการใช้โค้ด',
+    avatar_url: BOT_AVATAR_CREDITS,
+    embeds: [embed],
+  });
+}
+
+/**
  * 4. Notify Welcome: New Member Registration
  * Sent to Welcome Channel (e.g. ►-ยินดีต้อนรับ)
  */

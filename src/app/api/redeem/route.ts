@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { notifyDiscordCodeRedeemed } from '@/lib/services/discord';
 
 export async function POST(req: Request) {
   try {
@@ -52,6 +53,18 @@ export async function POST(req: Request) {
           updated_at: new Date().toISOString(),
         })
         .eq('id', discRow.id);
+
+      // Notify Discord Credits / Admin Channel
+      notifyDiscordCodeRedeemed({
+        code: cleanCode,
+        codeType: discRow.code_type || 'discount_fixed',
+        rewardAmount: Number(discRow.amount) || Number(discRow.discount_value) || 0,
+        userName: user.user_metadata?.full_name || user.email?.split('@')[0] || 'ลูกค้า',
+        userEmail: user.email,
+        userId: user.id,
+        usedCount: newUsedCount,
+        maxUses: Number(discRow.max_uses) || 0,
+      }).catch((e) => console.warn('Discord code notify error:', e));
 
       return NextResponse.json({ ok: true, success: true });
     }
@@ -162,6 +175,21 @@ export async function POST(req: Request) {
     if (insertTopupErr) {
       console.warn('Could not insert redeem topup history:', insertTopupErr.message);
     }
+
+    // Send Discord Admin Notification for Code Usage
+    try {
+      notifyDiscordCodeRedeemed({
+        code: cleanCode,
+        codeType: codeRow.code_type || 'credit',
+        rewardAmount,
+        userName: (userProfile as any)?.display_name || user.user_metadata?.full_name || 'ลูกค้า',
+        userEmail: user.email || (userProfile as any)?.email,
+        userId: user.id,
+        newCredits,
+        usedCount: newUsedCount,
+        maxUses,
+      }).catch((err) => console.warn('Discord code redeem notify error:', err));
+    } catch {}
 
     return NextResponse.json({
       ok: true,
