@@ -139,6 +139,30 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: `ไม่สามารถเพิ่มเครดิต: ${updateProfileErr.message}` }, { status: 500 });
     }
 
+    // 4. Create topup history record for audit and user top-up history
+    const topupId = `topup_rdm_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const topupNumber = `TOP-RDM-${Date.now().toString().slice(-6)}`;
+    const topupRow = {
+      id: topupId,
+      topup_number: topupNumber,
+      user_id: user.id,
+      user_email: user.email || (userProfile as any)?.email || null,
+      user_name: (userProfile as any)?.display_name || user.user_metadata?.full_name || 'ลูกค้า',
+      amount: rewardAmount,
+      payment_slip_url: `REDEEM_CODE:${cleanCode}`,
+      payment_method: 'redeem_code',
+      voucher_hash: cleanCode,
+      status: 'approved',
+      admin_note: `แลกรับเครดิตผ่านโค้ดของขวัญ (Code: ${cleanCode})`,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error: insertTopupErr } = await supabaseAdmin.from('topups').insert([topupRow]);
+    if (insertTopupErr) {
+      console.warn('Could not insert redeem topup history:', insertTopupErr.message);
+    }
+
     return NextResponse.json({
       ok: true,
       success: true,

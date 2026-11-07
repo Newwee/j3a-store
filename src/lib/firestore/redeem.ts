@@ -191,6 +191,28 @@ export async function redeemCodeForUser(codeStr: string, userId: string): Promis
       })
       .eq('id', userId);
 
+    try {
+      const topupId = `topup_rdm_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      const topupNumber = `TOP-RDM-${Date.now().toString().slice(-6)}`;
+      await supabase.from('topups').insert([
+        {
+          id: topupId,
+          topup_number: topupNumber,
+          user_id: userId,
+          amount: rewardAmount,
+          payment_slip_url: `REDEEM_CODE:${cleanCode}`,
+          payment_method: 'redeem_code',
+          voucher_hash: cleanCode,
+          status: 'approved',
+          admin_note: `แลกรับเครดิตผ่านโค้ดของขวัญ (Code: ${cleanCode})`,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ]);
+    } catch (tErr) {
+      console.warn('Could not record redeem topup history:', tErr);
+    }
+
     return {
       success: true,
       message: `แลกโค้ดสำเร็จ! คุณได้รับเครดิต ${rewardAmount} บาท`,

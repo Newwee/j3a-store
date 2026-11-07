@@ -38,6 +38,8 @@ import {
   Lock,
   ArrowRight,
   Percent,
+  Coins,
+  Tag,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
@@ -380,6 +382,7 @@ function ProfileContent() {
         setRedeemCodeInput('');
         triggerMoneyCelebration(res.amount || 50);
         await refreshProfile();
+        await loadTopupHistory();
       } else {
         error(res.message);
       }
@@ -1413,12 +1416,17 @@ function ProfileContent() {
                     </thead>
                     <tbody className="divide-y divide-slate-800/80">
                       {userTopups.map((topup) => {
-                        const isTestAngpao = topup.paymentMethod === 'truemoney_angpao_test';
+                        const isRedeemCode =
+                          topup.paymentMethod === 'redeem_code' ||
+                          topup.paymentSlipUrl?.startsWith('REDEEM_CODE:') ||
+                          topup.topupNumber?.startsWith('TOP-RDM-');
+                        const isTestAngpao = !isRedeemCode && topup.paymentMethod === 'truemoney_angpao_test';
                         const isAngpao =
-                          isTestAngpao ||
-                          topup.paymentMethod === 'truemoney_angpao' ||
-                          Boolean(topup.voucherHash) ||
-                          Boolean(topup.paymentSlipUrl?.includes('gift.truemoney.com'));
+                          !isRedeemCode &&
+                          (isTestAngpao ||
+                            topup.paymentMethod === 'truemoney_angpao' ||
+                            Boolean(topup.voucherHash) ||
+                            Boolean(topup.paymentSlipUrl?.includes('gift.truemoney.com')));
 
                         return (
                           <tr key={topup.id} className="hover:bg-slate-850/50 transition-colors">
@@ -1426,7 +1434,12 @@ function ProfileContent() {
                               #{topup.topupNumber}
                             </td>
                             <td className="py-3 px-4">
-                              {isTestAngpao ? (
+                              {isRedeemCode ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-300 bg-amber-500/15 border border-amber-500/35 px-2 py-0.5 rounded-full shadow-[0_0_8px_rgba(245,158,11,0.2)]">
+                                  <Coins className="w-3 h-3 text-amber-400" />
+                                  โค้ดของขวัญ (Redeem)
+                                </span>
+                              ) : isTestAngpao ? (
                                 <span className="inline-flex items-center gap-1 text-[10px] font-black text-purple-300 bg-purple-500/20 border border-purple-500/40 px-2 py-0.5 rounded-full shadow-[0_0_8px_rgba(168,85,247,0.25)]">
                                   <FlaskConical className="w-3 h-3 text-purple-400" />
                                   ซอง TrueMoney (TEST)
@@ -1474,7 +1487,12 @@ function ProfileContent() {
                               )}
                             </td>
                             <td className="py-3 px-4">
-                              {isAngpao ? (
+                              {isRedeemCode ? (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-amber-300 bg-amber-950/60 border border-amber-500/35 px-2 py-0.5 rounded">
+                                  <Tag className="w-3 h-3 text-amber-400" />
+                                  <span>{topup.voucherHash || topup.paymentSlipUrl?.replace('REDEEM_CODE:', '') || 'โค้ดของขวัญ'}</span>
+                                </span>
+                              ) : isAngpao ? (
                                 topup.paymentSlipUrl?.startsWith('http') ? (
                                   <a
                                     href={topup.paymentSlipUrl}

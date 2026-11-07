@@ -9,7 +9,7 @@ export interface TopupRequest {
   amount: number;
   paymentSlipUrl: string;
   status: TopupStatus;
-  paymentMethod?: 'slip' | 'truemoney_angpao' | 'truemoney_angpao_test';
+  paymentMethod?: 'slip' | 'truemoney_angpao' | 'truemoney_angpao_test' | 'redeem_code';
   voucherHash?: string;
   adminNote?: string;
   createdAt: string;
