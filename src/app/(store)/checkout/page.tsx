@@ -524,6 +524,42 @@ export default function CheckoutPage() {
       // 5. Save order to Supabase
       const created = await createOrder(orderData);
 
+      // 5.0 Ensure License Keys are claimed & bound to this order
+      if (hasLicenseItem && (paymentMethod === 'wallet' || finalTotal === 0) && claimedKeys.length === 0) {
+        try {
+          const licenseItemsPayload = items
+            .filter(
+              (it) =>
+                it.product.deliveryType === 'key' ||
+                it.product.deliveryType === 'both' ||
+                it.product.slug.includes('manager') ||
+                it.product.slug.includes('profile') ||
+                it.product.slug.includes('quest') ||
+                it.product.slug.includes('autoquest')
+            )
+            .map((it) => ({
+              productId: it.product.id,
+              name: it.selectedVariant ? `${it.product.name} - ${it.selectedVariant.name}` : it.product.name,
+              slug: it.selectedVariant?.tier ? `${it.product.slug}-${it.selectedVariant.tier}` : it.product.slug,
+              quantity: it.quantity,
+              deliveryType: it.product.deliveryType,
+              tier: it.selectedVariant?.tier,
+            }));
+
+          await fetch('/api/license/claim', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              orderId: created.id,
+              customerEmail: email.trim(),
+              items: licenseItemsPayload,
+            }),
+          });
+        } catch (postClaimErr) {
+          console.warn('Auto-claim after order creation error:', postClaimErr);
+        }
+      }
+
       // 5.1 Deduct stock in Supabase (automatically turns to out_of_stock if stock hits 0)
       try {
         await fetch('/api/orders/deduct-stock', {

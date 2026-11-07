@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { verifyAdminRequest } from '@/lib/auth/adminAuth';
+import { generateSingleKey } from '@/lib/utils/licenseGenerator';
 
 // Protected server-side endpoint - Not exposed to client bundle
 const GOOGLE_APPS_SCRIPT_BASE_URL =
@@ -221,7 +222,8 @@ async function claimKey(
   productType: string,
   tier: string = '1w',
   customerEmail?: string,
-  orderId?: string
+  orderId?: string,
+  excludeKeys: string[] = []
 ): Promise<{ success: boolean; key?: string; message?: string }> {
   try {
     // 1. Build list of potential product slug aliases in Supabase
@@ -252,25 +254,35 @@ async function claimKey(
       .select('*')
       .in('product_slug', uniqueSlugs)
       .eq('status', 'available')
-      .order('created_at', { ascending: true })
-      .limit(1);
+      .order('created_at', { ascending: true });
+
+    if (excludeKeys.length > 0) {
+      // Exclude keys already claimed in this request
+      const formattedExclude = `(${excludeKeys.map((k) => `"${k}"`).join(',')})`;
+      query = query.not('key', 'in', formattedExclude);
+    }
 
     if (tier && tier !== 'any') {
       query = query.eq('tier', tier);
     }
 
-    let { data: licenseToClaim } = await query.maybeSingle();
+    let { data: licenseToClaim } = await query.limit(1).maybeSingle();
 
     // If exact tier not found, check if product has lifetime keys (like DeskCord)
     if (!licenseToClaim && (productType === 'desk_cord' || tier === 'lifetime')) {
-      const { data: anyLifetime } = await supabaseAdmin
+      let anyLifetimeQuery = supabaseAdmin
         .from('licenses')
         .select('*')
         .in('product_slug', uniqueSlugs)
         .eq('status', 'available')
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .maybeSingle();
+        .order('created_at', { ascending: true });
+
+      if (excludeKeys.length > 0) {
+        const formattedExclude = `(${excludeKeys.map((k) => `"${k}"`).join(',')})`;
+        anyLifetimeQuery = anyLifetimeQuery.not('key', 'in', formattedExclude);
+      }
+
+      const { data: anyLifetime } = await anyLifetimeQuery.limit(1).maybeSingle();
 
       if (anyLifetime && (productType === 'desk_cord' || anyLifetime.tier === 'lifetime')) {
         licenseToClaim = anyLifetime;
@@ -290,16 +302,6 @@ async function claimKey(
         .update(updatePayload)
         .eq('id', licenseToClaim.id);
 
-      if (orderId) {
-        await supabaseAdmin
-          .from('orders')
-          .update({
-            transaction_ref: licenseToClaim.key,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', orderId);
-      }
-
       // Sync claimed key status to Google Sheets asynchronously
       syncKeyClaimToGAS(licenseToClaim.key, productType, customerEmail, orderId);
 
@@ -309,8 +311,121 @@ async function claimKey(
     console.warn('Database error claiming key from Supabase:', dbErr);
   }
 
-  // Fallback to Google Apps Script for other products (passing tier)
-  return claimSingleKeyFromGAS(productType, tier, customerEmail);
+  // 2. Fallback to Google Apps Script
+  try {
+    const gasRes = await claimSingleKeyFromGAS(productType, tier, customerEmail);
+    if (gasRes.success && gasRes.key && typeof gasRes.key === 'string') {
+      const cleanGasKey = gasRes.key.trim().toUpperCase();
+
+      // Check if key is fresh and not already used in this request or marked non-available in DB
+      const isAlreadyUsed = excludeKeys.includes(cleanGasKey);
+      const { data: existingInDb } = await supabaseAdmin
+        .from('licenses')
+        .select('id, status')
+        .eq('key', cleanGasKey)
+        .maybeSingle();
+
+      const isUnavailable =
+        existingInDb &&
+        (existingInDb.status === 'revoked' ||
+          existingInDb.status === 'active' ||
+          existingInDb.status === 'claimed');
+
+      if (!isAlreadyUsed && !isUnavailable) {
+        const durationDays =
+          tier === '3d' ? 3 : tier === '1w' ? 7 : tier === '4w' ? 28 : tier === '6m' ? 180 : 0;
+
+        if (!existingInDb) {
+          await supabaseAdmin.from('licenses').insert([
+            {
+              id: `lic_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+              key: cleanGasKey,
+              product_slug: productType,
+              tier,
+              duration_days: durationDays,
+              status: 'claimed',
+              order_id: orderId || null,
+              notes: `GAS Claimed for ${customerEmail || 'Customer'} (Order #${orderId || 'N/A'})`,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            },
+          ]);
+        } else {
+          await supabaseAdmin
+            .from('licenses')
+            .update({
+              status: 'claimed',
+              order_id: orderId || null,
+              notes: `GAS Claimed for ${customerEmail || 'Customer'} (Order #${orderId || 'N/A'})`,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existingInDb.id);
+        }
+
+        return { success: true, key: cleanGasKey };
+      }
+    }
+  } catch (gasErr) {
+    console.warn('GAS fallback error:', gasErr);
+  }
+
+  // 3. Guaranteed Unique Key Auto-Generator Fallback
+  // If database stock is empty and GAS provides duplicate/revoked key, generate fresh unique key in Supabase
+  try {
+    const prefixMap: Record<string, string> = {
+      desk_cord: 'J3ADC',
+      discord_autoquest:
+        tier === '3d'
+          ? 'J3ADQ-3D'
+          : tier === '1w'
+          ? 'J3ADQ-1W'
+          : tier === '4w'
+          ? 'J3ADQ-4W'
+          : tier === '6m'
+          ? 'J3ADQ-6M'
+          : 'J3ADQ',
+      discord_manager: 'J3ADM',
+      discord_profile: 'J3ADP',
+    };
+    const keyPrefix = prefixMap[productType] || 'J3A';
+
+    let freshKey = '';
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const candidate = generateSingleKey({ prefix: keyPrefix });
+      if (!excludeKeys.includes(candidate)) {
+        freshKey = candidate;
+        break;
+      }
+    }
+
+    if (freshKey) {
+      const durationDays =
+        tier === '3d' ? 3 : tier === '1w' ? 7 : tier === '4w' ? 28 : tier === '6m' ? 180 : 0;
+
+      await supabaseAdmin.from('licenses').insert([
+        {
+          id: `lic_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          key: freshKey,
+          product_slug: productType,
+          tier,
+          duration_days: durationDays,
+          status: 'claimed',
+          order_id: orderId || null,
+          notes: `Auto-generated for ${customerEmail || 'Customer'} (Order #${orderId || 'N/A'})`,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ]);
+
+      syncKeyClaimToGAS(freshKey, productType, customerEmail, orderId);
+
+      return { success: true, key: freshKey };
+    }
+  } catch (genErr) {
+    console.error('Failed to auto-generate unique key:', genErr);
+  }
+
+  return { success: false, message: 'ไม่สามารถจัดสรร License Key ได้ กรุณาติดต่อแอดมิน' };
 }
 
 /**
@@ -356,24 +471,56 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Idempotency: Return existing key if order already has key delivered
+      // Idempotency: Return existing keys if order already has key(s) delivered
       if (ord.transaction_ref && typeof ord.transaction_ref === 'string' && ord.transaction_ref.trim()) {
-        const existingKey = ord.transaction_ref.trim();
-        return NextResponse.json({
-          ok: true,
-          success: true,
-          keys: [
-            {
+        const existingRef = ord.transaction_ref.trim();
+        const orderItems = Array.isArray(ord.items) ? ord.items : [];
+        const existingClaimedKeys: ClaimedKeyItem[] = [];
+
+        // Check if items have structured licenseKeys
+        orderItems.forEach((it: any) => {
+          const keys: string[] = Array.isArray(it.licenseKeys) && it.licenseKeys.length > 0
+            ? it.licenseKeys
+            : it.licenseKey
+            ? [it.licenseKey]
+            : [];
+
+          const pType = mapProductToLicenseType(`${it.slug} ${it.name}`);
+          keys.forEach((k: string, idx: number) => {
+            if (k && typeof k === 'string') {
+              existingClaimedKeys.push({
+                productId: it.productId || it.slug || 'software',
+                productName: it.name || 'J3A Software License',
+                productSlug: it.slug || 'software',
+                productType: pType,
+                key: k.trim(),
+                unitIndex: idx + 1,
+              });
+            }
+          });
+        });
+
+        // Fallback: Parse comma separated transaction_ref
+        if (existingClaimedKeys.length === 0) {
+          const splitKeys = existingRef.split(/[\n,]+/).map((k) => k.trim()).filter(Boolean);
+          splitKeys.forEach((k, idx) => {
+            existingClaimedKeys.push({
               productId: 'existing-key',
               productName: 'J3A Software License',
               productSlug: 'license-key',
-              productType: 'discord_autoquest',
-              key: existingKey,
-              unitIndex: 1,
-            },
-          ],
-          key: existingKey,
-          totalClaimed: 1,
+              productType: 'discord_profile',
+              key: k,
+              unitIndex: idx + 1,
+            });
+          });
+        }
+
+        return NextResponse.json({
+          ok: true,
+          success: true,
+          keys: existingClaimedKeys,
+          key: existingClaimedKeys[0]?.key || existingRef,
+          totalClaimed: existingClaimedKeys.length,
           message: 'ส่งมอบ License Key ที่ออกให้แล้วสำหรับคำสั่งซื้อนี้เรียบร้อย',
         });
       }
@@ -390,6 +537,7 @@ export async function POST(req: NextRequest) {
 
     const claimedKeys: ClaimedKeyItem[] = [];
     const errors: string[] = [];
+    const usedKeysInRequest = new Set<string>();
 
     // Mode A: Claim keys for multiple items or multiple quantities
     if (itemsInput && Array.isArray(itemsInput) && itemsInput.length > 0) {
@@ -418,8 +566,15 @@ export async function POST(req: NextRequest) {
         const tier = item.tier ? detectTier(item.tier) : detectTier(`${pSlug} ${pName}`);
 
         for (let q = 1; q <= qty; q++) {
-          const res = await claimKey(productType, tier, customerEmail, orderId);
+          const res = await claimKey(
+            productType,
+            tier,
+            customerEmail,
+            orderId,
+            Array.from(usedKeysInRequest)
+          );
           if (res.success && res.key) {
+            usedKeysInRequest.add(res.key);
             const resolvedName =
               pName ||
               (productType === 'desk_cord'
@@ -478,8 +633,15 @@ export async function POST(req: NextRequest) {
           : 'j3a-discord-profile';
 
       for (let q = 1; q <= qty; q++) {
-        const res = await claimKey(productType, tier, customerEmail, orderId);
+        const res = await claimKey(
+          productType,
+          tier,
+          customerEmail,
+          orderId,
+          Array.from(usedKeysInRequest)
+        );
         if (res.success && res.key) {
+          usedKeysInRequest.add(res.key);
           claimedKeys.push({
             productId: fallbackProduct || productType,
             productName: defaultName,
