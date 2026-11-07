@@ -51,16 +51,17 @@ export async function POST(req: Request) {
 
       const id = `code_${Date.now()}`;
       const codeType = body.codeType || 'credit';
-      const discountVal = codeType === 'discount_percent' ? (Number(body.discountPercent) || amount) : amount;
+      const isCredit = codeType === 'credit';
+      const discountVal = isCredit ? 0 : (codeType === 'discount_percent' ? (Number(body.discountPercent) || amount) : amount);
 
       const row = {
         id,
         code: cleanCode,
-        credits: Math.round(amount),
+        credits: isCredit ? Math.round(amount) : 0,
         code_type: codeType,
-        discount_type: codeType === 'discount_percent' ? 'percent' : 'fixed',
+        discount_type: isCredit ? null : (codeType === 'discount_percent' ? 'percent' : 'fixed'),
         discount_value: discountVal,
-        min_spend: Number(body.minSpend) || 0,
+        min_spend: isCredit ? 0 : (Number(body.minSpend) || 0),
         max_uses: Number(body.maxUses) || 0,
         used_count: 0,
         used_by: [],
@@ -101,7 +102,11 @@ export async function POST(req: Request) {
       if (updatesData?.amount !== undefined) updates.credits = Math.round(Number(updatesData.amount));
       if (updatesData?.codeType !== undefined) {
         updates.code_type = updatesData.codeType;
-        updates.discount_type = updatesData.codeType === 'discount_percent' ? 'percent' : 'fixed';
+        updates.discount_type = updatesData.codeType === 'credit' ? null : (updatesData.codeType === 'discount_percent' ? 'percent' : 'fixed');
+        if (updatesData.codeType === 'credit') {
+          updates.discount_value = 0;
+          updates.min_spend = 0;
+        }
       }
       if (updatesData?.discountType !== undefined) updates.discount_type = updatesData.discountType;
       if (updatesData?.discountValue !== undefined) updates.discount_value = Number(updatesData.discountValue);

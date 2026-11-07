@@ -46,12 +46,20 @@ function mapRowToRedeemCode(row: any): RedeemCode {
     ? JSON.parse(row.used_by || '[]')
     : [];
 
-  const rawType = row.code_type || 'credit';
+  const rawType = (row.code_type || '').toLowerCase();
   let codeType: CodeType = 'credit';
-  if (rawType === 'discount_percent' || row.discount_type === 'percent') {
+  if (rawType === 'credit') {
+    codeType = 'credit';
+  } else if (rawType === 'discount_percent') {
     codeType = 'discount_percent';
-  } else if (rawType === 'discount_fixed' || row.discount_type === 'fixed') {
+  } else if (rawType === 'discount_fixed') {
     codeType = 'discount_fixed';
+  } else if (row.discount_type === 'percent') {
+    codeType = 'discount_percent';
+  } else if (row.discount_type === 'fixed' && !row.credits) {
+    codeType = 'discount_fixed';
+  } else {
+    codeType = 'credit';
   }
 
   const creditsNum = Number(row.credits) || 0;
@@ -276,7 +284,12 @@ export async function createRedeemCode(input: CreateRedeemCodeInput): Promise<Re
   }
 
   const codeType = input.codeType || 'credit';
-  const discountVal = codeType === 'discount_percent' ? (Number(input.discountPercent) || input.amount) : input.amount;
+  const isCredit = codeType === 'credit';
+  const discountVal = isCredit
+    ? 0
+    : codeType === 'discount_percent'
+    ? (Number(input.discountPercent) || input.amount)
+    : input.amount;
 
   // 1. Try secure Admin API Route first
   try {
@@ -295,8 +308,8 @@ export async function createRedeemCode(input: CreateRedeemCodeInput): Promise<Re
           codeType,
           amount: input.amount,
           discountValue: discountVal,
-          discountPercent: input.discountPercent,
-          minSpend: input.minSpend || 0,
+          discountPercent: codeType === 'discount_percent' ? input.discountPercent : undefined,
+          minSpend: isCredit ? 0 : (input.minSpend || 0),
           maxUses: input.maxUses || 0,
           limitPerUser: input.limitPerUser ?? true,
           isActive: input.isActive ?? true,
@@ -321,10 +334,10 @@ export async function createRedeemCode(input: CreateRedeemCodeInput): Promise<Re
     id,
     code: cleanCode,
     code_type: codeType,
-    discount_type: codeType === 'discount_percent' ? 'percent' : 'fixed',
+    discount_type: isCredit ? null : (codeType === 'discount_percent' ? 'percent' : 'fixed'),
     discount_value: discountVal,
-    credits: Math.round(input.amount),
-    min_spend: Number(input.minSpend) || 0,
+    credits: isCredit ? Math.round(input.amount) : 0,
+    min_spend: isCredit ? 0 : (Number(input.minSpend) || 0),
     max_uses: Number(input.maxUses) || 0,
     used_count: 0,
     used_by: [],
@@ -387,7 +400,10 @@ export async function updateRedeemCode(
   if (data.code !== undefined) updates.code = data.code.trim().toUpperCase();
   if (data.codeType !== undefined) {
     updates.code_type = data.codeType;
-    updates.discount_type = data.codeType === 'discount_percent' ? 'percent' : 'fixed';
+    updates.discount_type = data.codeType === 'credit' ? null : (data.codeType === 'discount_percent' ? 'percent' : 'fixed');
+    if (data.codeType === 'credit') {
+      updates.discount_value = 0;
+    }
   }
   if (data.amount !== undefined) updates.credits = Math.round(data.amount);
   if (data.discountValue !== undefined) updates.discount_value = Number(data.discountValue);
