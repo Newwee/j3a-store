@@ -19,7 +19,7 @@ export interface ClaimedKeyItem {
   productId: string;
   productName: string;
   productSlug: string;
-  productType: 'discord_manager' | 'discord_profile' | 'discord_autoquest';
+  productType: 'discord_manager' | 'discord_profile' | 'discord_autoquest' | 'desk_cord' | string;
   key: string;
   unitIndex: number;
 }
@@ -29,8 +29,11 @@ export interface ClaimedKeyItem {
  */
 export function mapProductToLicenseType(
   nameOrSlug: string = ''
-): 'discord_manager' | 'discord_profile' | 'discord_autoquest' {
+): 'discord_manager' | 'discord_profile' | 'discord_autoquest' | 'desk_cord' | string {
   const s = nameOrSlug.toLowerCase();
+  if (s.includes('deskcord') || s.includes('desk_cord') || s.includes('desk cord')) {
+    return 'desk_cord';
+  }
   if (
     s.includes('quest') ||
     s.includes('autoquest') ||
@@ -47,11 +50,29 @@ export function mapProductToLicenseType(
   ) {
     return 'discord_manager';
   }
-  return 'discord_profile';
+  if (
+    s.includes('profile') ||
+    s.includes('discord profile') ||
+    s.includes('j3a-discord-profile')
+  ) {
+    return 'discord_profile';
+  }
+  return s.replace(/[^a-z0-9_]/g, '_');
 }
 
-export function detectTier(str: string = ''): '3d' | '1w' | '4w' | '6m' {
+export function detectTier(str: string = ''): 'lifetime' | '3d' | '1w' | '4w' | '6m' {
   const s = str.toLowerCase();
+  // Lifetime / Permanent Check
+  if (
+    s.includes('lifetime') ||
+    s.includes('ถาวร') ||
+    s.includes('ตลอดชีพ') ||
+    s.includes('permanent') ||
+    s.includes('deskcord') ||
+    s.includes('desk_cord')
+  ) {
+    return 'lifetime';
+  }
   // 3 Days Check (including Thai variants)
   if (
     s.includes('3d') ||
@@ -161,8 +182,9 @@ async function claimSingleKeyFromGAS(
 }
 
 /**
- * Unified key claimer: checks local Supabase licenses first for AutoQuest,
- * falls back to GAS if not available or for other software.
+ * Unified key claimer: checks local Supabase licenses first for ANY software product
+ * (desk_cord, discord_autoquest, discord_manager, discord_profile, or custom),
+ * falls back to GAS if not available.
  * Strict Tier Enforcement: NEVER falls back to a different tier!
  */
 async function claimKey(
@@ -171,43 +193,87 @@ async function claimKey(
   customerEmail?: string,
   orderId?: string
 ): Promise<{ success: boolean; key?: string; message?: string }> {
-  if (productType === 'discord_autoquest') {
-    try {
-      // 1. Find an available key for the exact tier in Supabase
-      const { data: exactLicense } = await supabaseAdmin
+  try {
+    // 1. Build list of potential product slug aliases in Supabase
+    const slugCandidates = [
+      productType,
+      productType.replace(/_/g, '-'),
+      productType.replace(/-/g, '_'),
+      productType.replace(/[^a-z0-9]/g, ''),
+      `j3a-${productType.replace(/_/g, '-')}`,
+      `j3a${productType.replace(/_/g, '')}`,
+    ];
+
+    if (productType === 'desk_cord' || productType.includes('deskcord')) {
+      slugCandidates.push('desk_cord', 'j3a-deskcord', 'j3adeskcord');
+    } else if (productType === 'discord_autoquest' || productType.includes('quest')) {
+      slugCandidates.push('j3adiscordautoquest', 'j3akeydiscordquestauto', 'key-j3a-discord-quest-auto', 'discord_autoquest');
+    } else if (productType === 'discord_manager' || productType.includes('manager')) {
+      slugCandidates.push('discord_manager', 'j3a-discord-manager', 'j3adiscordmanager');
+    } else if (productType === 'discord_profile' || productType.includes('profile')) {
+      slugCandidates.push('discord_profile', 'j3a-discord-profile', 'j3adiscordprofile');
+    }
+
+    const uniqueSlugs = Array.from(new Set(slugCandidates));
+
+    // Try finding matching available key in Supabase
+    let query = supabaseAdmin
+      .from('licenses')
+      .select('*')
+      .in('product_slug', uniqueSlugs)
+      .eq('status', 'available')
+      .order('created_at', { ascending: true })
+      .limit(1);
+
+    if (tier && tier !== 'any') {
+      query = query.eq('tier', tier);
+    }
+
+    let { data: licenseToClaim } = await query.maybeSingle();
+
+    // If exact tier not found, check if product has lifetime keys (like DeskCord)
+    if (!licenseToClaim && (productType === 'desk_cord' || tier === 'lifetime')) {
+      const { data: anyLifetime } = await supabaseAdmin
         .from('licenses')
         .select('*')
-        .in('product_slug', ['j3adiscordautoquest', 'j3akeydiscordquestauto', 'key-j3a-discord-quest-auto'])
-        .eq('tier', tier)
+        .in('product_slug', uniqueSlugs)
         .eq('status', 'available')
         .order('created_at', { ascending: true })
         .limit(1)
         .maybeSingle();
 
-      if (exactLicense) {
-        const updatePayload: Record<string, any> = {
-          status: 'claimed',
-          updated_at: new Date().toISOString(),
-        };
-        if (orderId) updatePayload.order_id = orderId;
-        if (customerEmail) updatePayload.notes = `Claimed for ${customerEmail}`;
+      if (anyLifetime && (productType === 'desk_cord' || anyLifetime.tier === 'lifetime')) {
+        licenseToClaim = anyLifetime;
+      }
+    }
 
+    if (licenseToClaim) {
+      const updatePayload: Record<string, any> = {
+        status: 'claimed',
+        updated_at: new Date().toISOString(),
+      };
+      if (orderId) updatePayload.order_id = orderId;
+      if (customerEmail) updatePayload.notes = `Claimed for ${customerEmail}`;
+
+      await supabaseAdmin
+        .from('licenses')
+        .update(updatePayload)
+        .eq('id', licenseToClaim.id);
+
+      if (orderId) {
         await supabaseAdmin
-          .from('licenses')
-          .update(updatePayload)
-          .eq('id', exactLicense.id);
-
-        return { success: true, key: exactLicense.key };
+          .from('orders')
+          .update({
+            transaction_ref: licenseToClaim.key,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', orderId);
       }
 
-      // If exact tier key is not in Supabase, report out of stock for this tier
-      return {
-        success: false,
-        message: `สินค้าหมดชั่วคราว (ไม่มีคีย์ว่างสำหรับแพ็กเกจ ${tier.toUpperCase()}) กรุณาติดต่อแอดมินเพื่อเติมสต็อก`,
-      };
-    } catch (dbErr) {
-      console.warn('Database error claiming key from Supabase:', dbErr);
+      return { success: true, key: licenseToClaim.key };
     }
+  } catch (dbErr) {
+    console.warn('Database error claiming key from Supabase:', dbErr);
   }
 
   // Fallback to Google Apps Script for other products (passing tier)
@@ -307,6 +373,9 @@ export async function POST(req: NextRequest) {
           pSlug.includes('profile') ||
           pSlug.includes('quest') ||
           pSlug.includes('autoquest') ||
+          pSlug.includes('deskcord') ||
+          pSlug.includes('desk_cord') ||
+          pName.toLowerCase().includes('deskcord') ||
           pName.toLowerCase().includes('discord');
 
         if (!isLicenseProduct) continue;
@@ -320,7 +389,9 @@ export async function POST(req: NextRequest) {
           if (res.success && res.key) {
             const resolvedName =
               pName ||
-              (productType === 'discord_manager'
+              (productType === 'desk_cord'
+                ? 'J3A DeskCord'
+                : productType === 'discord_manager'
                 ? 'J3A Discord Manager'
                 : productType === 'discord_autoquest'
                 ? 'J3A Discord AutoQuest'
@@ -328,7 +399,9 @@ export async function POST(req: NextRequest) {
 
             const resolvedSlug =
               pSlug ||
-              (productType === 'discord_manager'
+              (productType === 'desk_cord'
+                ? 'j3a-deskcord'
+                : productType === 'discord_manager'
                 ? 'j3a-discord-manager'
                 : productType === 'discord_autoquest'
                 ? 'j3a-discord-autoquest'
@@ -354,14 +427,18 @@ export async function POST(req: NextRequest) {
       const qty = Math.max(1, Math.min(20, fallbackQuantity));
 
       const defaultName =
-        productType === 'discord_manager'
+        productType === 'desk_cord'
+          ? 'J3A DeskCord'
+          : productType === 'discord_manager'
           ? 'J3A Discord Manager'
           : productType === 'discord_autoquest'
           ? 'J3A Discord AutoQuest'
           : 'J3A Discord Profile';
 
       const defaultSlug =
-        productType === 'discord_manager'
+        productType === 'desk_cord'
+          ? 'j3a-deskcord'
+          : productType === 'discord_manager'
           ? 'j3a-discord-manager'
           : productType === 'discord_autoquest'
           ? 'j3a-discord-autoquest'

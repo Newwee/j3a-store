@@ -29,7 +29,16 @@ export interface SoftwareDownloadItem {
   guideStep3: string;
 }
 
-export const SOFTWARE_DOWNLOADS: Record<'DISCORD_MANAGER' | 'DISCORD_PROFILE' | 'DISCORD_AUTOQUEST', SoftwareDownloadItem> = {
+export const SOFTWARE_DOWNLOADS: Record<'DISCORD_MANAGER' | 'DISCORD_PROFILE' | 'DISCORD_AUTOQUEST' | 'DISCORD_DESKCORD', SoftwareDownloadItem> = {
+  DISCORD_DESKCORD: {
+    id: 'desk-cord',
+    name: 'J3A DeskCord',
+    shortName: 'J3A DeskCord',
+    downloadUrl: 'https://drive.google.com/file/d/1-7yqUrPH4VOwWDEbp25uTJsb2OIRW_ri/view?usp=sharing',
+    zipFileName: 'J3ADeskCord.zip',
+    exeFileName: 'J3ADeskCord_Setup.exe',
+    guideStep3: '💡 คำแนะนำ: แตกไฟล์ ZIP และติดตั้งโปรแกรม J3A DeskCord จากนั้นนำ License Key ไปลงทะเบียนเปิดใช้งาน',
+  },
   DISCORD_MANAGER: {
     id: 'discord-manager',
     name: 'J3A Discord Manager',
@@ -64,6 +73,9 @@ export const SOFTWARE_DOWNLOADS: Record<'DISCORD_MANAGER' | 'DISCORD_PROFILE' | 
  */
 export function getDownloadUrlForProduct(nameOrSlugOrId: string = ''): string | null {
   const s = nameOrSlugOrId.toLowerCase();
+  if (s.includes('deskcord') || s.includes('desk_cord') || s.includes('desk cord')) {
+    return SOFTWARE_DOWNLOADS.DISCORD_DESKCORD.downloadUrl;
+  }
   if (
     s.includes('autoquest') ||
     s.includes('auto quest') ||
@@ -110,7 +122,7 @@ export interface DisplayKeyUnit {
   key: string;
   productId?: string;
   productName: string;
-  productType: 'discord_manager' | 'discord_profile' | 'discord_autoquest';
+  productType: 'discord_manager' | 'discord_profile' | 'discord_autoquest' | 'desk_cord' | string;
   unitLabel: string;
   downloadUrl: string;
 }
@@ -358,6 +370,13 @@ export function LicenseKeyDelivery({
     // Helper to resolve product metadata
     const resolveProductMeta = (rawType?: string, rawKey?: string, rawNameOrSlug?: string) => {
       const s = `${rawType || ''} ${rawKey || ''} ${rawNameOrSlug || ''}`.toLowerCase();
+      if (s.includes('adc') || s.includes('deskcord') || s.includes('desk_cord') || s.includes('desk cord')) {
+        return {
+          type: 'desk_cord' as const,
+          name: 'J3A DeskCord',
+          download: SOFTWARE_DOWNLOADS.DISCORD_DESKCORD.downloadUrl,
+        };
+      }
       if (s.includes('adq') || s.includes('quest') || s.includes('autoquest') || s.includes('auto-quest')) {
         return {
           type: 'discord_autoquest' as const,
