@@ -42,32 +42,49 @@ export function CartDrawer() {
   } = useCart();
   const { t, language } = useLanguage();
 
-  // Prevent background scroll when open
+  // Prevent background scroll when open & handle Escape key
   useEffect(() => {
     if (isCartOpen) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = 'unset';
     }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isCartOpen) {
+        setIsCartOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
     return () => {
       document.body.style.overflow = 'unset';
+      window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isCartOpen]);
-
-  if (!isCartOpen) return null;
+  }, [isCartOpen, setIsCartOpen]);
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden">
-      {/* Backdrop */}
+    <div
+      className={`fixed inset-0 z-50 overflow-hidden transition-all duration-300 ${
+        isCartOpen ? 'pointer-events-auto visible' : 'pointer-events-none invisible'
+      }`}
+    >
+      {/* Backdrop with smooth fade */}
       <div
-        className="fixed inset-0 bg-black/80 backdrop-blur-md transition-opacity duration-300 animate-in fade-in"
+        className={`fixed inset-0 bg-black/80 backdrop-blur-md transition-opacity duration-300 ease-out ${
+          isCartOpen ? 'opacity-100' : 'opacity-0'
+        }`}
         onClick={() => setIsCartOpen(false)}
         aria-hidden="true"
       />
 
-      {/* Drawer Container */}
-      <div className="fixed inset-y-0 right-0 max-w-full flex pl-0 sm:pl-10">
-        <div className="w-screen max-w-md bg-slate-950/95 border-l border-cyan-500/20 backdrop-blur-2xl shadow-[-20px_0_60px_rgba(6,182,212,0.15)] flex flex-col z-10 animate-in slide-in-from-right duration-300 relative overflow-hidden">
+      {/* Drawer Container with hardware-accelerated slide */}
+      <div
+        className={`fixed inset-y-0 right-0 max-w-full flex pl-0 sm:pl-10 transition-transform duration-300 ease-out transform ${
+          isCartOpen ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
+        <div className="w-screen max-w-md bg-slate-950/95 border-l border-cyan-500/20 backdrop-blur-2xl shadow-[-20px_0_60px_rgba(6,182,212,0.25)] flex flex-col z-10 relative overflow-hidden">
           {/* Top Neon Accent Line */}
           <div className="h-1 w-full bg-gradient-to-r from-cyan-500 via-indigo-500 to-pink-500 shadow-[0_0_12px_rgba(6,182,212,0.8)]" />
 

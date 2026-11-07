@@ -25,7 +25,7 @@ export default async function StoreLayout({
 
       <div className="relative z-10 flex flex-col min-h-screen">
         <Navbar />
-        <main className="flex-1 pb-20 md:pb-0">{children}</main>
+        <main className="flex-1 pb-24 md:pb-0">{children}</main>
         <Footer footerDescription={settings?.footerDescription} />
         {/* Mobile App-Style Bottom Navigation */}
         <MobileBottomNav />

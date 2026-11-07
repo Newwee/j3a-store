@@ -71,13 +71,13 @@ export function UserDropdown() {
       <div className="flex items-center gap-1.5 sm:gap-2">
         <Link
           href="/login"
-          className="text-xs sm:text-sm font-semibold text-slate-300 hover:text-white px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl hover:bg-slate-800/60 transition-all active:scale-95 whitespace-nowrap"
+          className="h-10 text-xs sm:text-sm font-semibold text-slate-300 hover:text-white px-3 sm:px-3.5 rounded-xl hover:bg-slate-800/80 border border-slate-700/60 hover:border-cyan-500/40 transition-all flex items-center justify-center active:scale-95 whitespace-nowrap focus-visible:ring-2 focus-visible:ring-cyan-400"
         >
           {t('nav_login', 'เข้าสู่ระบบ')}
         </Link>
         <Link
           href="/register"
-          className="hidden sm:inline-flex text-xs sm:text-sm font-semibold bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl shadow-[0_0_15px_rgba(6,182,212,0.3)] transition-all active:scale-95 whitespace-nowrap"
+          className="h-10 hidden sm:inline-flex text-xs sm:text-sm font-bold bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white px-3.5 sm:px-4 rounded-xl shadow-[0_0_15px_rgba(6,182,212,0.3)] transition-all flex items-center justify-center active:scale-95 whitespace-nowrap focus-visible:ring-2 focus-visible:ring-cyan-400"
         >
           {t('nav_register', 'สมัครสมาชิก')}
         </Link>
@@ -92,32 +92,35 @@ export function UserDropdown() {
 
   return (
     <div className="relative" ref={dropdownRef}>
-      {/* Pill Trigger matching reference design */}
+      {/* Unified Balance + Profile Card (Height: 40px) */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2.5 bg-slate-900/90 hover:bg-slate-800/90 border border-slate-700/80 hover:border-cyan-500/40 rounded-full pl-3 pr-2 py-1.5 transition-all shadow-md group cursor-pointer"
+        className="h-10 flex items-center gap-2 sm:gap-2.5 bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 hover:border-cyan-500/50 rounded-xl px-2.5 sm:px-3 transition-all shadow-md group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 select-none"
         aria-expanded={isOpen}
+        title={`ผู้ใช้งาน: ${displayName} | เครดิต: ${formatCurrency(credits)}`}
       >
-        <div className="flex flex-col text-left leading-tight hidden sm:flex">
-          <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-            BALANCE
-          </span>
-          <span className="text-xs font-bold text-cyan-400">
+        {/* Wallet Balance */}
+        <div className="flex items-center gap-1.5 font-mono">
+          <div className="w-5 h-5 rounded-md bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center shrink-0">
+            <Wallet className="w-3 h-3 text-cyan-400" />
+          </div>
+          <span className="text-xs font-black text-cyan-300 tracking-tight whitespace-nowrap">
             {formatCurrency(credits)}
           </span>
         </div>
 
-        <div className="h-6 w-px bg-slate-800 hidden sm:block" />
+        <div className="h-4 w-px bg-slate-700/80 hidden sm:block" />
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-slate-200 group-hover:text-white max-w-[100px] truncate">
+        {/* User Info */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <span className="text-xs font-semibold text-slate-200 group-hover:text-white max-w-[85px] sm:max-w-[110px] truncate hidden sm:block">
             {displayName}
           </span>
-          <div className="relative w-7 h-7 rounded-full overflow-hidden border border-cyan-400/50 bg-slate-800 flex items-center justify-center shrink-0">
+          <div className="relative w-6 h-6 rounded-full overflow-hidden border border-cyan-400/60 bg-slate-800 flex items-center justify-center shrink-0 shadow-sm">
             {avatarUrl ? (
               <Image src={avatarUrl} alt={displayName} fill className="object-cover" />
             ) : (
-              <span className="text-xs font-bold text-cyan-400">
+              <span className="text-[10px] font-black text-cyan-400">
                 {displayName.charAt(0).toUpperCase()}
               </span>
             )}
