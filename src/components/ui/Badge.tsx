@@ -106,9 +106,9 @@ export function OrderStatusBadge({ status }: { status: OrderStatus }) {
       );
     case 'cancelled':
       return (
-        <Badge variant="danger">
-          <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
-          ยกเลิกแล้ว
+        <Badge variant="danger" className="bg-rose-950/80 text-rose-300 border-rose-500/60 font-bold shadow-[0_0_10px_rgba(244,63,94,0.3)]">
+          <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" />
+          ยกเลิกแล้ว (Cancelled)
         </Badge>
       );
     default:

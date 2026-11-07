@@ -432,6 +432,18 @@ export default function OrderDetailPage({
           </div>
         )}
 
+        {order.status === 'cancelled' && (
+          <div className="rounded-2xl p-5 bg-rose-950/40 border-2 border-rose-500/50 text-slate-200 text-xs sm:text-sm space-y-2 shadow-[0_0_20px_rgba(244,63,94,0.15)]">
+            <div className="flex items-center gap-2 font-bold text-rose-400 text-sm sm:text-base">
+              <AlertCircle className="w-5 h-5 shrink-0" />
+              <span>คำสั่งซื้อนี้ถูกยกเลิกแล้ว (Order Cancelled)</span>
+            </div>
+            <p className="text-rose-200/90 leading-relaxed">
+              คำสั่งซื้อนี้ถูกยกเลิกโดยผู้ดูแลระบบ ส่งผลให้ License Key และลิงก์ดาวน์โหลดทั้งหมดที่ผูกกับคำสั่งซื้อนี้ถูกระงับสิทธิ์การใช้งาน (REVOKED) เรียบร้อยแล้ว หากท่านมีข้อสงสัยหรือต้องการความช่วยเหลือเพิ่มเติม สามารถติดต่อทีมงานแอดมินผ่านทาง Discord หรือช่องทางติดต่อได้ตลอด 24 ชม.
+            </p>
+          </div>
+        )}
+
         {/* Order Header Card */}
         <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8 backdrop-blur-md space-y-6 shadow-xl">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-6">

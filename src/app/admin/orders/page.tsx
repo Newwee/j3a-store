@@ -26,6 +26,8 @@ import {
   Calendar,
   Sparkles,
   Ticket,
+  AlertTriangle,
+  XCircle,
 } from 'lucide-react';
 import { Order, OrderStatus } from '@/types/order';
 import { getOrders, updateOrderStatus } from '@/lib/firestore/orders';
@@ -92,20 +94,39 @@ export default function AdminOrdersPage() {
 
   const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
     try {
-      await updateOrderStatus(orderId, newStatus);
+      // Call dedicated API endpoint to sync status and license revocations atomically
+      const res = await fetch('/api/admin/orders/status', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId, status: newStatus }),
+      });
+
+      const resData = await res.json();
+      if (!res.ok || !resData.ok) {
+        throw new Error(resData.error || 'ไม่สามารถเปลี่ยนสถานะคำสั่งซื้อได้');
+      }
+
       setOrders((prev) =>
         prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
       );
       if (selectedOrder && selectedOrder.id === orderId) {
         setSelectedOrder((prev) => (prev ? { ...prev, status: newStatus } : null));
       }
-      if (newStatus === 'completed') {
-        success(`อนุมัติคำสั่งซื้อเรียบร้อย! ลูกค้าในออเดอร์นี้ได้รับการปลดล็อกสิทธิ์ให้คะแนนสินค้า (Rating & Review) แล้ว`);
+
+      if (newStatus === 'cancelled') {
+        success(
+          resData.message ||
+            `ยกเลิกคำสั่งซื้อสำเร็จ! สิทธิ์และ License Key ทั้งหมดถูกระงับ (REVOKED) เรียบร้อยแล้ว`
+        );
+      } else if (newStatus === 'completed') {
+        success(
+          `อนุมัติคำสั่งซื้อเรียบร้อย! ลูกค้าในออเดอร์นี้ได้รับการปลดล็อกสิทธิ์ให้คะแนนสินค้า (Rating & Review) แล้ว`
+        );
       } else {
         success(`อัปเดตสถานะคำสั่งซื้อเป็น "${newStatus}" แล้ว`);
       }
     } catch (err: any) {
-      error('ไม่สามารถเปลี่ยนสถานะคำสั่งซื้อได้');
+      error(err.message || 'ไม่สามารถเปลี่ยนสถานะคำสั่งซื้อได้');
     }
   };
 
@@ -187,22 +208,43 @@ export default function AdminOrdersPage() {
               <tbody className="divide-y divide-slate-800/80">
                 {filteredOrders.map((order) => {
                   const hasDiscount = Boolean(order.discount && order.discount > 0);
+                  const isCancelled = order.status === 'cancelled';
                   return (
-                    <tr key={order.id} className="hover:bg-slate-850/50 transition-colors">
+                    <tr
+                      key={order.id}
+                      className={`transition-colors ${
+                        isCancelled
+                          ? 'bg-rose-950/20 hover:bg-rose-950/30 border-l-4 border-l-rose-500'
+                          : 'hover:bg-slate-850/50'
+                      }`}
+                    >
                       {/* Order Number */}
                       <td className="py-4 px-4 sm:px-6 whitespace-nowrap">
                         <button
                           onClick={() => setSelectedOrder(order)}
-                          className="font-bold text-white hover:text-cyan-400 flex items-center gap-1.5 cursor-pointer text-left"
+                          className={`font-bold flex items-center gap-1.5 cursor-pointer text-left ${
+                            isCancelled
+                              ? 'text-rose-300 hover:text-rose-200'
+                              : 'text-white hover:text-cyan-400'
+                          }`}
                         >
                           <span>#{order.orderNumber}</span>
-                          <Eye className="w-3.5 h-3.5 text-cyan-400/70" />
+                          <Eye className="w-3.5 h-3.5 opacity-70" />
                         </button>
+                        {isCancelled && (
+                          <div className="mt-1">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-[0_0_8px_rgba(244,63,94,0.3)]">
+                              🔴 ยกเลิกแล้ว (CANCELLED)
+                            </span>
+                          </div>
+                        )}
                       </td>
 
                       {/* Customer */}
                       <td className="py-4 px-4 max-w-xs">
-                        <p className="font-semibold text-white">{order.customer.name}</p>
+                        <p className={`font-semibold ${isCancelled ? 'text-slate-300' : 'text-white'}`}>
+                          {order.customer.name}
+                        </p>
                         <p className="text-[11px] text-slate-400 truncate">{order.customer.email}</p>
                         <p className="text-[11px] text-slate-500">{order.customer.phone || '-'}</p>
                       </td>
@@ -217,11 +259,15 @@ export default function AdminOrdersPage() {
 
                             return (
                               <div key={idx} className="space-y-1">
-                                <p className="text-xs text-slate-200 font-medium">
+                                <p className={`text-xs font-medium ${isCancelled ? 'text-slate-400' : 'text-slate-200'}`}>
                                   • {item.name} <span className="text-slate-400 font-bold">×{item.quantity}</span>
                                 </p>
                                 <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
-                                  {item.deliveryType === 'both' ? (
+                                  {isCancelled ? (
+                                    <span className="px-1.5 py-0.5 rounded bg-rose-500/15 border border-rose-500/30 text-rose-300 font-medium flex items-center gap-1">
+                                      <span>⛔ ระงับสิทธิ์แล้ว</span>
+                                    </span>
+                                  ) : item.deliveryType === 'both' ? (
                                     <span className="px-1.5 py-0.5 rounded bg-purple-500/15 border border-purple-500/30 text-purple-300 font-medium flex items-center gap-1">
                                       <Key className="w-3 h-3 text-amber-300" />
                                       <Download className="w-3 h-3 text-sky-300" />
@@ -243,21 +289,31 @@ export default function AdminOrdersPage() {
                                     </span>
                                   )}
 
-                                  {/* Quick key preview if granted */}
+                                  {/* Quick key preview */}
                                   {primaryKey && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleCopyKey(primaryKey)}
-                                      title="คลิกเพื่อคัดลอก License Key"
-                                      className="font-mono text-[10px] text-emerald-400 bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-800/60 hover:bg-emerald-900/60 transition-colors cursor-pointer flex items-center gap-1"
-                                    >
-                                      <span>{primaryKey.slice(0, 16)}...</span>
-                                      {copiedKey === primaryKey ? (
-                                        <Check className="w-3 h-3 text-emerald-300" />
-                                      ) : (
-                                        <Copy className="w-2.5 h-2.5 text-slate-400" />
-                                      )}
-                                    </button>
+                                    isCancelled ? (
+                                      <div
+                                        title="License Key นี้ถูกระงับสิทธิ์การใช้งาน (REVOKED) แล้ว"
+                                        className="font-mono text-[10px] text-rose-400 bg-rose-950/80 px-1.5 py-0.5 rounded border border-rose-700/80 line-through font-semibold flex items-center gap-1"
+                                      >
+                                        <span>{primaryKey.slice(0, 16)}...</span>
+                                        <span className="text-[9px] text-rose-300 bg-rose-900/60 px-1 rounded no-underline">ระงับแล้ว</span>
+                                      </div>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleCopyKey(primaryKey)}
+                                        title="คลิกเพื่อคัดลอก License Key"
+                                        className="font-mono text-[10px] text-emerald-400 bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-800/60 hover:bg-emerald-900/60 transition-colors cursor-pointer flex items-center gap-1"
+                                      >
+                                        <span>{primaryKey.slice(0, 16)}...</span>
+                                        {copiedKey === primaryKey ? (
+                                          <Check className="w-3 h-3 text-emerald-300" />
+                                        ) : (
+                                          <Copy className="w-2.5 h-2.5 text-slate-400" />
+                                        )}
+                                      </button>
+                                    )
                                   )}
                                 </div>
                               </div>
@@ -270,7 +326,7 @@ export default function AdminOrdersPage() {
                       <td className="py-4 px-4 whitespace-nowrap">
                         <div className="space-y-1">
                           <div className="flex items-center gap-1.5">
-                            <span className="font-black text-cyan-400 text-sm">
+                            <span className={`font-black text-sm ${isCancelled ? 'text-slate-400 line-through' : 'text-cyan-400'}`}>
                               {formatCurrency(order.total)}
                             </span>
                             {hasDiscount && (
@@ -317,13 +373,23 @@ export default function AdminOrdersPage() {
                           onChange={(e) =>
                             handleStatusChange(order.id, e.target.value as OrderStatus)
                           }
-                          className="bg-slate-950 text-xs rounded-xl px-2.5 py-1.5 border border-slate-700 outline-none cursor-pointer"
+                          className={`text-xs rounded-xl px-2.5 py-1.5 border outline-none cursor-pointer font-bold transition-all ${
+                            isCancelled
+                              ? 'bg-rose-950 text-rose-200 border-rose-500 ring-1 ring-rose-500/50 shadow-[0_0_12px_rgba(244,63,94,0.35)]'
+                              : order.status === 'completed'
+                              ? 'bg-emerald-950/80 text-emerald-300 border-emerald-600/70'
+                              : order.status === 'paid'
+                              ? 'bg-cyan-950/80 text-cyan-300 border-cyan-600/70'
+                              : order.status === 'processing'
+                              ? 'bg-purple-950/80 text-purple-300 border-purple-600/70'
+                              : 'bg-amber-950/80 text-amber-300 border-amber-600/70'
+                          }`}
                         >
-                          <option value="pending">รอชำระ (Pending)</option>
-                          <option value="paid">ชำระแล้ว (Paid)</option>
-                          <option value="processing">กำลังทำรายการ (Processing)</option>
-                          <option value="completed">สำเร็จ (Completed)</option>
-                          <option value="cancelled">ยกเลิก (Cancelled)</option>
+                          <option value="pending" className="bg-slate-900 text-amber-300">🟡 รอชำระ (Pending)</option>
+                          <option value="paid" className="bg-slate-900 text-cyan-300">🔵 ชำระแล้ว (Paid)</option>
+                          <option value="processing" className="bg-slate-900 text-purple-300">🟣 กำลังทำรายการ (Processing)</option>
+                          <option value="completed" className="bg-slate-900 text-emerald-300">🟢 สำเร็จ (Completed)</option>
+                          <option value="cancelled" className="bg-slate-900 text-rose-300 font-bold">🔴 ยกเลิก (Cancelled)</option>
                         </select>
                       </td>
 
@@ -375,6 +441,19 @@ export default function AdminOrdersPage() {
           maxWidth="2xl"
         >
           <div className="space-y-5 p-1 text-slate-200">
+            {/* Cancelled Alert Banner */}
+            {selectedOrder.status === 'cancelled' && (
+              <div className="p-4 rounded-2xl bg-rose-950/50 border-2 border-rose-500/70 shadow-[0_0_20px_rgba(244,63,94,0.25)] space-y-1.5">
+                <div className="flex items-center gap-2 text-rose-300 font-black text-sm">
+                  <AlertTriangle className="w-5 h-5 text-rose-400 animate-pulse shrink-0" />
+                  <span>คำสั่งซื้อนี้ถูกยกเลิกแล้ว (ORDER CANCELLED)</span>
+                </div>
+                <p className="text-xs text-rose-200/90 leading-relaxed">
+                  สถานะของคำสั่งซื้อนี้คือ <strong>&quot;ยกเลิกแล้ว&quot;</strong> — สิทธิ์การใช้งานและ License Key ทั้งหมดที่ผูกกับคำสั่งซื้อนี้ถูกสั่งระงับสิทธิ์การใช้งาน (REVOKED) เรียบร้อยแล้ว โปรแกรมทุกตัวจะปฏิเสธการเข้าถึงและการเปิดใช้งานของคีย์ในคำสั่งซื้อนี้ทันที
+                </p>
+              </div>
+            )}
+
             {/* 1. Pricing & Discount Breakdown Card */}
             <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3">
               <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
@@ -540,33 +619,55 @@ export default function AdminOrdersPage() {
                             <span>License Key ที่ส่งมอบให้ลูกค้า ({allKeys.length} คีย์):</span>
                           </label>
                           <div className="space-y-1">
-                            {allKeys.map((k, kIdx) => (
-                              <div
-                                key={kIdx}
-                                className="flex items-center justify-between p-2 rounded-lg bg-slate-950 border border-amber-500/30 text-xs"
-                              >
-                                <code className="font-mono text-emerald-400 font-bold select-all tracking-wider">
-                                  {k}
-                                </code>
-                                <button
-                                  type="button"
-                                  onClick={() => handleCopyKey(k)}
-                                  className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-200 transition-colors flex items-center gap-1 cursor-pointer"
+                            {allKeys.map((k, kIdx) => {
+                              const isOrdCancelled = selectedOrder.status === 'cancelled';
+                              return (
+                                <div
+                                  key={kIdx}
+                                  className={`flex items-center justify-between p-2 rounded-lg text-xs ${
+                                    isOrdCancelled
+                                      ? 'bg-rose-950/40 border border-rose-500/40'
+                                      : 'bg-slate-950 border border-amber-500/30'
+                                  }`}
                                 >
-                                  {copiedKey === k ? (
-                                    <>
-                                      <Check className="w-3 h-3 text-emerald-400" />
-                                      <span className="text-emerald-400">คัดลอกแล้ว</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Copy className="w-3 h-3 text-slate-400" />
-                                      <span>คัดลอก</span>
-                                    </>
+                                  <div className="flex items-center gap-2">
+                                    <code
+                                      className={`font-mono font-bold select-all tracking-wider ${
+                                        isOrdCancelled
+                                          ? 'text-rose-400 line-through'
+                                          : 'text-emerald-400'
+                                      }`}
+                                    >
+                                      {k}
+                                    </code>
+                                    {isOrdCancelled && (
+                                      <span className="text-[10px] font-bold text-rose-300 bg-rose-900/60 px-1.5 py-0.5 rounded border border-rose-700/60">
+                                        ระงับสิทธิ์แล้ว (REVOKED)
+                                      </span>
+                                    )}
+                                  </div>
+                                  {!isOrdCancelled && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCopyKey(k)}
+                                      className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-200 transition-colors flex items-center gap-1 cursor-pointer"
+                                    >
+                                      {copiedKey === k ? (
+                                        <>
+                                          <Check className="w-3 h-3 text-emerald-400" />
+                                          <span className="text-emerald-400">คัดลอกแล้ว</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Copy className="w-3 h-3 text-slate-400" />
+                                          <span>คัดลอก</span>
+                                        </>
+                                      )}
+                                    </button>
                                   )}
-                                </button>
-                              </div>
-                            ))}
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       )}
