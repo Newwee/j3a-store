@@ -85,7 +85,24 @@ export async function POST(req: Request) {
       }
 
       case 'order_placed': {
-        const { orderNumber, userName, userEmail, itemsSummary, totalAmount, subtotal, discount, discountCode, paymentMethod } = data;
+        const { orderNumber, userName, userEmail, totalAmount, subtotal, discount, discountCode, paymentMethod } = data;
+        let itemsSummary = typeof data.itemsSummary === 'string' ? data.itemsSummary.trim() : '';
+
+        // If itemsSummary is empty or has 'undefined', synthesize from data.items array
+        if ((!itemsSummary || itemsSummary.includes('undefined')) && Array.isArray(data.items) && data.items.length > 0) {
+          itemsSummary = data.items
+            .map((i: any) => {
+              const name = i.name || i.productName || i.title || i.slug || 'สินค้า';
+              const qty = i.quantity || i.qty || 1;
+              return `• **${name}** x${qty}`;
+            })
+            .join('\n');
+        }
+
+        if (!itemsSummary || itemsSummary === 'undefined') {
+          itemsSummary = '• สินค้าดิจิทัล x1';
+        }
+
         if (!orderNumber || totalAmount === undefined) {
           return NextResponse.json({ error: 'Missing order details' }, { status: 400 });
         }

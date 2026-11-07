@@ -474,6 +474,8 @@ export default function CheckoutPage() {
           return {
             productId: item.product.id,
             name: effectiveName,
+            productName: effectiveName,
+            title: effectiveName,
             slug: item.product.slug,
             price: effectivePrice,
             quantity: item.quantity,
@@ -538,7 +540,14 @@ export default function CheckoutPage() {
 
       // 5.2 Dispatch Discord Order Notification (୨-💾-୧-⁺-˖-credits)
       try {
-        const itemsSummary = resolvedItems.map((i: any) => `${i.productName} x${i.quantity || 1}`).join(', ');
+        const itemsSummary = resolvedItems
+          .map((i: any) => {
+            const itemName = i.name || i.productName || i.title || i.slug || 'สินค้าดิจิทัล';
+            const itemQty = i.quantity || i.qty || 1;
+            return `• **${itemName}** x${itemQty}`;
+          })
+          .join('\n') || '• สินค้าดิจิทัล x1';
+
         await fetch('/api/notifications/discord', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -549,6 +558,7 @@ export default function CheckoutPage() {
               userName: name.trim() || user?.displayName || 'ลูกค้า',
               userEmail: user?.email || email || '',
               itemsSummary,
+              items: resolvedItems,
               totalAmount: finalTotal,
               subtotal: subtotal,
               discount: discountAmount,

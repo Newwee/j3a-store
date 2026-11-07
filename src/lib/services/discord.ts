@@ -463,6 +463,13 @@ export async function notifyDiscordOrderPlaced(data: {
       ? `🎟️ โค้ด **${data.discountCode || 'DISCOUNT'}** (-฿${data.discount.toLocaleString('th-TH', { minimumFractionDigits: 2 })})`
       : '❌ ไม่ได้ใช้ส่วนลด (ราคาเต็ม)';
 
+  let safeItemsSummary = (data.itemsSummary || '').trim();
+  if (!safeItemsSummary || safeItemsSummary === 'undefined') {
+    safeItemsSummary = '• สินค้าดิจิทัล x1';
+  } else if (safeItemsSummary.includes('undefined')) {
+    safeItemsSummary = safeItemsSummary.replace(/undefined/g, 'สินค้าดิจิทัล');
+  }
+
   const embed: any = {
     title: '🛍️ มีรายการสั่งซื้อใหม่สำเร็จ (New Order)',
     description: `ลูกค้าทำรายการสั่งซื้อสินค้าบนเว็บไซต์ J3A STORE เรียบร้อยแล้ว`,
@@ -474,7 +481,7 @@ export async function notifyDiscordOrderPlaced(data: {
       { name: 'ลูกค้า', value: data.userName || 'ลูกค้า', inline: true },
       { name: 'อีเมล', value: data.userEmail || '-', inline: true },
       { name: 'ส่วนลดคูปอง', value: discountField, inline: true },
-      { name: 'รายการสินค้า', value: data.itemsSummary || 'สินค้าดิจิทัล', inline: false },
+      { name: 'รายการสินค้า', value: safeItemsSummary, inline: false },
       {
         name: '🔗 ลิงก์สำหรับแอดมิน',
         value: `[คลิกที่นี่เพื่อไปหน้าจัดการออเดอร์](${STORE_URL}/admin/orders)`,
