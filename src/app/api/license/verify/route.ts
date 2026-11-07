@@ -126,8 +126,9 @@ export async function POST(req: NextRequest) {
       }
 
       // Calculate expiration timestamp
-      const durationDays = Number(license.duration_days) || 7;
-      const expiresAt = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
+      const isLifetime = license.tier === 'lifetime' || license.duration_days === 0;
+      const durationDays = isLifetime ? 0 : (Number(license.duration_days) || 7);
+      const expiresAt = isLifetime ? null : new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
 
       // Activate key & bind HWID
       const { error: updateErr } = await supabaseAdmin
@@ -136,7 +137,7 @@ export async function POST(req: NextRequest) {
           status: 'active',
           hwid,
           activated_at: now.toISOString(),
-          expires_at: expiresAt.toISOString(),
+          expires_at: expiresAt ? expiresAt.toISOString() : null,
           last_verified_at: now.toISOString(),
           updated_at: now.toISOString(),
         })
@@ -145,7 +146,7 @@ export async function POST(req: NextRequest) {
       if (updateErr) {
         console.error('Failed to activate license:', updateErr);
         return corsJson(
-          { valid: false, error: 'ไม่สามารถเปิดใช้งานคีย์ได้ กรุณาลองใหม่อีกครั้ง' },
+          { valid: false, success: false, error: 'ไม่สามารถเปิดใช้งานคีย์ได้ กรุณาลองใหม่อีกครั้ง' },
           { status: 500 }
         );
       }
@@ -160,24 +161,31 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      const remainingSeconds = durationDays * 86400;
+      const remainingSeconds = isLifetime ? 999999999 : durationDays * 86400;
 
       return corsJson({
+        success: true,
         valid: true,
+        is_lifetime: isLifetime,
         action: 'activated',
         status: 'active',
         key: license.key,
+        product: license.product_slug,
         tier: license.tier,
-        tierName: TIER_NAMES[license.tier] || license.tier,
+        tierName: isLifetime ? 'Lifetime (ถาวร / ตลอดชีพ)' : (TIER_NAMES[license.tier] || `${durationDays} วัน`),
         durationDays,
+        duration_days: durationDays,
         activatedAt: now.toISOString(),
-        expiresAt: expiresAt.toISOString(),
-        expires_at: expiresAt.toISOString(),
-        remainingDays: durationDays,
-        days_remaining: durationDays,
+        expiresAt: isLifetime ? 'NEVER' : expiresAt?.toISOString(),
+        expires_at: isLifetime ? 'NEVER' : expiresAt?.toISOString(),
+        remainingDays: isLifetime ? 999999 : durationDays,
+        days_remaining: isLifetime ? 999999 : durationDays,
+        days_left: isLifetime ? 999999 : durationDays,
         remainingSeconds,
         serverTime: now.toISOString(),
-        message: 'เปิดใช้งานและผูกคีย์กับอุปกรณ์นี้สำเร็จ!',
+        message: isLifetime
+          ? 'เปิดใช้งาน License Key แบบถาวร (Lifetime) สำเร็จ!'
+          : `เปิดใช้งานและผูกคีย์กับอุปกรณ์นี้สำเร็จ (${durationDays} วัน)!`,
       });
     }
 
@@ -203,30 +211,43 @@ export async function POST(req: NextRequest) {
           .eq('id', license.id);
       }
 
-      // 4.2 Expiration check
-      const expiresAt = license.expires_at ? new Date(license.expires_at) : null;
-      if (expiresAt && now.getTime() >= expiresAt.getTime()) {
-        // Mark as expired in DB
-        await supabaseAdmin
-          .from('licenses')
-          .update({ status: 'expired', updated_at: now.toISOString() })
-          .eq('id', license.id);
+      // 4.2 Expiration check (Lifetime keys NEVER expire)
+      const isLifetime =
+        license.tier === 'lifetime' ||
+        license.duration_days === 0 ||
+        !license.expires_at ||
+        license.expires_at === 'NEVER';
 
-        return corsJson(
-          {
-            valid: false,
-            status: 'expired',
-            error: `License Key หมดอายุแล้วเมื่อ ${expiresAt.toLocaleString('th-TH')}`,
-            expiresAt: expiresAt.toISOString(),
-            serverTime: now.toISOString(),
-          },
-          { status: 403 }
-        );
+      if (!isLifetime) {
+        const expiresAt = license.expires_at ? new Date(license.expires_at) : null;
+        if (expiresAt && now.getTime() >= expiresAt.getTime()) {
+          // Mark as expired in DB
+          await supabaseAdmin
+            .from('licenses')
+            .update({ status: 'expired', updated_at: now.toISOString() })
+            .eq('id', license.id);
+
+          return corsJson(
+            {
+              valid: false,
+              success: false,
+              status: 'expired',
+              is_lifetime: false,
+              error: `License Key หมดอายุแล้วเมื่อ ${expiresAt.toLocaleString('th-TH')}`,
+              expiresAt: expiresAt.toISOString(),
+              expires_at: expiresAt.toISOString(),
+              days_left: 0,
+              serverTime: now.toISOString(),
+            },
+            { status: 403 }
+          );
+        }
       }
 
+      const expiresAt = !isLifetime && license.expires_at ? new Date(license.expires_at) : null;
       const remainingMs = expiresAt ? Math.max(0, expiresAt.getTime() - now.getTime()) : 0;
-      const remainingSeconds = Math.floor(remainingMs / 1000);
-      const remainingDays = +(remainingMs / (1000 * 60 * 60 * 24)).toFixed(2);
+      const remainingSeconds = isLifetime ? 999999999 : Math.floor(remainingMs / 1000);
+      const remainingDays = isLifetime ? 999999 : +(remainingMs / (1000 * 60 * 60 * 24)).toFixed(2);
 
       // Update heartbeat
       await supabaseAdmin
@@ -237,21 +258,28 @@ export async function POST(req: NextRequest) {
         .eq('id', license.id);
 
       return corsJson({
+        success: true,
         valid: true,
+        is_lifetime: isLifetime,
         action: 'verified',
         status: 'active',
         key: license.key,
+        product: license.product_slug,
         tier: license.tier,
-        tierName: TIER_NAMES[license.tier] || license.tier,
+        tierName: isLifetime ? 'Lifetime (ถาวร / ตลอดชีพ)' : (TIER_NAMES[license.tier] || `${license.duration_days} วัน`),
         durationDays: license.duration_days,
+        duration_days: license.duration_days,
         activatedAt: license.activated_at,
-        expiresAt: license.expires_at,
-        expires_at: license.expires_at,
+        expiresAt: isLifetime ? 'NEVER' : license.expires_at,
+        expires_at: isLifetime ? 'NEVER' : license.expires_at,
         remainingDays,
         days_remaining: remainingDays,
+        days_left: remainingDays,
         remainingSeconds,
         serverTime: now.toISOString(),
-        message: 'License Key ถูกต้องและพร้อมใช้งาน',
+        message: isLifetime
+          ? 'License Key แบบถาวร (Lifetime) ถูกต้องและพร้อมใช้งาน'
+          : 'License Key ถูกต้องและพร้อมใช้งาน',
       });
     }
 

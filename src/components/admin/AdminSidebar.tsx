@@ -18,6 +18,7 @@ import {
   Wallet,
   Star,
   Ticket,
+  Key,
   Megaphone,
   ClipboardCheck,
 } from 'lucide-react';
@@ -76,6 +77,11 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
       href: '/admin/orders',
       label: 'รายการคำสั่งซื้อ (Orders)',
       icon: ShoppingBag,
+    },
+    {
+      href: '/admin/licenses',
+      label: 'สร้าง & จัดการคีย์ (Licenses)',
+      icon: Key,
     },
     {
       href: '/admin/codes',
