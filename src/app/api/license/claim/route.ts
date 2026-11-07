@@ -182,6 +182,36 @@ async function claimSingleKeyFromGAS(
 }
 
 /**
+ * Background non-blocking sync to Google Sheets via GAS
+ */
+function syncKeyClaimToGAS(
+  key: string,
+  productType: string,
+  customerEmail?: string,
+  orderId?: string
+) {
+  try {
+    const url = new URL(GOOGLE_APPS_SCRIPT_BASE_URL);
+    fetch(url.toString(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'sync_claim',
+        key,
+        product: productType,
+        status: 'CLAIMED',
+        email: customerEmail || '',
+        order_no: orderId || '',
+        token: 'J3A_SEC_ACTION_9921_X!',
+      }),
+      signal: AbortSignal.timeout(8000),
+    }).catch((err) => console.warn('Sync key claim to GAS non-fatal error:', err?.message));
+  } catch (err: any) {
+    console.warn('Sync key claim to GAS non-fatal error:', err?.message);
+  }
+}
+
+/**
  * Unified key claimer: checks local Supabase licenses first for ANY software product
  * (desk_cord, discord_autoquest, discord_manager, discord_profile, or custom),
  * falls back to GAS if not available.
@@ -269,6 +299,9 @@ async function claimKey(
           })
           .eq('id', orderId);
       }
+
+      // Sync claimed key status to Google Sheets asynchronously
+      syncKeyClaimToGAS(licenseToClaim.key, productType, customerEmail, orderId);
 
       return { success: true, key: licenseToClaim.key };
     }

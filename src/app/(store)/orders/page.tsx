@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ShoppingBag, ChevronRight, Clock, Search, PackageCheck } from 'lucide-react';
+import { ShoppingBag, ChevronRight, Clock, Search, PackageCheck, Key, Copy, Check, Download, ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { Order } from '@/types/order';
 import { getOrders, getOrderById } from '@/lib/firestore/orders';
@@ -17,6 +17,16 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchId, setSearchId] = useState('');
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const handleCopyKey = (key: string) => {
+    if (!key) return;
+    navigator.clipboard.writeText(key);
+    setCopiedKey(key);
+    setTimeout(() => {
+      setCopiedKey(null);
+    }, 2000);
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -132,71 +142,145 @@ export default function OrdersPage() {
           />
         ) : (
           <div className="space-y-4">
-            {orders.map((order) => (
-              <Link
-                key={order.id}
-                href={`/orders/${order.id}`}
-                className="block bg-slate-900/60 hover:bg-slate-900 border border-slate-800 hover:border-cyan-500/40 rounded-2xl p-5 transition-all duration-200 group shadow-md"
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
-                  <div>
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <span className="text-sm font-black text-white group-hover:text-cyan-400 transition-colors">
-                        #{order.orderNumber}
-                      </span>
-                      <OrderStatusBadge status={order.status} />
-                      {order.discountCode && (
-                        <span className="text-[10px] font-mono font-bold text-emerald-300 bg-emerald-950/80 border border-emerald-500/40 px-2 py-0.5 rounded-full flex items-center gap-1">
-                          🏷️ โค้ด: {order.discountCode} (-{formatCurrency(order.discount)})
+            {orders.map((order) => {
+              const primaryKey =
+                order.transactionRef ||
+                order.items.find((i) => i.licenseKey)?.licenseKey ||
+                order.items.find((i) => i.licenseKeys?.length)?.licenseKeys?.[0];
+
+              const downloadUrl =
+                order.items.find((i) => i.downloadUrl)?.downloadUrl ||
+                (primaryKey?.startsWith('J3ADC-')
+                  ? 'https://drive.google.com/file/d/1-7yqUrPH4VOwWDEbp25uTJsb2OIRW_ri/view?usp=sharing'
+                  : undefined);
+
+              return (
+                <Link
+                  key={order.id}
+                  href={`/orders/${order.id}`}
+                  className="block bg-slate-900/60 hover:bg-slate-900 border border-slate-800 hover:border-cyan-500/40 rounded-2xl p-5 transition-all duration-200 group shadow-md"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
+                    <div>
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <span className="text-sm font-black text-white group-hover:text-cyan-400 transition-colors">
+                          #{order.orderNumber}
                         </span>
-                      )}
-                      {order.status === 'completed' && (
-                        <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
-                          ⭐ ปลดล็อกสิทธิ์ให้คะแนนแล้ว
-                        </span>
-                      )}
+                        <OrderStatusBadge status={order.status} />
+                        {order.discountCode && (
+                          <span className="text-[10px] font-mono font-bold text-emerald-300 bg-emerald-950/80 border border-emerald-500/40 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            🏷️ โค้ด: {order.discountCode} (-{formatCurrency(order.discount)})
+                          </span>
+                        )}
+                        {order.status === 'completed' && (
+                          <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
+                            ⭐ ปลดล็อกสิทธิ์ให้คะแนนแล้ว
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-400 mt-1 flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>{formatDate(order.createdAt)}</span>
+                      </p>
                     </div>
-                    <p className="text-xs text-slate-400 mt-1 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>{formatDate(order.createdAt)}</span>
-                    </p>
+
+                    <div className="flex items-center justify-between sm:justify-end gap-4">
+                      <div className="text-left sm:text-right">
+                        <span className="text-xs text-slate-400 block">ยอดสุทธิ</span>
+                        {order.discount > 0 && (
+                          <span className="text-[11px] text-slate-500 line-through block font-mono">
+                            {formatCurrency(order.subtotal || (order.total + order.discount))}
+                          </span>
+                        )}
+                        <span className="text-base font-black text-cyan-400 font-mono">
+                          {formatCurrency(order.total)}
+                        </span>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-slate-500 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
+                    </div>
                   </div>
 
-                  <div className="flex items-center justify-between sm:justify-end gap-4">
-                    <div className="text-left sm:text-right">
-                      <span className="text-xs text-slate-400 block">ยอดสุทธิ</span>
-                      {order.discount > 0 && (
-                        <span className="text-[11px] text-slate-500 line-through block font-mono">
-                          {formatCurrency(order.subtotal || (order.total + order.discount))}
+                  {/* Items preview */}
+                  <div className="pt-3 flex items-center gap-3 overflow-x-auto">
+                    {order.items.slice(0, 4).map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center gap-2 text-xs text-slate-300 bg-slate-950/60 px-3 py-1.5 rounded-lg border border-slate-800 shrink-0"
+                      >
+                        <span className="font-semibold text-white truncate max-w-[120px]">
+                          {item.name}
                         </span>
-                      )}
-                      <span className="text-base font-black text-cyan-400 font-mono">
-                        {formatCurrency(order.total)}
-                      </span>
-                    </div>
-                    <ChevronRight className="w-5 h-5 text-slate-500 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
+                        <span className="text-slate-500">×{item.quantity}</span>
+                      </div>
+                    ))}
+                    {order.items.length > 4 && (
+                      <span className="text-xs text-slate-400">+{order.items.length - 4} รายการ</span>
+                    )}
                   </div>
-                </div>
 
-                {/* Items preview */}
-                <div className="pt-3 flex items-center gap-3 overflow-x-auto">
-                  {order.items.slice(0, 4).map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center gap-2 text-xs text-slate-300 bg-slate-950/60 px-3 py-1.5 rounded-lg border border-slate-800 shrink-0"
-                    >
-                      <span className="font-semibold text-white truncate max-w-[120px]">
-                        {item.name}
-                      </span>
-                      <span className="text-slate-500">×{item.quantity}</span>
+                  {/* License Key Quick Banner if Available */}
+                  {primaryKey && (order.status === 'completed' || order.status === 'paid') && (
+                    <div className="mt-3.5 pt-3 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-cyan-950/30 via-slate-950/50 to-slate-900/60 border border-cyan-500/25 rounded-xl p-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center shrink-0">
+                          <Key className="w-4 h-4 text-cyan-400" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-cyan-400">
+                              License Key
+                            </span>
+                            <span className="text-[9px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-1.5 py-0.2 rounded">
+                              ส่งมอบสำเร็จ
+                            </span>
+                          </div>
+                          <div className="text-xs sm:text-sm font-mono font-black text-white tracking-wider truncate mt-0.5">
+                            {primaryKey}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleCopyKey(primaryKey);
+                          }}
+                          className="px-3 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 active:scale-95 text-cyan-300 border border-cyan-500/40 text-xs font-bold transition flex items-center gap-1.5"
+                        >
+                          {copiedKey === primaryKey ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 text-emerald-400" />
+                              <span className="text-emerald-400">คัดลอกแล้ว!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5" />
+                              <span>คัดลอกคีย์</span>
+                            </>
+                          )}
+                        </button>
+
+                        {downloadUrl && (
+                          <a
+                            href={downloadUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 active:scale-95 text-emerald-300 border border-emerald-500/40 text-xs font-bold transition flex items-center gap-1.5"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>ดาวน์โหลด (.zip)</span>
+                          </a>
+                        )}
+                      </div>
                     </div>
-                  ))}
-                  {order.items.length > 4 && (
-                    <span className="text-xs text-slate-400">+{order.items.length - 4} รายการ</span>
                   )}
-                </div>
-              </Link>
-            ))}
+                </Link>
+              );
+            })}
           </div>
         )}
       </div>

@@ -35,6 +35,26 @@ const TIER_NAMES: Record<string, string> = {
   'legacy': 'Legacy (ชดเชยลูกค้าเดิม)',
 };
 
+const GOOGLE_APPS_SCRIPT_BASE_URL =
+  process.env.GOOGLE_APPS_SCRIPT_URL ||
+  'https://script.google.com/macros/s/AKfycbwq22hsYcYWJYuOaUkDy1Ysmut80NwQ5kdmQ-0ItJ8JhGjV2w2PRxEua9mi_3yGagh1/exec';
+
+function syncActivationToGAS(key: string, hwid: string, product?: string) {
+  try {
+    fetch(GOOGLE_APPS_SCRIPT_BASE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'activate',
+        key,
+        hwid,
+        product: product || '',
+      }),
+      signal: AbortSignal.timeout(8000),
+    }).catch((err) => console.warn('GAS sync activation non-fatal:', err?.message));
+  } catch {}
+}
+
 export async function POST(req: NextRequest) {
   try {
     let body: LicenseVerifyPayload = {};
@@ -150,6 +170,9 @@ export async function POST(req: NextRequest) {
           { status: 500 }
         );
       }
+
+      // Sync activation to Google Sheets asynchronously
+      syncActivationToGAS(license.key, hwid, license.product_slug);
 
       // If trial, log HWID into hwid_trials
       if (license.tier === '3d') {
