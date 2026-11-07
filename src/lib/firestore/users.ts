@@ -307,19 +307,38 @@ export async function updateUserCredits(uid: string, amount: number): Promise<vo
 }
 
 /**
- * Deduct user credits atomically for store purchases
+ * Deduct user credits atomically for store purchases via secure server endpoint
  */
-export async function deductUserCredits(uid: string, amountToDeduct: number): Promise<void> {
-  const current = await getUserProfile(uid);
-  const currentCredits = current?.credits || 0;
-  const newCredits = Math.max(0, currentCredits - amountToDeduct);
+export async function deductUserCredits(uid: string, amountToDeduct: number): Promise<{ success: boolean; newCredits: number }> {
+  let token: string | undefined;
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    token = sessionData?.session?.access_token;
+  } catch {}
 
-  const { error } = await supabase
-    .from('profiles')
-    .update({ credits: newCredits, updated_at: new Date().toISOString() })
-    .eq('id', uid);
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
 
-  if (error) throw new Error(error.message);
+  const res = await fetch('/api/wallet/deduct', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      userId: uid,
+      amount: amountToDeduct,
+    }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok || !data.success) {
+    throw new Error(data.error || 'ไม่สามารถตัดยอดเครดิตได้ กรุณาลองใหม่อีกครั้ง');
+  }
+
+  return { success: true, newCredits: data.newCredits };
 }
 
 /**
