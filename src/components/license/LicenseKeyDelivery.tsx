@@ -15,6 +15,8 @@ import {
   Terminal,
   Layers,
   ShieldCheck,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 import { Button } from '@/components/ui/Button';
@@ -458,9 +460,49 @@ export function LicenseKeyDelivery({
 
   const isMultipleKeys = displayKeyUnits.length > 1;
 
-  const handleCopySingleKey = (keyText: string) => {
+  // Track revealed keys state (default: all keys masked for privacy/streamer protection)
+  const [revealedKeys, setRevealedKeys] = useState<Record<number, boolean>>({});
+
+  const toggleRevealKey = (idx: number) => {
+    setRevealedKeys((prev) => ({
+      ...prev,
+      [idx]: !prev[idx],
+    }));
+  };
+
+  const isAllRevealed =
+    displayKeyUnits.length > 0 &&
+    displayKeyUnits.every((_, idx) => Boolean(revealedKeys[idx]));
+
+  const toggleRevealAll = () => {
+    if (isAllRevealed) {
+      setRevealedKeys({});
+    } else {
+      const all: Record<number, boolean> = {};
+      displayKeyUnits.forEach((_, idx) => {
+        all[idx] = true;
+      });
+      setRevealedKeys(all);
+    }
+  };
+
+  const maskKey = (key: string): string => {
+    if (!key) return '';
+    const trimmed = key.trim();
+    if (trimmed.includes('-')) {
+      const parts = trimmed.split('-');
+      // Keep prefix visible (e.g. J3ADP), mask subsequent secret parts
+      return `${parts[0]}-${parts.slice(1).map((p) => '•'.repeat(Math.max(4, p.length))).join('-')}`;
+    }
+    return '••••-••••-••••-••••';
+  };
+
+  const handleCopySingleKey = (keyText: string, idx?: number) => {
     navigator.clipboard.writeText(keyText);
     setCopiedKey(keyText);
+    if (idx !== undefined) {
+      setRevealedKeys((prev) => ({ ...prev, [idx]: true }));
+    }
     toast('✓ คัดลอก License Key สำเร็จแล้ว!', 'success');
     setTimeout(() => setCopiedKey(null), 2500);
   };
@@ -493,30 +535,52 @@ export function LicenseKeyDelivery({
 
       {/* 2. License Key Display Box(es) */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-300">
+        <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-300 flex-wrap gap-2">
           <span className="flex items-center gap-1.5 text-[#22c55e]">
             <Key className="w-4 h-4 text-[#22c55e]" />
             <span>🔑 License Key ของคุณ ({displayKeyUnits.length} รายการ):</span>
           </span>
-          {isMultipleKeys && (
+
+          <div className="flex items-center gap-2 sm:gap-3">
             <button
               type="button"
-              onClick={handleCopyAllKeys}
-              className="text-xs font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer transition-colors"
+              onClick={toggleRevealAll}
+              className="text-xs font-bold text-slate-400 hover:text-cyan-400 flex items-center gap-1.5 cursor-pointer transition-colors px-2.5 py-1 rounded-lg bg-slate-900/80 hover:bg-slate-800 border border-slate-800 shadow-sm"
+              title={isAllRevealed ? 'ซ่อนคีย์ทั้งหมด' : 'เปิดตาดูทั้งหมด'}
             >
-              {hasCopiedAll ? (
+              {isAllRevealed ? (
                 <>
-                  <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="text-emerald-400">คัดลอกหมดแล้ว!</span>
+                  <EyeOff className="w-3.5 h-3.5 text-slate-400" />
+                  <span>ซ่อนทั้งหมด</span>
                 </>
               ) : (
                 <>
-                  <Copy className="w-3.5 h-3.5" />
-                  <span>คัดลอกทั้งหมด</span>
+                  <Eye className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>เปิดตาดูทั้งหมด</span>
                 </>
               )}
             </button>
-          )}
+
+            {isMultipleKeys && (
+              <button
+                type="button"
+                onClick={handleCopyAllKeys}
+                className="text-xs font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer transition-colors px-2.5 py-1 rounded-lg bg-slate-900/80 hover:bg-slate-800 border border-slate-800 shadow-sm"
+              >
+                {hasCopiedAll ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-emerald-400">คัดลอกหมดแล้ว!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>คัดลอกทั้งหมด</span>
+                  </>
+                )}
+              </button>
+            )}
+          </div>
         </div>
 
         {isLoading ? (
@@ -557,6 +621,7 @@ export function LicenseKeyDelivery({
             {displayKeyUnits.map((item, idx) => {
               const isCopied = copiedKey === item.key;
               const isManager = item.productType === 'discord_manager';
+              const isRevealed = Boolean(revealedKeys[idx]);
 
               return (
                 <div
@@ -582,13 +647,47 @@ export function LicenseKeyDelivery({
                   </div>
 
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5 w-full sm:w-auto">
-                      <div className="w-9 h-9 rounded-xl bg-[#7c5cff]/20 text-[#7c5cff] flex items-center justify-center shrink-0 border border-[#7c5cff]/30">
+                    <div
+                      onClick={() => toggleRevealKey(idx)}
+                      className="flex items-center gap-2.5 w-full sm:w-auto cursor-pointer group/key select-none"
+                      title={isRevealed ? 'คลิกเพื่อซ่อน License Key' : 'คลิกเพื่อเปิดตาดู License Key'}
+                    >
+                      <div className="w-9 h-9 rounded-xl bg-[#7c5cff]/20 text-[#7c5cff] flex items-center justify-center shrink-0 border border-[#7c5cff]/30 group-hover/key:border-[#7c5cff] group-hover/key:bg-[#7c5cff]/30 transition-all">
                         <Terminal className="w-4 h-4" />
                       </div>
-                      <span className="font-mono text-base sm:text-xl font-black text-white tracking-widest select-all break-all drop-shadow-[0_0_10px_rgba(124,92,255,0.6)]">
-                        {item.key}
-                      </span>
+
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`font-mono text-base sm:text-xl font-black tracking-widest break-all transition-all duration-200 ${
+                            isRevealed
+                              ? 'text-white select-all drop-shadow-[0_0_10px_rgba(124,92,255,0.6)]'
+                              : 'text-slate-400 group-hover/key:text-slate-200 tracking-[0.16em]'
+                          }`}
+                        >
+                          {isRevealed ? item.key : maskKey(item.key)}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleRevealKey(idx);
+                          }}
+                          className={`p-1.5 rounded-lg border transition-all cursor-pointer shrink-0 ${
+                            isRevealed
+                              ? 'bg-[#7c5cff]/20 border-[#7c5cff]/50 text-[#a78bfa] hover:bg-[#7c5cff]/30'
+                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-cyan-400 hover:border-cyan-500/40'
+                          }`}
+                          title={isRevealed ? 'ซ่อนคีย์' : 'เปิดตาแสดงคีย์ (Reveal)'}
+                          aria-label={isRevealed ? 'ซ่อนคีย์' : 'เปิดตาแสดงคีย์'}
+                        >
+                          {isRevealed ? (
+                            <EyeOff className="w-3.5 h-3.5 text-slate-400" />
+                          ) : (
+                            <Eye className="w-3.5 h-3.5 text-cyan-400" />
+                          )}
+                        </button>
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 justify-end">
@@ -596,7 +695,7 @@ export function LicenseKeyDelivery({
                         type="button"
                         variant="primary"
                         size="sm"
-                        onClick={() => handleCopySingleKey(item.key)}
+                        onClick={() => handleCopySingleKey(item.key, idx)}
                         leftIcon={isCopied ? <Check className="w-3.5 h-3.5 text-slate-950 stroke-[3]" /> : <Copy className="w-3.5 h-3.5" />}
                         className={`text-xs font-black cursor-pointer transition-all ${
                           isCopied
